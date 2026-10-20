@@ -79,6 +79,12 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     return { items: await library.previewUploads(items) };
   });
 
+  ipcMain.handle("skills-discard-uploads", (_event, tokens) => {
+    if (!isStringArray(tokens)) return INVALID;
+    library.discardUploads(tokens);
+    return { ok: true };
+  });
+
   ipcMain.handle("skills-commit-upload", (_event, request) => {
     if (!isStringArray(request?.tokens) || !isStringArray(request?.replace)) return INVALID;
     const result = library.commitUploads({ tokens: request.tokens, replace: request.replace });

@@ -1712,6 +1712,8 @@ declare global {
         tokens: string[];
         replace: string[];
       }) => Promise<SkillCommitResult | SkillInvalidRequest>;
+      /** Frees previewed uploads that will not be installed. */
+      skillsDiscardUploads?: (tokens: string[]) => Promise<{ ok: true } | SkillInvalidRequest>;
       skillsCreate?: (input: SkillCreateInput) => Promise<SkillSaveResult>;
       skillsAddRecommended?: (
         id: string,

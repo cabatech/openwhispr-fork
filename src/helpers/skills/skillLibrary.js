@@ -15,7 +15,6 @@ const {
 } = require("./skillFormat");
 const { readSkillArchive, isSafeArchivePath, hasClashingPaths } = require("./skillArchive");
 
-const UPLOAD_TOKEN_TTL_MS = 10 * 60 * 1000;
 const ARCHIVE_EXTENSIONS = new Set([".zip", ".skill"]);
 const FINDER_JUNK = ".DS_Store";
 
@@ -241,7 +240,6 @@ class SkillLibrary {
   }
 
   async previewUploads(items) {
-    this._dropExpiredUploads();
     const batchNames = new Set();
     const previews = [];
     for (const item of items) {
@@ -251,7 +249,6 @@ class SkillLibrary {
   }
 
   commitUploads({ tokens, replace }) {
-    this._dropExpiredUploads();
     const installed = [];
     const failed = [];
     for (const token of tokens) {
@@ -276,6 +273,11 @@ class SkillLibrary {
       if (!installed.includes(upload.name)) installed.push(upload.name);
     }
     return { installed, failed };
+  }
+
+  // A previewed upload is held until it installs or the screen that previewed it lets go.
+  discardUploads(tokens) {
+    for (const token of tokens) this.uploads.delete(token);
   }
 
   create({ title, description, instructions, files }) {
@@ -394,7 +396,6 @@ class SkillLibrary {
       fileName,
       name: result.name,
       files,
-      expiresAt: Date.now() + UPLOAD_TOKEN_TTL_MS,
     });
     return {
       fileName,
@@ -460,13 +461,6 @@ class SkillLibrary {
   _takenNames() {
     fs.mkdirSync(this.skillsDir, { recursive: true });
     return new Set(fs.readdirSync(this.skillsDir).map((name) => name.toLowerCase()));
-  }
-
-  _dropExpiredUploads() {
-    const now = Date.now();
-    for (const [token, upload] of this.uploads) {
-      if (upload.expiresAt <= now) this.uploads.delete(token);
-    }
   }
 
   _removeQuietly(target) {

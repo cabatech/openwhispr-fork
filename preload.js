@@ -219,6 +219,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   skillsReveal: (name) => ipcRenderer.invoke("skills-reveal", name),
   skillsPreviewUpload: (items) => ipcRenderer.invoke("skills-preview-upload", items),
   skillsCommitUpload: (request) => ipcRenderer.invoke("skills-commit-upload", request),
+  skillsDiscardUploads: (tokens) => ipcRenderer.invoke("skills-discard-uploads", tokens),
   skillsCreate: (input) => ipcRenderer.invoke("skills-create", input),
   skillsAddRecommended: (id, copy) => ipcRenderer.invoke("skills-add-recommended", id, copy),
   onSkillsChanged: (callback) => {

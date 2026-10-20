@@ -316,17 +316,21 @@ test("one skill uploaded twice, the second replacing the first, is listed once",
   assert.match(readSkill(skillsDir, "weekly"), /description: Second\./);
 });
 
-test("an upload token expires after ten minutes", async (t) => {
+test("an upload stays ready until it is installed or discarded", async (t) => {
   const { library, skillsDir } = setup(t);
   t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 9, 20, 9, 0, 0) });
-  const [preview] = await library.previewUploads([markdownUpload("late.md", skillText("late"))]);
+  const preview = async (fileName, name) =>
+    (await library.previewUploads([markdownUpload(fileName, skillText(name))]))[0];
+  const kept = await preview("kept.md", "kept");
+  const dropped = await preview("dropped.md", "dropped");
 
-  t.mock.timers.tick(10 * 60 * 1000 + 1);
-  const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+  t.mock.timers.tick(24 * 60 * 60 * 1000);
+  library.discardUploads([dropped.token]);
+  const result = library.commitUploads({ tokens: [kept.token, dropped.token], replace: [] });
 
-  assert.deepEqual(result.installed, []);
+  assert.deepEqual(result.installed, ["kept"]);
   assert.equal(result.failed.length, 1);
-  assert.deepEqual(listDir(skillsDir), []);
+  assert.deepEqual(listDir(skillsDir), ["kept"]);
 });
 
 test(

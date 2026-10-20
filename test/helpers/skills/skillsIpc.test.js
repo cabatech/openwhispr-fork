@@ -29,6 +29,7 @@ function fakeLibrary(overrides = {}) {
     ),
     previewUploads: record("previewUploads", []),
     commitUploads: record("commitUploads", { installed: ["meeting-prep"], failed: [] }),
+    discardUploads: record("discardUploads"),
     create: record("create", { name: "weekly-recap" }),
     addRecommended: record("addRecommended", { name: "decision-log" }),
     ...overrides,
@@ -78,6 +79,16 @@ test("a malformed name or upload item is refused before the library runs", async
   assert.deepEqual(await call("skills-add-recommended", "../x", copy), INVALID);
 
   assert.deepEqual(library.calls, []);
+});
+
+test("discarding uploads frees them without telling the windows", async () => {
+  const { call, library, broadcasts } = setup();
+
+  assert.deepEqual(await call("skills-discard-uploads", "token"), INVALID);
+  assert.deepEqual(await call("skills-discard-uploads", ["a", "b"]), { ok: true });
+
+  assert.deepEqual(library.calls, [["discardUploads", ["a", "b"]]]);
+  assert.deepEqual(broadcasts, []);
 });
 
 test("every write broadcasts skills-changed", async () => {
