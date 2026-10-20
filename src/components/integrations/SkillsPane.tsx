@@ -46,6 +46,12 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
     });
   }, [active, t, toast]);
 
+  // The control that opened a screen is gone with home, so the screen's heading takes focus
+  // and the keyboard starts there; home restores its own focus.
+  useEffect(() => {
+    if (screen !== "home") root.current?.querySelector("h2")?.focus();
+  }, [screen]);
+
   const open = (next: SkillsScreen, from: SkillsHomeControl) => {
     setOpenedFrom(from);
     setArrived([]);

@@ -65,6 +65,24 @@ test("Esc on a screen goes back, and focus returns to the See link that opened i
   assert.equal(focused(container) === buttonStarting(container, "skills.pane.seeOne"), true);
 });
 
+// The control that opened a screen is gone once it opens, so without this the keyboard
+// would be left on the page body, where Esc can't reach the pane.
+test("a screen opens with focus on its heading, so Esc goes back from there", async (t) => {
+  const { container } = await renderPane(t, [skill("meeting-prep")]);
+  for (const [open, title] of [
+    [() => gear(container), "skills.manage.title"],
+    [() => buttonStarting(container, "skills.pane.addMenu.upload"), "skills.upload.title"],
+    [() => buttonStarting(container, "skills.pane.addMenu.create"), "skills.create.title"],
+  ]) {
+    await click(open());
+    assert.equal(label(heading(container)), title);
+    assert.equal(focused(container) === heading(container), true, title);
+
+    await pressEscape(heading(container));
+    assert.equal(label(heading(container)), "Skills", title);
+  }
+});
+
 test("a card on home opens its detail pop-up", async (t) => {
   const { container } = await renderPane(t, [skill("meeting-prep")]);
 
