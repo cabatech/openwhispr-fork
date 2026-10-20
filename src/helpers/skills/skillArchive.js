@@ -2,6 +2,36 @@ const unzipper = require("unzipper");
 const { SKILL_LIMITS, WINDOWS_RESERVED_NAME } = require("./skillFormat");
 
 const SKILL_FILE_NAME = "skill.md";
+const END_RECORD = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+const ZIP64_LOCATOR = Buffer.from([0x50, 0x4b, 0x06, 0x07]);
+const ZIP64_END_RECORD = Buffer.from([0x50, 0x4b, 0x06, 0x06]);
+// The end record is 22 bytes, followed by a comment of up to 64 KB.
+const MAX_TAIL = 22 + 0xffff;
+// Folders and macOS metadata are entries too, so the listing may run past the file cap.
+const ENTRIES_PER_FILE = 4;
+
+// Where the end record sits and how many entries it claims, read before the archive is
+// opened: the reader takes a step per claimed entry, so a forged count would exhaust memory.
+function readEndRecord(buffer) {
+  const at = buffer.lastIndexOf(END_RECORD, buffer.length - 22);
+  if (at < 0 || buffer.length - at > MAX_TAIL) return null;
+  let entries = buffer.readUInt16LE(at + 10);
+  const locator = at - 20;
+  if (
+    entries === 0xffff &&
+    locator >= 0 &&
+    buffer.subarray(locator, locator + 4).equals(ZIP64_LOCATOR)
+  ) {
+    const record = Number(buffer.readBigUInt64LE(locator + 8));
+    if (
+      record + 56 <= buffer.length &&
+      buffer.subarray(record, record + 4).equals(ZIP64_END_RECORD)
+    ) {
+      entries = Number(buffer.readBigUInt64LE(record + 32));
+    }
+  }
+  return { entries, tailSize: buffer.length - at };
+}
 
 function isSafeArchivePath(raw) {
   if (/[\u0000-\u001f]/.test(raw) || raw.includes("\\")) return false;
@@ -68,9 +98,12 @@ function refuse(code) {
  */
 async function readSkillArchive(buffer, { limits: overrides } = {}) {
   const limits = { ...SKILL_LIMITS, ...overrides };
+  const end = readEndRecord(buffer);
+  if (!end) return refuse("unreadableArchive");
+  if (end.entries > limits.maxFiles * ENTRIES_PER_FILE) return refuse("tooManyFiles");
   let directory;
   try {
-    directory = await unzipper.Open.buffer(buffer);
+    directory = await unzipper.Open.buffer(buffer, { tailSize: end.tailSize });
   } catch {
     return refuse("unreadableArchive");
   }

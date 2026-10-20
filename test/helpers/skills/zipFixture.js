@@ -56,4 +56,35 @@ function buildZip(entries) {
   return Buffer.concat([...parts, centralDirectory, end]);
 }
 
-module.exports = { buildZip };
+const endRecordAt = (zip) => zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+
+/** Makes the end record claim `count` entries through a zip64 record, as a forged file could. */
+function withClaimedEntries(zip, count) {
+  const at = endRecordAt(zip);
+  const end = Buffer.from(zip.subarray(at));
+  end.writeUInt16LE(0xffff, 8);
+  end.writeUInt16LE(0xffff, 10);
+  const record = Buffer.alloc(56);
+  record.writeUInt32LE(0x06064b50, 0);
+  record.writeBigUInt64LE(44n, 4);
+  record.writeBigUInt64LE(BigInt(count), 24);
+  record.writeBigUInt64LE(BigInt(count), 32);
+  record.writeBigUInt64LE(BigInt(end.readUInt32LE(12)), 40);
+  record.writeBigUInt64LE(BigInt(end.readUInt32LE(16)), 48);
+  const locator = Buffer.alloc(20);
+  locator.writeUInt32LE(0x07064b50, 0);
+  locator.writeBigUInt64LE(BigInt(at), 8);
+  locator.writeUInt32LE(1, 16);
+  return Buffer.concat([zip.subarray(0, at), record, locator, end]);
+}
+
+/** Adds an archive comment after the end record. */
+function withComment(zip, comment) {
+  const at = endRecordAt(zip);
+  const end = Buffer.from(zip.subarray(at));
+  const text = Buffer.from(comment);
+  end.writeUInt16LE(text.length, 20);
+  return Buffer.concat([zip.subarray(0, at), end, text]);
+}
+
+module.exports = { buildZip, withClaimedEntries, withComment };

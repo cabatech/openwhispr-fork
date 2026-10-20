@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { readSkillArchive, isSafeArchivePath } = require("../../../src/helpers/skills/skillArchive");
-const { buildZip } = require("./zipFixture");
+const { buildZip, withClaimedEntries, withComment } = require("./zipFixture");
 
 const SKILL = "---\nname: my-skill\ndescription: Does it.\n---\n\nSteps\n";
 const read = (entries, options) => readSkillArchive(buildZip(entries), options);
@@ -97,6 +97,25 @@ test("more than 500 files are refused", async () => {
   ];
   assert.deepEqual(await read(entries, { limits: { maxFiles: 3 } }), refusal("tooManyFiles"));
   assert.deepEqual((await read(entries, { limits: { maxFiles: 4 } })).problems, []);
+});
+
+// The reader walks every entry the end record claims, so the claim is checked first.
+test("an end record that claims more entries than allowed is refused unopened", async () => {
+  const forged = withClaimedEntries(buildZip([{ path: "SKILL.md", data: SKILL }]), 3000);
+  assert.deepEqual(await readSkillArchive(forged), refusal("tooManyFiles"));
+});
+
+test("an end record that claims millions of entries is refused at once", async () => {
+  const forged = withClaimedEntries(buildZip([{ path: "SKILL.md", data: SKILL }]), 100_000_000);
+  const started = Date.now();
+  assert.deepEqual(await readSkillArchive(forged), refusal("tooManyFiles"));
+  assert.ok(Date.now() - started < 1000);
+});
+
+test("an archive with a long comment still opens", async () => {
+  const commented = withComment(buildZip([{ path: "SKILL.md", data: SKILL }]), "x".repeat(200));
+  const result = await readSkillArchive(commented);
+  assert.deepEqual([paths(result), result.problems], [["SKILL.md"], []]);
 });
 
 test("no SKILL.md, two SKILL.md files, or one nested two folders deep are refused", async () => {
