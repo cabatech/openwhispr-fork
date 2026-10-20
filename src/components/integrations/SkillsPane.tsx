@@ -1,7 +1,10 @@
-import { useEffect, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { refreshSkills } from "../../stores/skillsStore";
-import { IntegrationsPane } from "./IntegrationsPane";
+import { refreshSkills, useSkillsStore } from "../../stores/skillsStore";
+import { useToast } from "../ui/useToast";
+import { SkillsHome } from "../skills/SkillsHome";
+
+type SkillsScreen = "home" | "manage" | "upload" | "create";
 
 interface SkillsPaneProps {
   title: string;
@@ -9,17 +12,29 @@ interface SkillsPaneProps {
   active: boolean;
 }
 
-export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
+export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement | null {
   const { t } = useTranslation();
+  const { toast } = useToast();
+  const [screen, setScreen] = useState<SkillsScreen>("home");
 
   // Opening the pane rereads the folder, so a skill edited outside the app shows up.
   useEffect(() => {
-    if (active) void refreshSkills();
-  }, [active]);
+    if (!active) return;
+    void refreshSkills().then(() => {
+      if (useSkillsStore.getState().loadError) {
+        toast({ title: t("skills.toasts.loadFailed"), variant: "destructive" });
+      }
+    });
+  }, [active, t, toast]);
 
+  if (screen !== "home") return null;
   return (
-    <IntegrationsPane title={title} description={t("skills.pane.description")}>
-      {null}
-    </IntegrationsPane>
+    <SkillsHome
+      title={title}
+      onOpenSkill={() => {}}
+      onManage={() => setScreen("manage")}
+      onCreate={() => setScreen("create")}
+      onUpload={() => setScreen("upload")}
+    />
   );
 }

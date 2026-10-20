@@ -1,0 +1,239 @@
+import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  ChevronDown,
+  ChevronRight,
+  Pencil,
+  Plus,
+  Search,
+  Settings,
+  SkillStack,
+  Upload,
+} from "../icons";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import EmptyStateCard from "../ui/EmptyStateCard";
+import { SectionLabel } from "../ui/SettingsSection";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { useToast } from "../ui/useToast";
+import { IntegrationsPane } from "../integrations/IntegrationsPane";
+import { playSkillIcon, refreshSkills, useSkillsStore } from "../../stores/skillsStore";
+import { InstalledSkillCard, RecommendedSkillCard } from "./SkillCards";
+import { RECOMMENDED_SKILL_IDS, writeFailedToast } from "./skillCopy";
+
+const VISIBLE_INSTALLED = 6;
+
+interface SkillsHomeProps {
+  title: string;
+  onOpenSkill: (name: string) => void;
+  onManage: () => void;
+  onCreate: () => void;
+  onUpload: () => void;
+}
+
+export function SkillsHome({
+  title,
+  onOpenSkill,
+  onManage,
+  onCreate,
+  onUpload,
+}: SkillsHomeProps): ReactElement {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const skills = useSkillsStore((state) => state.skills);
+  const loaded = useSkillsStore((state) => state.loaded);
+  const [query, setQuery] = useState("");
+  // Skills that just arrived. Once their cards are on screen the first takes focus and each
+  // icon plays: a card mounted after the play count changed would not play.
+  const [arrivals, setArrivals] = useState<string[]>([]);
+  const cardRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  useEffect(() => {
+    if (arrivals.length === 0) return;
+    const shown = arrivals.filter((name) => cardRefs.current.has(name));
+    if (shown.length > 0) cardRefs.current.get(shown[0])?.focus();
+    shown.forEach(playSkillIcon);
+    setArrivals([]);
+  }, [arrivals]);
+
+  const needle = query.trim().toLowerCase();
+  const matches = (text: string) => !needle || text.toLowerCase().includes(needle);
+  const installed = skills.filter((skill) => matches(`${skill.displayName} ${skill.description}`));
+  const shownInstalled = needle ? installed : installed.slice(0, VISIBLE_INSTALLED);
+  const hiddenInstalled = needle ? [] : installed.slice(VISIBLE_INSTALLED);
+  const recommended = RECOMMENDED_SKILL_IDS.filter(
+    (id) => !skills.some((skill) => skill.name === id)
+  )
+    .map((id) => ({
+      id,
+      title: t(`skills.recommended.${id}.title`),
+      description: t(`skills.recommended.${id}.description`),
+    }))
+    .filter((entry) => matches(`${entry.title} ${entry.description}`));
+
+  const addRecommended = async ({ id, title: name, description }: (typeof recommended)[number]) => {
+    const result = await window.electronAPI?.skillsAddRecommended?.(id, {
+      title: name,
+      description,
+    });
+    if (!result?.ok) {
+      toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
+      return;
+    }
+    await refreshSkills();
+    setArrivals([result.name]);
+    toast({ title: t("skills.toasts.added", { name }), variant: "success" });
+  };
+
+  const [firstHidden, secondHidden] = hiddenInstalled.map((skill) => skill.displayName);
+  const seeLabel =
+    hiddenInstalled.length === 1
+      ? t("skills.pane.seeOne", { first: firstHidden })
+      : hiddenInstalled.length === 2
+        ? t("skills.pane.seeTwo", { first: firstHidden, second: secondHidden })
+        : t("skills.pane.seeMore", {
+            first: firstHidden,
+            second: secondHidden,
+            count: hiddenInstalled.length - 2,
+          });
+
+  const recommendedSection = recommended.length > 0 && (
+    <div className="pt-2">
+      <SectionLabel>{t("skills.pane.recommended")}</SectionLabel>
+      <div className="grid grid-cols-2 gap-2">
+        {recommended.map((entry) => (
+          <RecommendedSkillCard
+            key={entry.id}
+            title={entry.title}
+            description={entry.description}
+            onAdd={() => void addRecommended(entry)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  const addMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Plus className="h-3.5 w-3.5" />
+          {t("skills.pane.add")}
+          <ChevronDown className="h-3 w-3 -me-0.5 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={6} className="min-w-52">
+        <DropdownMenuItem onSelect={onCreate} className="gap-2.5">
+          <Pencil className="h-4 w-4" />
+          {t("skills.pane.addMenu.create")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onUpload} className="gap-2.5">
+          <Upload className="h-4 w-4" />
+          {t("skills.pane.addMenu.upload")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  return (
+    <IntegrationsPane
+      title={title}
+      description={t("skills.pane.description")}
+      actions={
+        skills.length === 0 ? (
+          addMenu
+        ) : (
+          <>
+            <div className="relative">
+              <Search
+                size={13}
+                className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70"
+              />
+              <Input
+                type="search"
+                dir="auto"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("skills.pane.search")}
+                aria-label={t("skills.pane.search")}
+                className="h-8 w-44 ps-8 pe-3 text-xs rounded-lg"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onManage}
+              aria-label={t("skills.pane.manage")}
+              title={t("skills.pane.manage")}
+              className="size-8 px-0"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
+            {addMenu}
+          </>
+        )
+      }
+    >
+      {loaded &&
+        (skills.length === 0 ? (
+          <>
+            <EmptyStateCard
+              icon={SkillStack}
+              title={t("skills.pane.empty.title")}
+              description={t("skills.pane.empty.description")}
+              headingLevel={3}
+            >
+              <Button size="sm" onClick={onUpload}>
+                <Upload className="h-3.5 w-3.5" />
+                {t("skills.pane.addMenu.upload")}
+              </Button>
+            </EmptyStateCard>
+            {recommendedSection}
+          </>
+        ) : (
+          <div>
+            <div>
+              <SectionLabel>{t("skills.pane.installed")}</SectionLabel>
+              {installed.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {shownInstalled.map((skill) => (
+                      <InstalledSkillCard
+                        key={skill.name}
+                        skill={skill}
+                        onOpen={() => onOpenSkill(skill.name)}
+                        ref={(element) => {
+                          if (element) cardRefs.current.set(skill.name, element);
+                          else cardRefs.current.delete(skill.name);
+                        }}
+                      />
+                    ))}
+                  </div>
+                  {hiddenInstalled.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={onManage}
+                      className="mt-2 ms-1 inline-flex items-center gap-1 rounded-sm text-xs text-primary/80 hover:text-primary outline-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-colors"
+                    >
+                      {seeLabel}
+                      <ChevronRight className="h-3 w-3 rtl:rotate-180" />
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="ps-1 text-xs text-muted-foreground">
+                  {t("skills.pane.noMatches", { query: query.trim() })}
+                </p>
+              )}
+            </div>
+            {recommendedSection}
+          </div>
+        ))}
+    </IntegrationsPane>
+  );
+}
