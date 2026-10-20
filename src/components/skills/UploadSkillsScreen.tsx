@@ -61,7 +61,20 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
           : (previews[next++] ?? refusal("unreadableArchive"));
       return { id: nextRowId.current++, preview };
     });
-    setRows((current) => [...current, ...added]);
+    setRows((current) => {
+      // A skill already listed from an earlier drop asks Replace or Skip, as one in this drop does.
+      const listed = new Set(
+        current.filter((row) => row.preview.status !== "invalid").map((row) => row.preview.name)
+      );
+      return [
+        ...current,
+        ...added.map((row) =>
+          row.preview.status === "ready" && listed.has(row.preview.name)
+            ? { ...row, preview: { ...row.preview, status: "duplicate" as const } }
+            : row
+        ),
+      ];
+    });
   };
 
   const choose = (id: number, choice?: UploadRow["choice"]) =>

@@ -45,7 +45,8 @@ const invalid = (fileName, code) => ({
   warnings: [],
 });
 
-async function renderUpload(t, { previews = [], commit = null } = {}) {
+// previewQueue answers each preview call in turn, for screens that take several drops.
+async function renderUpload(t, { previews = [], previewQueue = null, commit = null } = {}) {
   const calls = { previewed: [], committed: [], done: [], back: 0 };
   const mounted = await mountSkillsComponent(t, {
     modulePath: "/components/skills/UploadSkillsScreen.tsx",
@@ -54,7 +55,7 @@ async function renderUpload(t, { previews = [], commit = null } = {}) {
     api: {
       skillsPreviewUpload: async (items) => {
         calls.previewed.push(items);
-        return { items: previews.slice(0, items.length) };
+        return { items: previewQueue ? previewQueue.shift() : previews.slice(0, items.length) };
       },
       skillsCommitUpload: async (request) => {
         calls.committed.push(request);
@@ -155,6 +156,28 @@ test("Upload counts ready skills and replaced ones", async (t) => {
   ]);
   assert.deepEqual(calls.done, [["dup-skill", "ready-one"]]);
   assert.deepEqual(toasts, [{ title: 'skills.toasts.uploaded{"count":2}', variant: "success" }]);
+});
+
+test("a skill dropped again in a later drop asks Replace or Skip too", async (t) => {
+  const { container, calls, drop } = await renderUpload(t, {
+    previewQueue: [
+      [ready("v1.md", "weekly")],
+      [{ ...ready("v2.md", "weekly"), token: "token-weekly-2" }],
+    ],
+  });
+  await drop(fakeFile("v1.md"));
+  await drop(fakeFile("v2.md"));
+
+  const [first, second] = rows(container);
+  assert.match(label(first), /skills\.upload\.ready/);
+  assert.match(label(second), /skills\.upload\.duplicate/);
+  await click(button(second, "skills.upload.replace"));
+  await click(submit(container));
+  await settle();
+
+  assert.deepEqual(calls.committed, [
+    { tokens: ["token-weekly", "token-weekly-2"], replace: ["weekly"] },
+  ]);
 });
 
 test("a skipped or undecided duplicate is left out of the upload", async (t) => {

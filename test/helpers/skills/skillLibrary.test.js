@@ -302,6 +302,20 @@ test("an upload token installs exactly what was previewed, once", async (t) => {
   assert.equal(again.failed.length, 1);
 });
 
+test("one skill uploaded twice, the second replacing the first, is listed once", async (t) => {
+  const { library, skillsDir } = setup(t);
+  const preview = async (fileName, description) =>
+    (await library.previewUploads([markdownUpload(fileName, skillText("weekly", description))]))[0];
+  const first = await preview("v1.md", "First.");
+  const second = await preview("v2.md", "Second.");
+
+  assert.deepEqual(
+    library.commitUploads({ tokens: [first.token, second.token], replace: ["weekly"] }),
+    { installed: ["weekly"], failed: [] }
+  );
+  assert.match(readSkill(skillsDir, "weekly"), /description: Second\./);
+});
+
 test("an upload token expires after ten minutes", async (t) => {
   const { library, skillsDir } = setup(t);
   t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 9, 20, 9, 0, 0) });

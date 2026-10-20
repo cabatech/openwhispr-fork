@@ -272,7 +272,8 @@ class SkillLibrary {
         continue;
       }
       this.uploads.delete(token);
-      installed.push(upload.name);
+      // Listed once, even when a later upload in the same go replaced it.
+      if (!installed.includes(upload.name)) installed.push(upload.name);
     }
     return { installed, failed };
   }
