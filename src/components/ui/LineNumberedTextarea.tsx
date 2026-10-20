@@ -65,7 +65,7 @@ export function LineNumberedTextarea({
         aria-label={ariaLabel}
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
-        className="block h-full min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground/50 caret-primary"
+        className="input-inline block h-full min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground/50 caret-primary"
       />
     </div>
   );

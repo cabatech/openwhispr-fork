@@ -64,6 +64,13 @@ test("the numbers and the text share one fixed-height box", async (t) => {
   assert.ok(classes(gutter).includes("overflow-hidden"));
 });
 
+// index.css gives every other field a border, a background and the sans font, which would
+// draw a second box inside the editor and undo font-mono.
+test("the text area opts out of the app's own field style", async (t) => {
+  const { textarea } = await renderEditor(t, { id: "instructions", value: "" });
+  assert.ok(textarea.getAttribute("class").split(/\s+/).includes("input-inline"));
+});
+
 test("an invalid editor says so and points at its message", async (t) => {
   const { textarea } = await renderEditor(t, {
     id: "instructions",
