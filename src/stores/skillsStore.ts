@@ -1,10 +1,19 @@
 import { create } from "zustand";
-import type { SkillSummary } from "../types/skills";
+import type { SkillSummary, SkillUploadItem } from "../types/skills";
+
+/** What Create skill holds, kept here so it survives leaving the page. */
+export interface SkillCreateDraft {
+  title: string;
+  description: string;
+  instructions: string;
+  files: SkillUploadItem[];
+}
 
 interface SkillsState {
   skills: SkillSummary[];
   loaded: boolean;
   loadError: boolean;
+  createDraft: SkillCreateDraft | null;
   /** Bumped to play a skill's icon once; see components/skills/SkillIcon. */
   iconPlays: Record<string, number>;
 }
@@ -13,6 +22,7 @@ export const useSkillsStore = create<SkillsState>(() => ({
   skills: [],
   loaded: false,
   loadError: false,
+  createDraft: null,
   iconPlays: {},
 }));
 
@@ -56,6 +66,10 @@ export function refreshSkills(): Promise<void> {
 export async function ensureSkills(): Promise<void> {
   subscribe();
   if (!useSkillsStore.getState().loaded) await refreshSkills();
+}
+
+export function setCreateDraft(createDraft: SkillCreateDraft | null): void {
+  useSkillsStore.setState({ createDraft });
 }
 
 export function playSkillIcon(name: string): void {

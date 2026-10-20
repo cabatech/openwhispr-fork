@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } fr
 import { useTranslation } from "react-i18next";
 import { refreshSkills, useSkillsStore } from "../../stores/skillsStore";
 import { useToast } from "../ui/useToast";
+import { CreateSkillScreen } from "../skills/CreateSkillScreen";
 import { ManageSkillsScreen } from "../skills/ManageSkillsScreen";
 import { SkillDetailDialog } from "../skills/SkillDetailDialog";
 import { SkillsHome, type SkillsHomeControl } from "../skills/SkillsHome";
@@ -79,6 +80,9 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
       )}
       {screen === "manage" && <ManageSkillsScreen onOpenSkill={openSkill} onBack={goHome} />}
       {screen === "upload" && <UploadSkillsScreen onDone={arriveHome} onBack={goHome} />}
+      {screen === "create" && (
+        <CreateSkillScreen onCreated={(name) => arriveHome([name])} onBack={goHome} />
+      )}
       {/* After an uninstall the skill's card or row is gone, so the heading takes focus. */}
       <SkillDetailDialog
         name={detail?.name ?? null}

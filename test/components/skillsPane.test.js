@@ -13,6 +13,7 @@ const {
   pressEscape,
   settle,
   skill,
+  typeInto,
 } = require("../lib/skillsHarness");
 
 async function renderPane(t, skills) {
@@ -141,5 +142,45 @@ test("an upload goes home, plays each new icon and focuses the first new card", 
   const first = find(container, (node) => ariaLabel(node).startsWith("skills.pane.cardLabel"));
   assert.match(ariaLabel(first), /weekly recap/);
   assert.equal(focused(container) === first, true);
+  assert.deepEqual(store.useSkillsStore.getState().iconPlays, { "weekly-recap": 1 });
+});
+
+test("Create keeps a half-written skill on Esc, and a saved one lands on home", async (t) => {
+  let listed = [];
+  const { container, store } = await mountSkillsComponent(t, {
+    modulePath: "/components/integrations/SkillsPane.tsx",
+    exportName: "SkillsPane",
+    props: { title: "Skills", active: true },
+    api: {
+      skillsList: async () => ({ skills: listed }),
+      skillsCreate: async () => {
+        listed = [skill("weekly-recap")];
+        return { ok: true, name: "weekly-recap" };
+      },
+    },
+  });
+  await click(buttonStarting(container, "skills.pane.addMenu.create"));
+  assert.equal(label(heading(container)), "skills.create.title");
+  const control = (labelKey) => {
+    const fieldLabel = find(
+      container,
+      (node) => node.tagName === "LABEL" && label(node) === labelKey
+    );
+    return find(container, (node) => node.getAttribute("id") === fieldLabel.getAttribute("for"));
+  };
+
+  await typeInto(control("skills.create.name"), "Weekly recap");
+  await pressEscape(control("skills.create.name"));
+  assert.equal(label(heading(container)), "skills.create.title");
+  assert.ok(find(container, (node) => node.getAttribute("role") === "alert"));
+
+  await typeInto(control("skills.create.descriptionLabel"), "Writes my recap.");
+  await typeInto(control("skills.create.instructions"), "Go");
+  await click(buttonStarting(container, "skills.create.submit"));
+  await settle();
+
+  assert.equal(label(heading(container)), "Skills");
+  const card = find(container, (node) => ariaLabel(node).startsWith("skills.pane.cardLabel"));
+  assert.equal(focused(container) === card, true);
   assert.deepEqual(store.useSkillsStore.getState().iconPlays, { "weekly-recap": 1 });
 });
