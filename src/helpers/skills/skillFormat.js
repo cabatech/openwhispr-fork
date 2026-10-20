@@ -13,6 +13,9 @@ const SKILL_LIMITS = {
   warnBodyLines: 500,
 };
 const SKILL_NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+// The Windows device names markdownMirror.js also avoids: a file or folder named like this
+// can't be written on Windows, so a skill holding one, or named one, couldn't move there.
+const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/i;
 const ALLOWED_TOP_LEVEL_KEYS = [
   "name",
   "description",
@@ -79,6 +82,8 @@ function fieldProblems(data) {
   if (!trimmedString(name)) problems.push({ code: "missingName" });
   else if (!SKILL_NAME_PATTERN.test(name)) problems.push({ code: "nameFormat" });
   else if (name.length > SKILL_LIMITS.nameMax) problems.push({ code: "nameTooLong" });
+  // The name is the skill's folder name.
+  else if (WINDOWS_RESERVED_NAME.test(name)) problems.push({ code: "unsafePath" });
 
   const description = trimmedString(data.description);
   if (!description) {
@@ -203,11 +208,12 @@ function slugifySkillName(title, taken) {
     ).slice(0, SKILL_LIMITS.nameMax)
   );
   const base = slug || "skill";
-  if (!taken.has(base)) return base;
+  const usable = (candidate) => !taken.has(candidate) && !WINDOWS_RESERVED_NAME.test(candidate);
+  if (usable(base)) return base;
   for (let suffix = 2; ; suffix += 1) {
     const ending = `-${suffix}`;
     const candidate = `${trimHyphens(base.slice(0, SKILL_LIMITS.nameMax - ending.length))}${ending}`;
-    if (!taken.has(candidate)) return candidate;
+    if (usable(candidate)) return candidate;
   }
 }
 
@@ -241,6 +247,7 @@ function contentHash(files) {
 module.exports = {
   SKILL_LIMITS,
   SKILL_NAME_PATTERN,
+  WINDOWS_RESERVED_NAME,
   ALLOWED_TOP_LEVEL_KEYS,
   normalizeLineEndings,
   splitFrontmatter,

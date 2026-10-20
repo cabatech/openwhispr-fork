@@ -133,8 +133,10 @@ class SkillLibrary {
     fs.mkdirSync(this.skillsDir, { recursive: true });
     const found = new Map();
     for (const entry of fs.readdirSync(this.skillsDir, { withFileTypes: true })) {
-      // Hidden names include the staging and trash folders of a write in progress.
-      if (entry.name.startsWith(".")) continue;
+      // Hidden names include the staging and trash folders of a write in progress. A name the
+      // app can't address, such as a Windows device name, is left alone too: it couldn't be
+      // opened, switched or removed from here.
+      if (!isSkillFolderName(entry.name)) continue;
       if (entry.isSymbolicLink()) found.set(entry.name, folderProblem(entry.name, "unreadable"));
       else if (entry.isDirectory()) found.set(entry.name, this._inspect(entry.name));
     }

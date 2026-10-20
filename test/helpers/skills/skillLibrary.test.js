@@ -415,6 +415,22 @@ test("folders starting with a dot, like an interrupted write's, are never listed
   );
 });
 
+test("a folder whose name the app can't address is left out, not listed unmanageable", (t) => {
+  const { library, database, skillsDir } = setup(t);
+  writeFolder(skillsDir, "con", { "SKILL.md": skillText("con") });
+  writeFolder(skillsDir, "what?", { "SKILL.md": skillText("what") });
+  writeFolder(skillsDir, "real", { "SKILL.md": skillText("real") });
+
+  assert.deepEqual(
+    library.scan().map((skill) => skill.name),
+    ["real"]
+  );
+  assert.deepEqual(
+    database.getSkillStates().map((state) => state.name),
+    ["real"]
+  );
+});
+
 test("a symlinked skill folder or file is never followed", (t) => {
   const { library, skillsDir } = setup(t);
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), "openwhispr-skill-outside-"));

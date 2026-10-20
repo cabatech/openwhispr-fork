@@ -1,9 +1,6 @@
 const unzipper = require("unzipper");
-const { SKILL_LIMITS } = require("./skillFormat");
+const { SKILL_LIMITS, WINDOWS_RESERVED_NAME } = require("./skillFormat");
 
-// The Windows device names markdownMirror.js also avoids: a file named like this can't be
-// written on Windows, so a skill holding one couldn't move there.
-const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/i;
 const SKILL_FILE_NAME = "skill.md";
 
 function isSafeArchivePath(raw) {

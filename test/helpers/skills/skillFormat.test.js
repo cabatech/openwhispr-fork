@@ -61,6 +61,13 @@ test("a name that breaks the pattern or runs past 64 characters is refused", () 
   assert.deepEqual(check(`name: ${"a".repeat(64)}\ndescription: b`).problems, []);
 });
 
+test("a Windows device name can't be a skill's name, since it can't be a folder there", () => {
+  for (const name of ["con", "aux", "nul", "prn", "com1", "lpt9"]) {
+    assert.deepEqual(codes(check(`name: ${name}\ndescription: b`).problems), ["unsafePath"], name);
+  }
+  assert.deepEqual(check("name: con-notes\ndescription: b").problems, []);
+});
+
 test("a description over 1,024 characters or with < or > is refused", () => {
   const long = check(`name: a\ndescription: ${"d".repeat(1025)}`);
   assert.deepEqual(long.problems, [{ code: "descriptionTooLong", values: { max: 1024 } }]);
@@ -160,6 +167,12 @@ test("slugs come from the title, stay unique and fall back for non-Latin titles"
   assert.equal(longTaken, `${"x".repeat(62)}-2`);
   // A cut that lands on a hyphen doesn't leave one dangling
   assert.equal(slugifySkillName(`${"a".repeat(63)} b`, new Set()), "a".repeat(63));
+});
+
+test("a title that slugs to a Windows device name gets a suffix", () => {
+  assert.equal(slugifySkillName("Con", new Set()), "con-2");
+  assert.equal(slugifySkillName("AUX", new Set()), "aux-2");
+  assert.equal(slugifySkillName("Com1", new Set(["com1-2"])), "com1-3");
 });
 
 test("a built SKILL.md round-trips through the parser with every value quoted", () => {
