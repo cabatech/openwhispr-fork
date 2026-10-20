@@ -4786,6 +4786,7 @@
       "instructionsPlaceholder": "## When to use\nWhen I ask for my weekly update.\n\n## Steps\n1. Read this week's notes.\n2. Group them into wins, blockers and next week.\n\n## Output format\nThree short lists.",
       "instructionsMissing": "Add the instructions.",
       "addFile": "Add file",
+      "filesTooLarge": "A skill's files can be up to 25 MB in all.",
       "removeFile": "Remove {{path}}",
       "submit": "Create",
       "unsaved": "You have unsaved changes",

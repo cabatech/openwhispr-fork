@@ -4616,6 +4616,7 @@
       "instructionsPlaceholder": "## Quando usar\nQuando eu pedir minha atualização semanal.\n\n## Etapas\n1. Leia as notas desta semana.\n2. Agrupe-as em conquistas, bloqueios e próxima semana.\n\n## Formato de saída\nTrês listas curtas.",
       "instructionsMissing": "Adicione as instruções.",
       "addFile": "Adicionar arquivo",
+      "filesTooLarge": "Os arquivos de uma habilidade podem somar no máximo 25 MB.",
       "removeFile": "Remover {{path}}",
       "submit": "Criar",
       "unsaved": "Você tem alterações não salvas",

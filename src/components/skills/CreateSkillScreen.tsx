@@ -17,13 +17,15 @@ import {
   type SkillCreateDraft,
 } from "../../stores/skillsStore";
 import type { SkillProblemCode } from "../../types/skills";
-import { problemKey, writeFailedToast } from "./skillCopy";
+import { MAX_SKILL_BYTES, problemKey, writeFailedToast } from "./skillCopy";
 
 type Field = "name" | "description" | "instructions";
 const FIELDS: readonly Field[] = ["name", "description", "instructions"];
 const EMPTY_DRAFT: SkillCreateDraft = { title: "", description: "", instructions: "", files: [] };
 
 const currentDraft = () => useSkillsStore.getState().createDraft ?? EMPTY_DRAFT;
+// As a case-insensitive disk sees a name: two such files would land on one path.
+const fileKey = (fileName: string) => fileName.normalize("NFC").toLowerCase();
 
 // The library names a problem by code; each code belongs to one of the fields.
 function fieldFor(code: SkillProblemCode): Field {
@@ -76,15 +78,41 @@ export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps)
     if (first) controls[first].current?.focus();
   };
 
-  const addFiles = async (files: File[]) => {
-    const added = await Promise.all(
-      files.map(async (file) => ({
+  // A file named like one already added replaces it. Sizes are checked before anything is
+  // read, so a file too large for a skill is never loaded.
+  const addFiles = async (picked: File[]) => {
+    const sizes = new Map(
+      currentDraft().files.map((file) => [fileKey(file.fileName), file.data.byteLength] as const)
+    );
+    const fitting = picked.filter((file) => {
+      const key = fileKey(file.name);
+      const total = [...sizes.values()].reduce((sum, size) => sum + size, 0);
+      if (total - (sizes.get(key) ?? 0) + file.size > MAX_SKILL_BYTES) {
+        toast({
+          title: file.name,
+          description: t("skills.create.filesTooLarge"),
+          variant: "destructive",
+        });
+        return false;
+      }
+      sizes.set(key, file.size);
+      return true;
+    });
+    const read = await Promise.all(
+      fitting.map(async (file) => ({
         fileName: file.name,
         data: new Uint8Array(await file.arrayBuffer()),
       }))
     );
+    const added = new Map(read.map((file) => [fileKey(file.fileName), file] as const));
     const current = currentDraft();
-    setCreateDraft({ ...current, files: [...current.files, ...added] });
+    setCreateDraft({
+      ...current,
+      files: [
+        ...current.files.filter((file) => !added.has(fileKey(file.fileName))),
+        ...added.values(),
+      ],
+    });
   };
 
   const removeFile = (index: number) => {

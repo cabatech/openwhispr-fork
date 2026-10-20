@@ -60,6 +60,25 @@ const alert = (container) =>
   findElement(container, (node) => node.getAttribute("role") === "alert");
 const focused = (container) => container.ownerDocument.activeElement;
 
+const MB = 1024 * 1024;
+// React sets an input's type as a property
+const fileInput = (container) =>
+  findElement(container, (node) => node.tagName === "INPUT" && node.type === "file");
+const fakeFile = (name, bytes) => ({
+  name,
+  size: bytes.length,
+  arrayBuffer: async () => new Uint8Array(bytes).buffer,
+});
+async function pick(container, files) {
+  const input = fileInput(container);
+  input.files = files;
+  await React.act(async () => dispatch(input, "change"));
+  await settle();
+}
+// The file chips' list, not the breadcrumb's
+const chips = (container) =>
+  findAll(container, (node) => node.tagName === "LI" && node.parentNode.tagName === "UL");
+
 async function fill(container, { name = "", description = "", instructions = "" }) {
   if (name) await typeInto(field(container, "name"), name);
   if (description) await typeInto(field(container, "description"), description);
@@ -234,28 +253,18 @@ test("a write that fails says why", async (t) => {
 
 test("an added file appears as a chip and can be removed", async (t) => {
   const { container, calls } = await renderCreate(t);
-  // React sets an input's type as a property
-  const input = findElement(container, (node) => node.tagName === "INPUT" && node.type === "file");
-  const addFile = async () => {
-    const bytes = new Uint8Array([1, 2, 3]);
-    input.files = [{ name: "export.sh", size: 3, arrayBuffer: async () => bytes.buffer }];
-    await React.act(async () => dispatch(input, "change"));
-    await settle();
-  };
-  // The file chips' list, not the breadcrumb's
-  const chips = () =>
-    findAll(container, (node) => node.tagName === "LI" && node.parentNode.tagName === "UL");
+  const addFile = () => pick(container, [fakeFile("export.sh", [1, 2, 3])]);
 
   await addFile();
-  assert.equal(chips().length, 1);
-  const fileName = findElement(chips()[0], (node) => node.tagName === "SPAN");
+  assert.equal(chips(container).length, 1);
+  const fileName = findElement(chips(container)[0], (node) => node.tagName === "SPAN");
   assert.deepEqual([label(fileName), fileName.getAttribute("dir")], ["export.sh", "ltr"]);
   const remove = findElement(
-    chips()[0],
+    chips(container)[0],
     (node) => node.getAttribute("aria-label") === 'skills.create.removeFile{"path":"export.sh"}'
   );
   await click(remove);
-  assert.equal(chips().length, 0);
+  assert.equal(chips(container).length, 0);
 
   await addFile();
   await fill(container, { name: "Export", description: "Exports.", instructions: "Run it." });
@@ -265,4 +274,40 @@ test("an added file appears as a chip and can be removed", async (t) => {
     calls.saved[0].files.map((file) => [file.fileName, [...file.data]]),
     [["export.sh", [1, 2, 3]]]
   );
+});
+
+test("a file named like one already added replaces it", async (t) => {
+  const { container, calls } = await renderCreate(t);
+  await pick(container, [fakeFile("export.sh", [1])]);
+  await pick(container, [fakeFile("Export.sh", [2])]);
+  assert.equal(chips(container).length, 1);
+
+  await fill(container, { name: "Export", description: "Exports.", instructions: "Run it." });
+  await click(createButton(container));
+  await settle();
+  assert.deepEqual(
+    calls.saved[0].files.map((file) => [file.fileName, [...file.data]]),
+    [["Export.sh", [2]]]
+  );
+});
+
+test("a file that would take the skill past 25 MB is refused before it is read", async (t) => {
+  const { container, toasts } = await renderCreate(t);
+  const read = [];
+  const sized = (name, size) => ({
+    name,
+    size,
+    arrayBuffer: async () => {
+      read.push(name);
+      return new Uint8Array(1).buffer;
+    },
+  });
+
+  await pick(container, [sized("notes.pdf", 15 * MB), sized("video.mov", 15 * MB)]);
+
+  assert.deepEqual(read, ["notes.pdf"]);
+  assert.equal(chips(container).length, 1);
+  assert.deepEqual(toasts, [
+    { title: "video.mov", description: "skills.create.filesTooLarge", variant: "destructive" },
+  ]);
 });

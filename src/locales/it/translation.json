@@ -4616,6 +4616,7 @@
       "instructionsPlaceholder": "## Quando usarla\nQuando chiedo il mio aggiornamento settimanale.\n\n## Passaggi\n1. Leggi le note di questa settimana.\n2. Raggruppale in successi, ostacoli e prossima settimana.\n\n## Formato di output\nTre brevi elenchi.",
       "instructionsMissing": "Aggiungi le istruzioni.",
       "addFile": "Aggiungi file",
+      "filesTooLarge": "I file di una skill possono arrivare al massimo a 25 MB in tutto.",
       "removeFile": "Rimuovi {{path}}",
       "submit": "Crea",
       "unsaved": "Hai modifiche non salvate",

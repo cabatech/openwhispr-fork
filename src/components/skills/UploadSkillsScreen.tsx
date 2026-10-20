@@ -9,10 +9,7 @@ import { useToast } from "../ui/useToast";
 import { IntegrationsPane } from "../integrations/IntegrationsPane";
 import { refreshSkills } from "../../stores/skillsStore";
 import type { SkillUploadPreview } from "../../types/skills";
-import { problemKey, warningKey, writeFailedToast } from "./skillCopy";
-
-// The library's own cap, checked first so a file that large is never read into memory.
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+import { MAX_SKILL_BYTES, problemKey, warningKey, writeFailedToast } from "./skillCopy";
 
 interface UploadRow {
   id: number;
@@ -41,7 +38,7 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
   const toInstall = rows.filter(willInstall);
 
   const addFiles = async (files: File[]) => {
-    const readable = files.filter((file) => file.size <= MAX_UPLOAD_BYTES);
+    const readable = files.filter((file) => file.size <= MAX_SKILL_BYTES);
     const items = await Promise.all(
       readable.map(async (file) => ({
         fileName: file.name,
@@ -59,7 +56,7 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
         warnings: [],
       });
       const preview =
-        file.size > MAX_UPLOAD_BYTES
+        file.size > MAX_SKILL_BYTES
           ? refusal("tooLarge")
           : (previews[next++] ?? refusal("unreadableArchive"));
       return { id: nextRowId.current++, preview };

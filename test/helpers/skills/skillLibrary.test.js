@@ -559,6 +559,22 @@ test("create returns the problems instead of writing a skill that can't be used"
   assert.deepEqual(listDir(skillsDir), []);
 });
 
+test("create refuses two files that would land on one path instead of keeping one", (t) => {
+  const { library, skillsDir } = setup(t);
+  const base = { title: "Draft", description: "Does it.", instructions: "Go" };
+  const attach = (...names) => names.map((fileName) => ({ fileName, data: Buffer.from(fileName) }));
+
+  for (const names of [
+    ["notes.md", "notes.md"],
+    ["Notes.md", "notes.md"],
+  ]) {
+    assert.deepEqual(library.create({ ...base, files: attach(...names) }), {
+      problems: [{ code: "unsafePath" }],
+    });
+  }
+  assert.deepEqual(listDir(skillsDir), []);
+});
+
 test(
   "adding a recommended skill writes the given title and description and keeps its body",
   (t) => {

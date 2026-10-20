@@ -4786,6 +4786,7 @@
       "instructionsPlaceholder": "## Wann nutzen\nWenn ich nach meinem Wochen-Update frage.\n\n## Schritte\n1. Lies die Notizen dieser Woche.\n2. Ordne sie nach Erfolgen, Hindernissen und nächster Woche.\n\n## Ausgabeformat\nDrei kurze Listen.",
       "instructionsMissing": "Füge die Anweisungen hinzu.",
       "addFile": "Datei hinzufügen",
+      "filesTooLarge": "Die Dateien eines Skills dürfen zusammen höchstens 25 MB groß sein.",
       "removeFile": "{{path}} entfernen",
       "submit": "Erstellen",
       "unsaved": "Du hast ungespeicherte Änderungen",

@@ -4616,6 +4616,7 @@
       "instructionsPlaceholder": "## 使うタイミング\n週次報告を頼んだとき。\n\n## 手順\n1. 今週のメモを読む。\n2. 成果、課題、来週の予定に分ける。\n\n## 出力形式\n短いリストを3つ。",
       "instructionsMissing": "指示を入力してください。",
       "addFile": "ファイルを追加",
+      "filesTooLarge": "スキルのファイルは合計25 MBまでです。",
       "removeFile": "{{path}}を削除",
       "submit": "作成",
       "unsaved": "保存されていない変更があります",

@@ -6,6 +6,9 @@ import type {
   SkillWriteError,
 } from "../../types/skills";
 
+/** The library's cap on a skill's files (SKILL_LIMITS.maxBytes), checked before any is read. */
+export const MAX_SKILL_BYTES = 25 * 1024 * 1024;
+
 /** The starter skills shipped in src/helpers/skills/recommended, by folder name. */
 export const RECOMMENDED_SKILL_IDS = [
   "action-items-to-linear",

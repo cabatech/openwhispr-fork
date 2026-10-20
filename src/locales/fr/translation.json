@@ -4786,6 +4786,7 @@
       "instructionsPlaceholder": "## Quand l'utiliser\nQuand je demande mon point hebdomadaire.\n\n## Étapes\n1. Lire les notes de la semaine.\n2. Les classer en réussites, blocages et semaine prochaine.\n\n## Format de sortie\nTrois listes courtes.",
       "instructionsMissing": "Ajoutez les instructions.",
       "addFile": "Ajouter un fichier",
+      "filesTooLarge": "Les fichiers d'une compétence ne peuvent pas dépasser 25 Mo au total.",
       "removeFile": "Retirer {{path}}",
       "submit": "Créer",
       "unsaved": "Vous avez des modifications non enregistrées",

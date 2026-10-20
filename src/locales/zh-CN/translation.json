@@ -4616,6 +4616,7 @@
       "instructionsPlaceholder": "## 何时使用\n当我要每周更新时。\n\n## 步骤\n1. 阅读本周的笔记。\n2. 将它们分为成果、阻碍和下周计划。\n\n## 输出格式\n三个简短的列表。",
       "instructionsMissing": "请添加指令。",
       "addFile": "添加文件",
+      "filesTooLarge": "一个技能的文件总共不能超过 25 MB。",
       "removeFile": "移除 {{path}}",
       "submit": "创建",
       "unsaved": "您有未保存的更改",

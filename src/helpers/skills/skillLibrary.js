@@ -13,7 +13,7 @@ const {
   isScriptPath,
   contentHash,
 } = require("./skillFormat");
-const { readSkillArchive, isSafeArchivePath } = require("./skillArchive");
+const { readSkillArchive, isSafeArchivePath, hasClashingPaths } = require("./skillArchive");
 
 const UPLOAD_TOKEN_TTL_MS = 10 * 60 * 1000;
 const ARCHIVE_EXTENSIONS = new Set([".zip", ".skill"]);
@@ -283,6 +283,14 @@ class SkillLibrary {
     if (files.some((file) => file.fileName.includes("/") || !isSafeArchivePath(file.fileName))) {
       return { problems: [{ code: "unsafePath" }] };
     }
+    const attachments = files.map((file) => ({
+      path: `${isScriptPath(file.fileName) ? "scripts" : "references"}/${file.fileName}`,
+      data: Buffer.from(file.data),
+    }));
+    // Two files on one path would leave only the last one written.
+    if (hasClashingPaths(attachments.map((file) => file.path))) {
+      return { problems: [{ code: "unsafePath" }] };
+    }
     const name = slugifySkillName(cleanTitle, this._takenNames());
     const skillFiles = [
       {
@@ -291,10 +299,7 @@ class SkillLibrary {
           buildSkillMarkdown({ name, title: cleanTitle, description, instructions })
         ),
       },
-      ...files.map((file) => ({
-        path: `${isScriptPath(file.fileName) ? "scripts" : "references"}/${file.fileName}`,
-        data: Buffer.from(file.data),
-      })),
+      ...attachments,
     ];
     const limit = sizeProblem(skillFiles);
     if (limit) return { problems: [limit] };

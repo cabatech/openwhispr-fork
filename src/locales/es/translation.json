@@ -4668,6 +4668,7 @@
       "instructionsPlaceholder": "## Cuándo usarla\nCuando pida mi resumen semanal.\n\n## Pasos\n1. Lee las notas de esta semana.\n2. Agrúpalas en logros, bloqueos y la próxima semana.\n\n## Formato de salida\nTres listas cortas.",
       "instructionsMissing": "Añade las instrucciones.",
       "addFile": "Añadir archivo",
+      "filesTooLarge": "Los archivos de una habilidad pueden sumar como máximo 25 MB.",
       "removeFile": "Quitar {{path}}",
       "submit": "Crear",
       "unsaved": "Tienes cambios sin guardar",

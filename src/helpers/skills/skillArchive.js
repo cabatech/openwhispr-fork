@@ -113,4 +113,4 @@ async function readSkillArchive(buffer, { limits: overrides } = {}) {
   return { files, rootFolder, problems: [] };
 }
 
-module.exports = { readSkillArchive, isSafeArchivePath };
+module.exports = { readSkillArchive, isSafeArchivePath, hasClashingPaths };

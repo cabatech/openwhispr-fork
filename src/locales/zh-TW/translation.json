@@ -4616,6 +4616,7 @@
       "instructionsPlaceholder": "## 何時使用\n當我要每週更新時。\n\n## 步驟\n1. 閱讀本週的筆記。\n2. 將它們分為成果、阻礙和下週計畫。\n\n## 輸出格式\n三個簡短的清單。",
       "instructionsMissing": "請新增指示。",
       "addFile": "新增檔案",
+      "filesTooLarge": "一個技能的檔案總共不能超過 25 MB。",
       "removeFile": "移除 {{path}}",
       "submit": "建立",
       "unsaved": "您有未儲存的變更",
