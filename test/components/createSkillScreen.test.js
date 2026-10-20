@@ -211,7 +211,6 @@ test("a problem from the library shows under the field it concerns", async (t) =
   const responses = [
     { ok: false, problems: [{ code: "descriptionAngleBrackets" }] },
     { ok: false, problems: [{ code: "placeholder" }] },
-    { ok: false, problems: [{ code: "unsafePath" }] },
   ];
   const { container, calls } = await renderCreate(t, {
     api: { skillsCreate: async () => responses.shift() },
@@ -225,10 +224,39 @@ test("a problem from the library shows under the field it concerns", async (t) =
   await click(createButton(container));
   await settle();
   assert.equal(messageFor(container, "instructions"), "skills.problems.placeholder");
+  assert.deepEqual(calls.created, []);
+});
+
+test("a problem with the attached files shows in a toast, named by the file", async (t) => {
+  const responses = [
+    { ok: false, problems: [{ code: "unsafePath", values: { path: "What to ask?.md" } }] },
+    { ok: false, problems: [{ code: "tooLarge" }] },
+  ];
+  const { container, toasts, calls } = await renderCreate(t, {
+    api: { skillsCreate: async () => responses.shift() },
+  });
+  await fill(container, { name: "Draft", description: "Does it.", instructions: "Go" });
 
   await click(createButton(container));
   await settle();
-  assert.equal(messageFor(container, "name"), "skills.problems.unsafePath");
+  await click(createButton(container));
+  await settle();
+
+  assert.deepEqual(toasts, [
+    {
+      title: "What to ask?.md",
+      description: 'skills.problems.unsafePath{"path":"What to ask?.md"}',
+      variant: "destructive",
+    },
+    {
+      title: "skills.toasts.writeFailed",
+      description: "skills.problems.tooLarge",
+      variant: "destructive",
+    },
+  ]);
+  for (const key of Object.keys(FIELD_LABELS)) {
+    assert.equal(field(container, key).getAttribute("aria-invalid"), null);
+  }
   assert.deepEqual(calls.created, []);
 });
 

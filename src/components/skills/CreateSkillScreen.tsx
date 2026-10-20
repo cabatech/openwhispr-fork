@@ -27,11 +27,13 @@ const currentDraft = () => useSkillsStore.getState().createDraft ?? EMPTY_DRAFT;
 // As a case-insensitive disk sees a name: two such files would land on one path.
 const fileKey = (fileName: string) => fileName.normalize("NFC").toLowerCase();
 
-// The library names a problem by code; each code belongs to one of the fields.
-function fieldFor(code: SkillProblemCode): Field {
+// The library names a problem by code. Most belong to one of the fields; the rest concern the
+// attached files, which have no field of their own.
+function fieldFor(code: SkillProblemCode): Field | null {
+  if (code === "missingName") return "name";
   if (code.toLowerCase().includes("description")) return "description";
   if (code === "placeholder") return "instructions";
-  return "name";
+  return null;
 }
 
 interface CreateSkillScreenProps {
@@ -168,7 +170,17 @@ export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps)
     if (result && "problems" in result) {
       const next: Partial<Record<Field, string>> = {};
       for (const problem of result.problems) {
-        next[fieldFor(problem.code)] ??= t(problemKey(problem), problem.values);
+        const message = t(problemKey(problem), problem.values);
+        const field = fieldFor(problem.code);
+        if (field) {
+          next[field] ??= message;
+        } else {
+          toast({
+            title: String(problem.values?.path ?? t("skills.toasts.writeFailed")),
+            description: message,
+            variant: "destructive",
+          });
+        }
       }
       showErrors(next);
       return;

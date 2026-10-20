@@ -173,12 +173,8 @@ function validateSkillFiles(files, { folderName, source }) {
     if (source === "disk") problems.push({ code: "nameMismatch" });
     if (source === "upload") warnings.push({ code: "folderRenamed" });
   }
-  if (
-    source === "app" &&
-    files.some(
-      (entry) => isTextFile(entry.data) && entry.data.toString("utf8").includes(PLACEHOLDER)
-    )
-  ) {
+  // The instructions only: a file the person attaches may hold a [TODO: of its own.
+  if (source === "app" && parsed.body?.includes(PLACEHOLDER)) {
     problems.push({ code: "placeholder" });
   }
 

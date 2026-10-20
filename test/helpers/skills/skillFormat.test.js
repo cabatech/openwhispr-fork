@@ -144,15 +144,18 @@ test("a skill whose header can't be read is named after its folder", () => {
   assert.deepEqual([r.name, r.displayName, r.description], ["", "Weekly recap", ""]);
 });
 
-test("a [TODO: placeholder blocks an app save but not an upload", () => {
+test("a [TODO: placeholder in the instructions blocks an app save, never an upload", () => {
+  const inBody = file(md("name: a\ndescription: b", "1. [TODO: fill in]\n"));
+  assert.deepEqual(codes(validateSkillFiles(inBody, { source: "app" }).problems), ["placeholder"]);
+  assert.deepEqual(validateSkillFiles(inBody, { source: "upload" }).problems, []);
+});
+
+test("a [TODO: in an attached file doesn't block an app save", () => {
   const files = [
     { path: "SKILL.md", data: Buffer.from(md("name: a\ndescription: b", "Steps\n")) },
     { path: "references/notes.md", data: Buffer.from("[TODO: add examples]") },
   ];
-  assert.deepEqual(codes(validateSkillFiles(files, { source: "app" }).problems), ["placeholder"]);
-  assert.deepEqual(validateSkillFiles(files, { source: "upload" }).problems, []);
-  const inBody = file(md("name: a\ndescription: b", "1. [TODO: fill in]\n"));
-  assert.deepEqual(codes(validateSkillFiles(inBody, { source: "app" }).problems), ["placeholder"]);
+  assert.deepEqual(validateSkillFiles(files, { source: "app" }).problems, []);
 });
 
 test("slugs come from the title, stay unique and fall back for non-Latin titles", () => {

@@ -572,9 +572,19 @@ test("create returns the problems instead of writing a skill that can't be used"
   });
   assert.deepEqual(
     library.create({ ...base, files: [{ fileName: "../escape.md", data: Buffer.from("x") }] }),
-    { problems: [{ code: "unsafePath" }] }
+    { problems: [{ code: "unsafePath", values: { path: "../escape.md" } }] }
   );
   assert.deepEqual(listDir(skillsDir), []);
+});
+
+test("create keeps an attached file that holds a [TODO: placeholder", (t) => {
+  const { library, skillsDir } = setup(t);
+  const base = { title: "Draft", description: "Does it.", instructions: "Go" };
+  const template = { fileName: "template.md", data: Buffer.from("[TODO: your notes]") };
+
+  assert.deepEqual(library.create({ ...base, files: [template] }), { name: "draft" });
+  const saved = path.join(skillsDir, "draft", "references", "template.md");
+  assert.equal(fs.readFileSync(saved, "utf8"), "[TODO: your notes]");
 });
 
 test("create refuses two files that would land on one path instead of keeping one", (t) => {

@@ -283,9 +283,10 @@ class SkillLibrary {
   create({ title, description, instructions, files }) {
     const cleanTitle = title.trim();
     if (!cleanTitle) return { problems: [{ code: "missingName" }] };
-    if (files.some((file) => file.fileName.includes("/") || !isSafeArchivePath(file.fileName))) {
-      return { problems: [{ code: "unsafePath" }] };
-    }
+    const unsafe = files.find(
+      (file) => file.fileName.includes("/") || !isSafeArchivePath(file.fileName)
+    );
+    if (unsafe) return { problems: [{ code: "unsafePath", values: { path: unsafe.fileName } }] };
     const attachments = files.map((file) => ({
       path: `${isScriptPath(file.fileName) ? "scripts" : "references"}/${file.fileName}`,
       data: Buffer.from(file.data),
