@@ -32,9 +32,11 @@ export function LineNumberedTextarea({
   const lineCount = Math.max(minLines, value.split("\n").length);
 
   return (
+    // The box has the height, so a long text overflows the gutter and the textarea alike and
+    // the gutter can follow the textarea's scroll.
     <div
       className={cn(
-        "flex overflow-hidden rounded-lg border border-border/70 bg-input transition-colors hover:border-border-hover focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 dark:border-border-subtle/60 dark:bg-surface-1 dark:focus-within:border-border-active dark:focus-within:ring-ring/10",
+        "flex h-56 overflow-hidden rounded-lg border border-border/70 bg-input transition-colors hover:border-border-hover focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 dark:border-border-subtle/60 dark:bg-surface-1 dark:focus-within:border-border-active dark:focus-within:ring-ring/10",
         invalid && "border-destructive! ring-destructive/20 dark:ring-destructive/40",
         className
       )}
@@ -63,7 +65,7 @@ export function LineNumberedTextarea({
         aria-label={ariaLabel}
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
-        className="block h-56 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground/50 caret-primary"
+        className="block h-full min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground/50 caret-primary"
       />
     </div>
   );

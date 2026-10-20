@@ -51,6 +51,19 @@ test("the gutter numbers every line and scrolls with the text", async (t) => {
   assert.equal(gutter.scrollTop, 40);
 });
 
+// The test DOM has no layout, so this pins the classes that give both columns one height:
+// the box is fixed and the text fills it, so the numbers overflow and scroll with the text
+// instead of growing the box.
+test("the numbers and the text share one fixed-height box", async (t) => {
+  const { textarea, gutter } = await renderEditor(t, { id: "instructions", value: "" });
+  const classes = (node) => node.getAttribute("class").split(/\s+/);
+
+  assert.equal(gutter.parentNode, textarea.parentNode);
+  assert.ok(classes(textarea.parentNode).includes("h-56"));
+  assert.ok(classes(textarea).includes("h-full"));
+  assert.ok(classes(gutter).includes("overflow-hidden"));
+});
+
 test("an invalid editor says so and points at its message", async (t) => {
   const { textarea } = await renderEditor(t, {
     id: "instructions",
