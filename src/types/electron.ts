@@ -34,6 +34,17 @@ import type {
   NoteAttendee,
   NoteAttendeesRequest,
 } from "./connectors";
+import type {
+  SkillCommitResult,
+  SkillCreateInput,
+  SkillDetail,
+  SkillInvalidRequest,
+  SkillSaveResult,
+  SkillSummary,
+  SkillUploadItem,
+  SkillUploadPreview,
+  SkillWriteError,
+} from "./skills";
 
 export type LocalTranscriptionProvider = "whisper" | "nvidia" | "cohere";
 
@@ -1682,6 +1693,31 @@ declare global {
       onSnippetsUpdated?: (
         callback: (snippets: Array<{ trigger: string; replacement: string }>) => void
       ) => () => void;
+      skillsList?: () => Promise<{ skills: SkillSummary[] }>;
+      skillsGet?: (name: string) => Promise<SkillDetail | null>;
+      /** A text file inside the skill, or null for anything else. */
+      skillsReadFile?: (name: string, path: string) => Promise<{ text: string } | null>;
+      skillsSetEnabled?: (
+        name: string,
+        enabled: boolean
+      ) => Promise<{ ok: true } | SkillInvalidRequest>;
+      skillsUninstall?: (
+        name: string
+      ) => Promise<{ ok: true } | { ok: false; error: SkillWriteError } | SkillInvalidRequest>;
+      skillsReveal?: (name: string) => Promise<{ ok: boolean }>;
+      skillsPreviewUpload?: (
+        items: SkillUploadItem[]
+      ) => Promise<{ items: SkillUploadPreview[] } | SkillInvalidRequest>;
+      skillsCommitUpload?: (request: {
+        tokens: string[];
+        replace: string[];
+      }) => Promise<SkillCommitResult | SkillInvalidRequest>;
+      skillsCreate?: (input: SkillCreateInput) => Promise<SkillSaveResult>;
+      skillsAddRecommended?: (
+        id: string,
+        copy: { title: string; description: string }
+      ) => Promise<SkillSaveResult>;
+      onSkillsChanged?: (callback: () => void) => () => void;
       setAutoLearnEnabled?: (enabled: boolean) => void;
       onCorrectionsLearned?: (callback: (words: string[]) => void) => () => void;
       undoLearnedCorrections?: (words: string[]) => Promise<{ success: boolean }>;

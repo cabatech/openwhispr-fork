@@ -1,0 +1,144 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const { installElectronStub } = require("../harness/electronStub.js");
+
+installElectronStub();
+const { registerSkillsIpc } = require("../../../src/helpers/skills/skillsIpc");
+
+const INVALID = { ok: false, error: "invalid" };
+const SUMMARY = { name: "meeting-prep", enabled: true, valid: true };
+
+function fakeLibrary(overrides = {}) {
+  const calls = [];
+  const record =
+    (method, result) =>
+    (...args) => {
+      calls.push([method, ...args]);
+      return typeof result === "function" ? result(...args) : result;
+    };
+  return {
+    calls,
+    scan: record("scan", [SUMMARY]),
+    get: record("get", { ...SUMMARY, markdown: "x", files: [] }),
+    readFile: record("readFile", "notes"),
+    setEnabled: record("setEnabled", true),
+    uninstall: record("uninstall"),
+    skillDir: record("skillDir", (name) =>
+      name === "meeting-prep" ? "/data/skills/meeting-prep" : null
+    ),
+    previewUploads: record("previewUploads", []),
+    commitUploads: record("commitUploads", { installed: ["meeting-prep"], failed: [] }),
+    create: record("create", { name: "weekly-recap" }),
+    addRecommended: record("addRecommended", { name: "decision-log" }),
+    ...overrides,
+  };
+}
+
+function setup(libraryOverrides) {
+  const handlers = new Map();
+  const broadcasts = [];
+  const revealed = [];
+  const library = fakeLibrary(libraryOverrides);
+  registerSkillsIpc({
+    ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
+    library,
+    shell: { showItemInFolder: (target) => revealed.push(target) },
+    broadcast: (channel) => broadcasts.push(channel),
+  });
+  const call = (channel, ...args) => handlers.get(channel)({}, ...args);
+  return { call, library, broadcasts, revealed };
+}
+
+const upload = (overrides = {}) => ({ fileName: "a.md", data: new Uint8Array([45]), ...overrides });
+const draft = { title: "Recap", description: "Recaps.", instructions: "Go", files: [] };
+
+test("a malformed name or upload item is refused before the library runs", async () => {
+  const { call, library } = setup();
+
+  for (const name of [7, "", "../escape", ".hidden", "a/b", null]) {
+    assert.deepEqual(await call("skills-set-enabled", name, true), INVALID, String(name));
+    assert.deepEqual(await call("skills-uninstall", name), INVALID, String(name));
+    assert.equal(await call("skills-get", name), null, String(name));
+    assert.equal(await call("skills-read-file", name, "SKILL.md"), null, String(name));
+  }
+  assert.deepEqual(await call("skills-set-enabled", "meeting-prep", "yes"), INVALID);
+  assert.equal(await call("skills-read-file", "meeting-prep", 7), null);
+  for (const items of [null, "a.md", [upload({ data: "text" })], [upload({ fileName: 7 })]]) {
+    assert.deepEqual(await call("skills-preview-upload", items), INVALID);
+  }
+  for (const request of [null, { tokens: "t", replace: [] }, { tokens: [], replace: [3] }]) {
+    assert.deepEqual(await call("skills-commit-upload", request), INVALID);
+  }
+  for (const input of [null, { ...draft, title: 3 }, { ...draft, files: [upload({ data: [] })] }]) {
+    assert.deepEqual(await call("skills-create", input), INVALID);
+  }
+  assert.deepEqual(await call("skills-add-recommended", "decision-log", { title: 1 }), INVALID);
+  const copy = { title: "a", description: "b" };
+  assert.deepEqual(await call("skills-add-recommended", "../x", copy), INVALID);
+
+  assert.deepEqual(library.calls, []);
+});
+
+test("every write broadcasts skills-changed", async () => {
+  const { call, broadcasts } = setup();
+
+  assert.deepEqual(await call("skills-list"), { skills: [SUMMARY] });
+  await call("skills-get", "meeting-prep");
+  assert.deepEqual(await call("skills-read-file", "meeting-prep", "notes.md"), { text: "notes" });
+  assert.deepEqual(await call("skills-preview-upload", [upload()]), { items: [] });
+  assert.deepEqual(broadcasts, [], "reads don't broadcast");
+
+  assert.deepEqual(await call("skills-set-enabled", "meeting-prep", false), { ok: true });
+  assert.deepEqual(await call("skills-uninstall", "meeting-prep"), { ok: true });
+  assert.deepEqual(await call("skills-commit-upload", { tokens: ["t"], replace: [] }), {
+    installed: ["meeting-prep"],
+    failed: [],
+  });
+  assert.deepEqual(await call("skills-create", draft), { ok: true, name: "weekly-recap" });
+  const copy = { title: "Decision log", description: "Keeps decisions." };
+  assert.deepEqual(await call("skills-add-recommended", "decision-log", copy), {
+    ok: true,
+    name: "decision-log",
+  });
+  assert.deepEqual(broadcasts, Array(5).fill("skills-changed"));
+});
+
+test("nothing written means nothing broadcast", async () => {
+  const problems = [{ code: "placeholder" }];
+  const { call, broadcasts } = setup({
+    setEnabled: () => false,
+    commitUploads: () => ({ installed: [], failed: [] }),
+    create: () => ({ problems }),
+    addRecommended: () => null,
+  });
+
+  assert.deepEqual(await call("skills-set-enabled", "meeting-prep", true), INVALID);
+  await call("skills-commit-upload", { tokens: ["t"], replace: [] });
+  assert.deepEqual(await call("skills-create", draft), { ok: false, problems });
+  const copy = { title: "x", description: "y" };
+  assert.deepEqual(await call("skills-add-recommended", "not-shipped", copy), INVALID);
+  assert.deepEqual(broadcasts, []);
+});
+
+test("a write that fails reports why", async () => {
+  const fail = (code) => () => {
+    throw Object.assign(new Error("disk"), { code });
+  };
+  const { call, broadcasts } = setup({ uninstall: fail("permission"), create: fail("noSpace") });
+
+  assert.deepEqual(await call("skills-uninstall", "meeting-prep"), {
+    ok: false,
+    error: "permission",
+  });
+  assert.deepEqual(await call("skills-create", draft), { ok: false, error: "noSpace" });
+  assert.deepEqual(broadcasts, []);
+});
+
+test("reveal shows the skill's folder", async () => {
+  const { call, revealed } = setup();
+
+  assert.deepEqual(await call("skills-reveal", "meeting-prep"), { ok: true });
+  assert.deepEqual(await call("skills-reveal", "missing"), { ok: false });
+  assert.deepEqual(revealed, ["/data/skills/meeting-prep"]);
+});

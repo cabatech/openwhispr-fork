@@ -134,6 +134,8 @@ const { getTinfoilChatModels } = require("./tinfoilCatalog");
 const { transcribeWithTinfoil } = require("./tinfoilTranscription");
 const { transcribeWithGemini } = require("./geminiTranscription");
 const AudioStorageManager = require("./audioStorage");
+const { SkillLibrary } = require("./skills/skillLibrary");
+const { registerSkillsIpc } = require("./skills/skillsIpc");
 const LocalModelDownloadStatus = require("./localModelDownloadStatus");
 const AgentStreamRequestRegistry = require("./agentStreamRequestRegistry");
 const createMeetingTranscriptionLifecycle = require("./meetingTranscriptionLifecycle");
@@ -702,6 +704,11 @@ class IPCHandlers {
     this._activeRecordingPipeline = null;
     this._onboardingDemoSession = null;
     this.audioStorageManager = new AudioStorageManager();
+    this.skillLibrary = new SkillLibrary({
+      userDataDir: app.getPath("userData"),
+      database: this.databaseManager,
+      recommendedDir: path.join(__dirname, "skills", "recommended"),
+    });
     this.localModelDownloadStatus = new LocalModelDownloadStatus();
     this._retentionCleanupInterval = null;
     this._retentionSettings = { ...DEFAULT_RETENTION_SETTINGS }; // Synced from renderer
@@ -4400,8 +4407,8 @@ class IPCHandlers {
         errors.push(`Device setting files: ${e.message}`);
       }
       // "connectors" holds encrypted connector logins (Slack, Gmail), all
-      // revoked above.
-      for (const directoryName of ["bin", "llama-cpp", "connectors"]) {
+      // revoked above. "skills" holds the user's assistant skills.
+      for (const directoryName of ["bin", "llama-cpp", "connectors", "skills"]) {
         try {
           fs.rmSync(path.join(app.getPath("userData"), directoryName), {
             recursive: true,
@@ -6616,6 +6623,12 @@ class IPCHandlers {
         }),
       });
     }
+    registerSkillsIpc({
+      ipcMain,
+      library: this.skillLibrary,
+      shell,
+      broadcast: broadcastToWindows,
+    });
     this.enterpriseIdentityManager = createEnterpriseIdentityManager({
       cachePath: path.join(app.getPath("userData"), "managed-enterprise-config.json"),
       getApiUrl,
