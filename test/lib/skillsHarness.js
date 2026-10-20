@@ -157,7 +157,11 @@ async function mountSkillsComponent(
     root.render(wrap ? wrap(Component) : React.createElement(Component, props))
   );
   await settle();
-  return { container, toasts, store, vite };
+  const unmount = async () => {
+    await React.act(async () => root.unmount());
+    root = null;
+  };
+  return { container, toasts, store, vite, unmount };
 }
 
 module.exports = {

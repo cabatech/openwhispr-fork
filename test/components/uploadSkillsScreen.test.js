@@ -47,7 +47,7 @@ const invalid = (fileName, code) => ({
 
 // previewQueue answers each preview call in turn, for screens that take several drops.
 async function renderUpload(t, { previews = [], previewQueue = null, commit = null } = {}) {
-  const calls = { previewed: [], committed: [], done: [], back: 0 };
+  const calls = { previewed: [], committed: [], discarded: [], done: [], back: 0 };
   const mounted = await mountSkillsComponent(t, {
     modulePath: "/components/skills/UploadSkillsScreen.tsx",
     exportName: "UploadSkillsScreen",
@@ -60,6 +60,10 @@ async function renderUpload(t, { previews = [], previewQueue = null, commit = nu
       skillsCommitUpload: async (request) => {
         calls.committed.push(request);
         return commit ?? { installed: request.replace.concat(["ready-one"]), failed: [] };
+      },
+      skillsDiscardUploads: async (tokens) => {
+        calls.discarded.push(tokens);
+        return { ok: true };
       },
     },
   });
@@ -113,6 +117,54 @@ test("ready, invalid and duplicate files each get their row and reason", async (
     (node) => node.tagName === "SPAN" && label(node) === "meeting-prep.skill"
   );
   assert.equal(fileName.getAttribute("dir"), "ltr");
+});
+
+test("a folder or an unreadable file gets its own row, and the rest still preview", async (t) => {
+  const { container, calls, drop } = await renderUpload(t, { previews: [ready("a.md", "a")] });
+  // A dropped folder arrives as a File whose read rejects.
+  const unreadable = (name) => ({
+    name,
+    size: 96,
+    arrayBuffer: async () => {
+      throw new Error("NotFoundError");
+    },
+  });
+
+  await drop(unreadable("my-skill"), fakeFile("a.md"), unreadable("b.md"));
+
+  const [folder, readable, broken] = rows(container);
+  assert.match(label(folder), /^my-skill\s*skills\.problems\.unsupportedFile$/);
+  assert.match(label(readable), /^a\.md\s*skills\.upload\.ready/);
+  assert.match(label(broken), /^b\.md\s*skills\.problems\.unreadableArchive$/);
+  assert.deepEqual(
+    calls.previewed.map((items) => items.map((item) => item.fileName)),
+    [["a.md"]]
+  );
+});
+
+test("leaving the screen frees the uploads it previewed", async (t) => {
+  const { calls, drop, unmount } = await renderUpload(t, {
+    previews: [ready("a.md", "a"), duplicate("b.zip", "b")],
+  });
+  await drop(fakeFile("a.md"), fakeFile("b.zip"));
+
+  await unmount();
+
+  assert.deepEqual(calls.discarded, [["token-a", "token-b"]]);
+});
+
+test("Upload can't be pressed again once it has saved", async (t) => {
+  const { container, calls, drop } = await renderUpload(t, {
+    previews: [ready("a.md", "ready-one")],
+  });
+  await drop(fakeFile("a.md"));
+
+  await click(submit(container));
+  await settle();
+  await click(submit(container));
+  await settle();
+
+  assert.equal(calls.committed.length, 1);
 });
 
 test("Replace and Skip decide what a duplicate does, with Undo", async (t) => {

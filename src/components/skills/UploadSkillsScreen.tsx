@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactElement } from "react";
+import { useEffect, useId, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Check, Code2, FileText, Info } from "../icons";
 import { Button } from "../ui/button";
@@ -8,7 +8,7 @@ import { SectionLabel, SettingsPanel } from "../ui/SettingsSection";
 import { useToast } from "../ui/useToast";
 import { IntegrationsPane } from "../integrations/IntegrationsPane";
 import { refreshSkills } from "../../stores/skillsStore";
-import type { SkillUploadPreview } from "../../types/skills";
+import type { SkillProblemCode, SkillUploadPreview } from "../../types/skills";
 import { MAX_SKILL_BYTES, problemKey, warningKey, writeFailedToast } from "./skillCopy";
 
 interface UploadRow {
@@ -17,6 +17,16 @@ interface UploadRow {
   /** What the user decided for a skill they already have. */
   choice?: "replace" | "skip";
 }
+
+// The library takes these; anything else, a dropped folder included, is refused by name.
+const SKILL_FILE = /\.(md|zip|skill)$/i;
+
+const refusal = (fileName: string, code: SkillProblemCode): SkillUploadPreview => ({
+  fileName,
+  status: "invalid",
+  problems: [{ code }],
+  warnings: [],
+});
 
 const willInstall = (row: UploadRow) =>
   row.preview.status === "ready" ||
@@ -34,33 +44,38 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const nextRowId = useRef(0);
+  // Every upload this screen previewed; whatever didn't install is let go when it closes.
+  const issued = useRef(new Set<string>());
   const hintId = useId();
   const toInstall = rows.filter(willInstall);
 
   const addFiles = async (files: File[]) => {
-    const readable = files.filter((file) => file.size <= MAX_SKILL_BYTES);
-    const items = await Promise.all(
-      readable.map(async (file) => ({
-        fileName: file.name,
-        data: new Uint8Array(await file.arrayBuffer()),
-      }))
+    // Read one by one, so a file that can't be read doesn't take the others with it.
+    const read = await Promise.all(
+      files.map(async (file) => {
+        if (!SKILL_FILE.test(file.name)) return { file, problem: "unsupportedFile" as const };
+        if (file.size > MAX_SKILL_BYTES) return { file, problem: "tooLarge" as const };
+        try {
+          return { file, data: new Uint8Array(await file.arrayBuffer()) };
+        } catch {
+          return { file, problem: "unreadableArchive" as const };
+        }
+      })
+    );
+    const items = read.flatMap((entry) =>
+      "data" in entry ? [{ fileName: entry.file.name, data: entry.data }] : []
     );
     const result = items.length > 0 ? await window.electronAPI?.skillsPreviewUpload?.(items) : null;
     const previews = result && "items" in result ? result.items : [];
+    for (const preview of previews) if (preview.token) issued.current.add(preview.token);
     let next = 0;
-    const added = files.map((file): UploadRow => {
-      const refusal = (code: "tooLarge" | "unreadableArchive"): SkillUploadPreview => ({
-        fileName: file.name,
-        status: "invalid",
-        problems: [{ code }],
-        warnings: [],
-      });
-      const preview =
-        file.size > MAX_SKILL_BYTES
-          ? refusal("tooLarge")
-          : (previews[next++] ?? refusal("unreadableArchive"));
-      return { id: nextRowId.current++, preview };
-    });
+    const added = read.map((entry): UploadRow => ({
+      id: nextRowId.current++,
+      preview:
+        "data" in entry
+          ? (previews[next++] ?? refusal(entry.file.name, "unreadableArchive"))
+          : refusal(entry.file.name, entry.problem),
+    }));
     setRows((current) => {
       // A skill already listed from an earlier drop asks Replace or Skip, as one in this drop does.
       const listed = new Set(
@@ -77,6 +92,11 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
     });
   };
 
+  useEffect(() => {
+    const held = issued.current;
+    return () => void window.electronAPI?.skillsDiscardUploads?.([...held]);
+  }, []);
+
   const choose = (id: number, choice?: UploadRow["choice"]) =>
     setRows((current) => current.map((row) => (row.id === id ? { ...row, choice } : row)));
 
@@ -88,13 +108,17 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
         .filter((row) => row.preview.status === "duplicate")
         .map((row) => row.preview.name ?? ""),
     });
-    setSubmitting(false);
     if (!result || !("installed" in result)) {
+      setSubmitting(false);
       toast(writeFailedToast(t));
       return;
     }
     if (result.failed.length > 0) toast(writeFailedToast(t, result.failed[0].error));
-    if (result.installed.length === 0) return;
+    if (result.installed.length === 0) {
+      setSubmitting(false);
+      return;
+    }
+    // Stays busy from here: the screen closes once the list has reloaded.
     await refreshSkills();
     toast({
       title: t("skills.toasts.uploaded", { count: result.installed.length }),
