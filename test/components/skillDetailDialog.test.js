@@ -222,11 +222,12 @@ test("switching a skill on plays its icon once; switching it off doesn't", async
   assert.equal(store.useSkillsStore.getState().iconPlays["meeting-prep"], 1);
 });
 
-test("an invalid skill's switch is disabled and its problem is shown", async (t) => {
+test("an invalid skill's switch is off and disabled, and its problem is shown", async (t) => {
   const { container } = await openDetail(t, {
     summary: skill("broken", { valid: false, problem: { code: "missingDescription" } }),
   });
 
+  assert.equal(toggle(container).getAttribute("aria-checked"), "false");
   assert.equal(toggle(container).getAttribute("disabled"), "");
   assert.match(
     label(dialog(container)),

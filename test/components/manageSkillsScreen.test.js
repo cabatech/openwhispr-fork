@@ -102,6 +102,16 @@ test(
   }
 );
 
+test("a skill that needs fixing says so on its row, and its switch shows off", async (t) => {
+  const skills = [skill("broken", { valid: false, problem: { code: "nameMismatch" } })];
+  const { container } = await renderManage(t, { skills });
+
+  const row = rowFor(container, "broken");
+  assert.match(label(row), /skills\.pane\.needsFix/);
+  const toggle = findElement(row, (node) => node.getAttribute("role") === "switch");
+  assert.equal(toggle.getAttribute("aria-checked"), "false");
+});
+
 test("the menu reveals the folder and copies the markdown exactly", async (t) => {
   const { container, toasts, calls } = await renderManage(t, { skills: [skill("recap")] });
 

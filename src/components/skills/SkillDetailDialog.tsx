@@ -165,7 +165,7 @@ export function SkillDetailDialog({
               />
               <div className="flex-1" />
               <Toggle
-                checked={skill.enabled}
+                checked={skill.enabled && skill.valid}
                 onChange={(next) => void setSkillEnabled(name, next)}
                 disabled={!skill.valid}
                 ariaLabel={t("skills.detail.toggle", { name: skill.displayName })}

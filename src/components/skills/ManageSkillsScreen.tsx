@@ -7,7 +7,7 @@ import { Toggle } from "../ui/toggle";
 import { IntegrationsPane } from "../integrations/IntegrationsPane";
 import { setSkillEnabled, useSkillsStore } from "../../stores/skillsStore";
 import { SkillActionsMenu } from "./SkillActionsMenu";
-import { SkillTile } from "./SkillCards";
+import { NeedsFixLabel, SkillTile } from "./SkillCards";
 import { SkillSearchInput } from "./SkillSearchInput";
 import { problemKey } from "./skillCopy";
 
@@ -72,12 +72,13 @@ export function ManageSkillsScreen({ onOpenSkill, onBack }: ManageSkillsScreenPr
                     </p>
                   </div>
                 </button>
+                {!skill.valid && <NeedsFixLabel />}
                 <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
                   {t("skills.manage.personal")}
                 </Badge>
                 <SkillActionsMenu skill={skill} onUninstall={() => onOpenSkill(skill.name, true)} />
                 <Toggle
-                  checked={skill.enabled}
+                  checked={skill.enabled && skill.valid}
                   onChange={(next) => void setSkillEnabled(skill.name, next)}
                   disabled={!skill.valid}
                   ariaLabel={

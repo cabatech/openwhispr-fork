@@ -39,6 +39,17 @@ export function SkillTile({
   );
 }
 
+/** Marks a skill that can't be used until it's fixed, wherever the skill is listed. */
+export function NeedsFixLabel(): ReactElement {
+  const { t } = useTranslation();
+  return (
+    <span className="flex shrink-0 items-center gap-1 text-[11px] text-warning">
+      <AlertTriangle size={12} />
+      {t("skills.pane.needsFix")}
+    </span>
+  );
+}
+
 interface InstalledSkillCardProps {
   skill: SkillSummary;
   onOpen: () => void;
@@ -72,10 +83,7 @@ export function InstalledSkillCard({ skill, onOpen, ref }: InstalledSkillCardPro
         </p>
       </div>
       {!skill.valid ? (
-        <span className="flex shrink-0 items-center gap-1 text-[11px] text-warning">
-          <AlertTriangle size={12} />
-          {t("skills.pane.needsFix")}
-        </span>
+        <NeedsFixLabel />
       ) : skill.enabled ? (
         <Check size={14} className="shrink-0 text-muted-foreground/60" />
       ) : (
