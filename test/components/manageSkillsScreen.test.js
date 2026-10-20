@@ -1,0 +1,156 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const { findElement } = require("../lib/interactiveDom");
+const {
+  ariaLabel,
+  click,
+  findAll,
+  label,
+  mountSkillsComponent,
+  settle,
+  skill,
+  typeInto,
+} = require("../lib/skillsHarness");
+
+const COPIED = "\uFEFF---\r\nname: x\r\n---\r\n";
+
+async function renderManage(t, { skills, api = {} }) {
+  const calls = { opened: [], back: 0, revealed: [], clipboard: [], switched: [] };
+  const mounted = await mountSkillsComponent(t, {
+    modulePath: "/components/skills/ManageSkillsScreen.tsx",
+    exportName: "ManageSkillsScreen",
+    skills,
+    props: {
+      onOpenSkill: (name, confirmUninstall) => calls.opened.push([name, confirmUninstall]),
+      onBack: () => calls.back++,
+    },
+    api: {
+      skillsReveal: async (name) => {
+        calls.revealed.push(name);
+        return { ok: true };
+      },
+      skillsGet: async (name) => ({ ...skill(name), markdown: COPIED, files: [] }),
+      writeClipboard: async (text) => {
+        calls.clipboard.push(text);
+        return { success: true };
+      },
+      skillsSetEnabled: async (name, enabled) => {
+        calls.switched.push([name, enabled]);
+        return { ok: true };
+      },
+      ...api,
+    },
+  });
+  return { ...mounted, calls };
+}
+
+// A row is the element holding the skill's open button, badge, menu and switch.
+const rows = (container) =>
+  findAll(
+    container,
+    (node) =>
+      node.tagName === "DIV" &&
+      node.childNodes.some((child) => child.getAttribute?.("role") === "switch")
+  );
+const rowFor = (container, name) => rows(container).find((row) => label(row).startsWith(name));
+const button = (root, text) =>
+  findElement(root, (node) => node.tagName === "BUTTON" && label(node) === text);
+
+test(
+  "Manage lists every skill with its badge, menu and switch, and a row opens the detail",
+  async (t) => {
+    const skills = [
+      ...Array.from({ length: 7 }, (_, index) => skill(`skill-${index + 1}`)),
+      skill("paused", { enabled: false }),
+      skill("broken", { valid: false, problem: { code: "nameMismatch" } }),
+    ];
+    const { container, calls } = await renderManage(t, { skills });
+
+    const crumbs = findElement(container, (node) => node.tagName === "NAV");
+    assert.equal(ariaLabel(crumbs), "skills.breadcrumb.label");
+    assert.match(label(crumbs), /^skills\.breadcrumb\.root\s*skills\.manage\.title$/);
+    await click(button(crumbs, "skills.breadcrumb.root"));
+    assert.equal(calls.back, 1);
+
+    assert.equal(rows(container).length, 9);
+    for (const row of rows(container)) {
+      assert.match(label(row), /skills\.manage\.personal/);
+      assert.ok(findElement(row, (node) => ariaLabel(node).startsWith("skills.detail.more")));
+    }
+    const switchOf = (name) =>
+      findElement(rowFor(container, name), (node) => node.getAttribute("role") === "switch");
+    assert.equal(switchOf("paused").getAttribute("aria-checked"), "false");
+    assert.equal(switchOf("skill 1").getAttribute("aria-checked"), "true");
+    assert.equal(switchOf("broken").getAttribute("disabled"), "");
+    assert.equal(
+      ariaLabel(switchOf("broken")),
+      'skills.detail.problem{"reason":"skills.problems.nameMismatch"}'
+    );
+
+    const open = findElement(rowFor(container, "skill 3"), (node) => node.tagName === "BUTTON");
+    await click(open);
+    await click(button(rowFor(container, "skill 4"), "skills.menu.uninstall"));
+    assert.deepEqual(calls.opened, [
+      ["skill-3", false],
+      ["skill-4", true],
+    ]);
+
+    await click(switchOf("paused"));
+    await settle();
+    assert.deepEqual(calls.switched, [["paused", true]]);
+  }
+);
+
+test("the menu reveals the folder and copies the markdown exactly", async (t) => {
+  const { container, toasts, calls } = await renderManage(t, { skills: [skill("recap")] });
+
+  await click(button(container, "controlPanel.history.showInFolder"));
+  await click(button(container, "skills.menu.copyMarkdown"));
+  await settle();
+
+  assert.deepEqual(calls.revealed, ["recap"]);
+  assert.deepEqual(calls.clipboard, [COPIED]);
+  assert.deepEqual(toasts, [{ title: "skills.toasts.copiedMarkdown", variant: "success" }]);
+});
+
+test("a copy that fails says so", async (t) => {
+  const { container, toasts } = await renderManage(t, {
+    skills: [skill("recap")],
+    api: {
+      writeClipboard: async () => ({ success: false }),
+    },
+  });
+
+  await click(button(container, "skills.menu.copyMarkdown"));
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.copyFailed", variant: "destructive" }]);
+});
+
+test("search narrows the list and says when nothing matches", async (t) => {
+  const { container } = await renderManage(t, {
+    skills: [
+      skill("meeting-prep", { description: "Briefs me before calls" }),
+      skill("weekly-recap", { description: "Friday note" }),
+    ],
+  });
+  const search = findElement(container, (node) => node.tagName === "INPUT");
+  assert.deepEqual(
+    [ariaLabel(search), search.getAttribute("dir")],
+    ["skills.pane.search", "auto"]
+  );
+
+  await typeInto(search, "calls");
+  assert.equal(rows(container).length, 1);
+  assert.ok(rowFor(container, "meeting prep"));
+
+  await typeInto(search, "zzz");
+  assert.equal(rows(container).length, 0);
+  assert.match(label(container), /skills\.manage\.noMatches\{"query":"zzz"\}/);
+});
+
+test("an empty library says so", async (t) => {
+  const { container } = await renderManage(t, { skills: [] });
+  assert.match(label(container), /skills\.manage\.none/);
+});

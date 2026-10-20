@@ -1,17 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ChevronDown,
-  ChevronRight,
-  Pencil,
-  Plus,
-  Search,
-  Settings,
-  SkillStack,
-  Upload,
-} from "../icons";
+import { ChevronDown, ChevronRight, Pencil, Plus, Settings, SkillStack, Upload } from "../icons";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import EmptyStateCard from "../ui/EmptyStateCard";
 import { SectionLabel } from "../ui/SettingsSection";
 import {
@@ -25,19 +15,25 @@ import { IntegrationsPane } from "../integrations/IntegrationsPane";
 import { playSkillIcon, refreshSkills, useSkillsStore } from "../../stores/skillsStore";
 import { InstalledSkillCard, RecommendedSkillCard } from "./SkillCards";
 import { RECOMMENDED_SKILL_IDS, writeFailedToast } from "./skillCopy";
+import { SkillSearchInput } from "./SkillSearchInput";
 
 const VISIBLE_INSTALLED = 6;
 
+/** The home controls that open another screen; coming back focuses the one used. */
+export type SkillsHomeControl = "manage" | "seeMore" | "add";
+
 interface SkillsHomeProps {
   title: string;
+  restoreFocus?: SkillsHomeControl | null;
   onOpenSkill: (name: string) => void;
-  onManage: () => void;
+  onManage: (from: SkillsHomeControl) => void;
   onCreate: () => void;
   onUpload: () => void;
 }
 
 export function SkillsHome({
   title,
+  restoreFocus,
   onOpenSkill,
   onManage,
   onCreate,
@@ -52,6 +48,17 @@ export function SkillsHome({
   // icon plays: a card mounted after the play count changed would not play.
   const [arrivals, setArrivals] = useState<string[]>([]);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
+  const controlRefs = {
+    manage: useRef<HTMLButtonElement>(null),
+    seeMore: useRef<HTMLButtonElement>(null),
+    add: useRef<HTMLButtonElement>(null),
+  };
+
+  // Coming back from another screen focuses the control that opened it.
+  useEffect(() => {
+    if (restoreFocus) controlRefs[restoreFocus].current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the screen mounts
+  }, []);
 
   useEffect(() => {
     if (arrivals.length === 0) return;
@@ -121,7 +128,7 @@ export function SkillsHome({
   const addMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button ref={controlRefs.add} variant="outline" size="sm">
           <Plus className="h-3.5 w-3.5" />
           {t("skills.pane.add")}
           <ChevronDown className="h-3 w-3 -me-0.5 text-muted-foreground" />
@@ -149,25 +156,12 @@ export function SkillsHome({
           addMenu
         ) : (
           <>
-            <div className="relative">
-              <Search
-                size={13}
-                className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70"
-              />
-              <Input
-                type="search"
-                dir="auto"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t("skills.pane.search")}
-                aria-label={t("skills.pane.search")}
-                className="h-8 w-44 ps-8 pe-3 text-xs rounded-lg"
-              />
-            </div>
+            <SkillSearchInput value={query} onChange={setQuery} />
             <Button
+              ref={controlRefs.manage}
               variant="outline"
               size="sm"
-              onClick={onManage}
+              onClick={() => onManage("manage")}
               aria-label={t("skills.pane.manage")}
               title={t("skills.pane.manage")}
               className="size-8 px-0"
@@ -216,8 +210,9 @@ export function SkillsHome({
                   </div>
                   {hiddenInstalled.length > 0 && (
                     <button
+                      ref={controlRefs.seeMore}
                       type="button"
-                      onClick={onManage}
+                      onClick={() => onManage("seeMore")}
                       className="mt-2 ms-1 inline-flex items-center gap-1 rounded-sm text-xs text-primary/80 hover:text-primary outline-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-colors"
                     >
                       {seeLabel}

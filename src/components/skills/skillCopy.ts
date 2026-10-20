@@ -1,5 +1,10 @@
 import type { TFunction } from "i18next";
-import type { SkillWriteError } from "../../types/skills";
+import type {
+  SkillIssue,
+  SkillProblemCode,
+  SkillWarningCode,
+  SkillWriteError,
+} from "../../types/skills";
 
 /** The starter skills shipped in src/helpers/skills/recommended, by folder name. */
 export const RECOMMENDED_SKILL_IDS = [
@@ -22,4 +27,12 @@ export function writeFailedToast(t: TFunction, error?: string) {
     ...(reason ? { description: t(reason) } : {}),
     variant: "destructive" as const,
   };
+}
+
+export function problemKey(issue: SkillIssue<SkillProblemCode>): string {
+  return `skills.problems.${issue.code}`;
+}
+
+export function warningKey(issue: SkillIssue<SkillWarningCode>): string {
+  return `skills.warnings.${issue.code}`;
 }

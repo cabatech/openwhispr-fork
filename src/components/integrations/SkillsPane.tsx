@@ -1,8 +1,10 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { refreshSkills, useSkillsStore } from "../../stores/skillsStore";
 import { useToast } from "../ui/useToast";
-import { SkillsHome } from "../skills/SkillsHome";
+import { ManageSkillsScreen } from "../skills/ManageSkillsScreen";
+import { SkillDetailDialog } from "../skills/SkillDetailDialog";
+import { SkillsHome, type SkillsHomeControl } from "../skills/SkillsHome";
 
 type SkillsScreen = "home" | "manage" | "upload" | "create";
 
@@ -12,10 +14,24 @@ interface SkillsPaneProps {
   active: boolean;
 }
 
-export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement | null {
+// Keys pressed in the pop-up or a menu are theirs. Both are portalled, but React still
+// bubbles their events through the pane.
+function isInsidePopup(target: EventTarget | null): boolean {
+  for (let node = target as Element | null; node; node = node.parentNode as Element | null) {
+    const role = node.getAttribute?.("role");
+    if (role === "dialog" || role === "menu") return true;
+  }
+  return false;
+}
+
+/** Skills home, with Manage, Upload and Create opening in place of it. */
+export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [screen, setScreen] = useState<SkillsScreen>("home");
+  const [openedFrom, setOpenedFrom] = useState<SkillsHomeControl | null>(null);
+  const [detail, setDetail] = useState<{ name: string; confirmUninstall: boolean } | null>(null);
+  const root = useRef<HTMLDivElement>(null);
 
   // Opening the pane rereads the folder, so a skill edited outside the app shows up.
   useEffect(() => {
@@ -27,14 +43,43 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement | n
     });
   }, [active, t, toast]);
 
-  if (screen !== "home") return null;
+  const open = (next: SkillsScreen, from: SkillsHomeControl) => {
+    setOpenedFrom(from);
+    setScreen(next);
+  };
+  const goHome = () => setScreen("home");
+  const openSkill = (name: string, confirmUninstall = false) =>
+    setDetail({ name, confirmUninstall });
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Escape" || screen === "home" || isInsidePopup(event.target)) return;
+    event.preventDefault();
+    goHome();
+  };
+
   return (
-    <SkillsHome
-      title={title}
-      onOpenSkill={() => {}}
-      onManage={() => setScreen("manage")}
-      onCreate={() => setScreen("create")}
-      onUpload={() => setScreen("upload")}
-    />
+    <div ref={root} onKeyDown={onKeyDown}>
+      {screen === "home" && (
+        <SkillsHome
+          title={title}
+          restoreFocus={openedFrom}
+          onOpenSkill={openSkill}
+          onManage={(from) => open("manage", from)}
+          onCreate={() => open("create", "add")}
+          onUpload={() => open("upload", "add")}
+        />
+      )}
+      {screen === "manage" && <ManageSkillsScreen onOpenSkill={openSkill} onBack={goHome} />}
+      {/* After an uninstall the skill's card or row is gone, so the heading takes focus. */}
+      <SkillDetailDialog
+        name={detail?.name ?? null}
+        open={detail !== null}
+        initialConfirmUninstall={detail?.confirmUninstall}
+        onOpenChange={(next) => {
+          if (!next) setDetail(null);
+        }}
+        onUninstalled={() => root.current?.querySelector("h2")?.focus()}
+      />
+    </div>
   );
 }
