@@ -15,6 +15,7 @@ export {
   ListEnd,
   ListOrdered,
   Quote,
+  SkillStack,
   Square,
   SquareSlash,
   SquareSparkle,
