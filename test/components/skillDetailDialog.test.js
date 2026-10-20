@@ -55,7 +55,7 @@ async function openDetail(t, { summary = skill("meeting-prep"), confirm = false,
             calls.openChange.push(next);
             setOpen(next);
           },
-          onUninstalled: () => calls.uninstalled++,
+          focusFallback: () => calls.uninstalled++,
         });
       }
       return React.createElement(Harness);

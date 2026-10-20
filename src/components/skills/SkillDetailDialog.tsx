@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Check, Code2, Copy, FileText, Trash2 } from "../icons";
 import { Button } from "../ui/button";
@@ -59,8 +59,8 @@ interface SkillDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Opens on the Uninstall confirmation, as Manage's menu does. */
   initialConfirmUninstall?: boolean;
-  /** The skill's card or row is gone, so focus needs a new home. */
-  onUninstalled?: () => void;
+  /** Where focus goes when the control that opened the pop-up is gone, as after an uninstall. */
+  focusFallback?: () => void;
 }
 
 /** The one pop-up of the Skills page: a skill's instructions, files and switch. */
@@ -69,7 +69,7 @@ export function SkillDetailDialog({
   open,
   onOpenChange,
   initialConfirmUninstall = false,
-  onUninstalled,
+  focusFallback,
 }: SkillDetailDialogProps): ReactElement {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -81,6 +81,12 @@ export function SkillDetailDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const uninstallRef = useRef<HTMLButtonElement>(null);
   const uninstalled = useRef(false);
+  const opener = useRef<HTMLElement | null>(null);
+  // The dialog keeps the Escape handler it first rendered with, so the handler reads this.
+  const confirmingNow = useRef(confirming);
+  useLayoutEffect(() => {
+    confirmingNow.current = confirming;
+  });
   const skill = summary ?? detail;
   const problem = skill && !skill.valid ? skill.problem : undefined;
 
@@ -129,20 +135,23 @@ export function SkillDetailDialog({
       <DialogContent
         className="max-w-xl max-h-[calc(100%-48px)] grid-rows-[auto_auto_minmax(0,1fr)_auto]"
         onOpenAutoFocus={(event) => {
+          // Opened by state rather than a trigger, so the opener is remembered here.
+          opener.current = document.activeElement as HTMLElement | null;
           if (!confirming) return;
           event.preventDefault();
           cancelRef.current?.focus();
         }}
         onEscapeKeyDown={(event) => {
-          if (!confirming) return;
+          if (!confirmingNow.current) return;
           event.preventDefault();
           setConfirmChoice(false);
         }}
         onCloseAutoFocus={(event) => {
-          if (!uninstalled.current) return;
-          uninstalled.current = false;
           event.preventDefault();
-          onUninstalled?.();
+          const back = uninstalled.current ? null : opener.current;
+          uninstalled.current = false;
+          if (back?.isConnected) back.focus();
+          else focusFallback?.();
         }}
       >
         {skill && name && (

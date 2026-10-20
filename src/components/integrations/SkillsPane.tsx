@@ -89,7 +89,7 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
       {screen === "create" && (
         <CreateSkillScreen onCreated={(name) => arriveHome([name])} onBack={goHome} />
       )}
-      {/* After an uninstall the skill's card or row is gone, so the heading takes focus. */}
+      {/* When the card or row that opened the pop-up is gone, the heading takes focus. */}
       <SkillDetailDialog
         name={detail?.name ?? null}
         open={detail !== null}
@@ -97,7 +97,7 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
         onOpenChange={(next) => {
           if (!next) setDetail(null);
         }}
-        onUninstalled={() => root.current?.querySelector("h2")?.focus()}
+        focusFallback={() => root.current?.querySelector("h2")?.focus()}
       />
     </div>
   );
