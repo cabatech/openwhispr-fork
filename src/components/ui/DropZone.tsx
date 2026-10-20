@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent, type ReactElement } from "react";
-import { Upload, type IconComponent } from "../icons";
+import { Upload } from "../icons";
 import { cn } from "../lib/utils";
 
 interface DropZoneProps {
@@ -8,7 +8,6 @@ interface DropZoneProps {
   /** Shown while files are dragged over. */
   activeLabel: string;
   hint?: string;
-  icon?: IconComponent;
   onFiles: (files: File[]) => void;
   onBrowse: () => void;
   className?: string;
@@ -19,7 +18,6 @@ export function DropZone({
   label,
   activeLabel,
   hint,
-  icon: Icon = Upload,
   onFiles,
   onBrowse,
   className,
@@ -73,7 +71,7 @@ export function DropZone({
             : "bg-surface-3 text-foreground/70 group-hover:text-primary"
         )}
       >
-        <Icon size={20} />
+        <Upload size={20} />
       </span>
       <p
         className={cn(

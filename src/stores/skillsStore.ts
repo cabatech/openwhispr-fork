@@ -1,13 +1,8 @@
 import { create } from "zustand";
-import type { SkillSummary, SkillUploadItem } from "../types/skills";
+import type { SkillCreateInput, SkillSummary } from "../types/skills";
 
 /** What Create skill holds, kept here so it survives leaving the page. */
-export interface SkillCreateDraft {
-  title: string;
-  description: string;
-  instructions: string;
-  files: SkillUploadItem[];
-}
+export type SkillCreateDraft = SkillCreateInput;
 
 interface SkillsState {
   skills: SkillSummary[];
@@ -60,12 +55,6 @@ export function refreshSkills(): Promise<void> {
     }
   })();
   return loading;
-}
-
-/** Loads the list once per window. */
-export async function ensureSkills(): Promise<void> {
-  subscribe();
-  if (!useSkillsStore.getState().loaded) await refreshSkills();
 }
 
 export function setCreateDraft(createDraft: SkillCreateDraft | null): void {

@@ -44,12 +44,11 @@ function libraryApi(lists) {
   return api;
 }
 
-test("ensureSkills loads once and refresh reloads", async (t) => {
+test("each refresh reads the list again", async (t) => {
   const api = libraryApi([[skill("first")], [skill("first"), skill("second")]]);
   const { store } = await loadStore(t, api);
 
-  await store.ensureSkills();
-  await store.ensureSkills();
+  await store.refreshSkills();
   assert.equal(api.lists, 1);
   assert.deepEqual(
     store.useSkillsStore.getState().skills.map((entry) => entry.name),
@@ -69,7 +68,7 @@ test("a skills-changed event and a window focus refresh the list", async (t) => 
   const api = libraryApi([[], [skill("added")], [skill("added"), skill("edited-outside")]]);
   const { store, windowListeners } = await loadStore(t, api);
   const names = () => store.useSkillsStore.getState().skills.map((entry) => entry.name);
-  await store.ensureSkills();
+  await store.refreshSkills();
 
   api.changed();
   await settle();
@@ -132,7 +131,7 @@ test("switching on bumps the icon's play count and switching off doesn't", async
     },
   };
   const { store } = await loadStore(t, api);
-  await store.ensureSkills();
+  await store.refreshSkills();
   const plays = () => store.useSkillsStore.getState().iconPlays.recap ?? 0;
 
   assert.equal(await store.setSkillEnabled("recap", true), true);

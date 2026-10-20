@@ -6,6 +6,7 @@ const React = require("react");
 
 const { findElement } = require("../lib/interactiveDom");
 const { createRendererServer } = require("../lib/rendererTestHarness");
+const { SKILL_LIMITS } = require("../../src/helpers/skills/skillFormat");
 const {
   ariaLabel,
   dispatch,
@@ -250,6 +251,13 @@ test("the gear opens Manage and the Add menu offers Create skill and Upload skil
   await React.act(async () => dispatch(cards(container)[0], "click"));
 
   assert.deepEqual(calls, { opened: ["meeting-prep"], manage: 1, create: 1, upload: 1 });
+});
+
+test("the screens' size cap is the library's", async (t) => {
+  const vite = await createRendererServer(t, { cachePrefix: "openwhispr-skill-copy-test-" });
+  const { MAX_SKILL_BYTES } = await vite.ssrLoadModule("/components/skills/skillCopy.ts");
+
+  assert.equal(MAX_SKILL_BYTES, SKILL_LIMITS.maxBytes);
 });
 
 test("the recommended skills are the ones the app ships", async (t) => {
