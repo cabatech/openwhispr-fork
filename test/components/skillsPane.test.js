@@ -1,10 +1,13 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const React = require("react");
+
 const { findElement } = require("../lib/interactiveDom");
 const {
   ariaLabel,
   click,
+  dispatch,
   label,
   mountSkillsComponent,
   pressEscape,
@@ -95,4 +98,48 @@ test("after an uninstall from the pop-up, focus moves to the screen's heading", 
 
   assert.equal(dialog(container), null);
   assert.equal(focused(container) === heading(container), true);
+});
+
+test("an upload goes home, plays each new icon and focuses the first new card", async (t) => {
+  let listed = [];
+  const file = { name: "a.md", size: 3, arrayBuffer: async () => new ArrayBuffer(3) };
+  const { container, store } = await mountSkillsComponent(t, {
+    modulePath: "/components/integrations/SkillsPane.tsx",
+    exportName: "SkillsPane",
+    props: { title: "Skills", active: true },
+    api: {
+      skillsList: async () => ({ skills: listed }),
+      skillsPreviewUpload: async () => ({
+        items: [
+          {
+            fileName: "a.md",
+            status: "ready",
+            token: "token-a",
+            name: "weekly-recap",
+            displayName: "Weekly recap",
+            problems: [],
+            warnings: [],
+          },
+        ],
+      }),
+      skillsCommitUpload: async () => {
+        listed = [skill("weekly-recap"), skill("older-skill")];
+        return { installed: ["weekly-recap"], failed: [] };
+      },
+    },
+  });
+
+  await click(buttonStarting(container, "skills.pane.addMenu.upload"));
+  assert.equal(label(heading(container)), "skills.upload.title");
+  const zone = find(container, (node) => node.getAttribute("role") === "button");
+  await React.act(async () => dispatch(zone, "drop", { dataTransfer: { files: [file] } }));
+  await settle();
+  await click(buttonStarting(container, "skills.upload.submitCount"));
+  await settle();
+
+  assert.equal(label(heading(container)), "Skills");
+  const first = find(container, (node) => ariaLabel(node).startsWith("skills.pane.cardLabel"));
+  assert.match(ariaLabel(first), /weekly recap/);
+  assert.equal(focused(container) === first, true);
+  assert.deepEqual(store.useSkillsStore.getState().iconPlays, { "weekly-recap": 1 });
 });

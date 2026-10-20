@@ -5,6 +5,7 @@ import { useToast } from "../ui/useToast";
 import { ManageSkillsScreen } from "../skills/ManageSkillsScreen";
 import { SkillDetailDialog } from "../skills/SkillDetailDialog";
 import { SkillsHome, type SkillsHomeControl } from "../skills/SkillsHome";
+import { UploadSkillsScreen } from "../skills/UploadSkillsScreen";
 
 type SkillsScreen = "home" | "manage" | "upload" | "create";
 
@@ -30,6 +31,7 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
   const { toast } = useToast();
   const [screen, setScreen] = useState<SkillsScreen>("home");
   const [openedFrom, setOpenedFrom] = useState<SkillsHomeControl | null>(null);
+  const [arrived, setArrived] = useState<string[]>([]);
   const [detail, setDetail] = useState<{ name: string; confirmUninstall: boolean } | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
@@ -45,9 +47,14 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
 
   const open = (next: SkillsScreen, from: SkillsHomeControl) => {
     setOpenedFrom(from);
+    setArrived([]);
     setScreen(next);
   };
   const goHome = () => setScreen("home");
+  const arriveHome = (names: string[]) => {
+    setArrived(names);
+    goHome();
+  };
   const openSkill = (name: string, confirmUninstall = false) =>
     setDetail({ name, confirmUninstall });
 
@@ -63,6 +70,7 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
         <SkillsHome
           title={title}
           restoreFocus={openedFrom}
+          arrived={arrived}
           onOpenSkill={openSkill}
           onManage={(from) => open("manage", from)}
           onCreate={() => open("create", "add")}
@@ -70,6 +78,7 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
         />
       )}
       {screen === "manage" && <ManageSkillsScreen onOpenSkill={openSkill} onBack={goHome} />}
+      {screen === "upload" && <UploadSkillsScreen onDone={arriveHome} onBack={goHome} />}
       {/* After an uninstall the skill's card or row is gone, so the heading takes focus. */}
       <SkillDetailDialog
         name={detail?.name ?? null}

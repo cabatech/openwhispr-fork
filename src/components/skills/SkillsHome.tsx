@@ -25,6 +25,8 @@ export type SkillsHomeControl = "manage" | "seeMore" | "add";
 interface SkillsHomeProps {
   title: string;
   restoreFocus?: SkillsHomeControl | null;
+  /** Skills that another screen just added: their icons play and the first takes focus. */
+  arrived?: string[];
   onOpenSkill: (name: string) => void;
   onManage: (from: SkillsHomeControl) => void;
   onCreate: () => void;
@@ -34,6 +36,7 @@ interface SkillsHomeProps {
 export function SkillsHome({
   title,
   restoreFocus,
+  arrived = [],
   onOpenSkill,
   onManage,
   onCreate,
@@ -46,7 +49,7 @@ export function SkillsHome({
   const [query, setQuery] = useState("");
   // Skills that just arrived. Once their cards are on screen the first takes focus and each
   // icon plays: a card mounted after the play count changed would not play.
-  const [arrivals, setArrivals] = useState<string[]>([]);
+  const [arrivals, setArrivals] = useState<string[]>(arrived);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
   const controlRefs = {
     manage: useRef<HTMLButtonElement>(null),
@@ -56,7 +59,7 @@ export function SkillsHome({
 
   // Coming back from another screen focuses the control that opened it.
   useEffect(() => {
-    if (restoreFocus) controlRefs[restoreFocus].current?.focus();
+    if (restoreFocus && arrived.length === 0) controlRefs[restoreFocus].current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the screen mounts
   }, []);
 
