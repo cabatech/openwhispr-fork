@@ -296,7 +296,7 @@ $RECYCLE.BIN/
 .trae/
 .windsurf/
 .zencoder/
-skills/
+/skills/
 
 # OS generated files
 .DS_Store
