@@ -1193,6 +1193,7 @@ class DatabaseManager {
         this.db.exec(
           "UPDATE notes SET cloud_create_attempted = 1 WHERE cloud_id IS NULL AND sync_status = 'error'"
         );
+        this._removeNeverSyncedTombstones();
       }
 
       // Sync columns for transcriptions
@@ -7107,6 +7108,22 @@ class DatabaseManager {
         const summary = typedTextOperation(row.enhanced_content);
         if (content || summary) mark.run(content, summary, row.id);
       }
+    })();
+  }
+
+  // Runs once, when the create attempt columns are added. Earlier versions
+  // only marked a deleted note or chat as deleted, so one that never synced
+  // stayed on the device. This removes those rows with their speaker rows and
+  // messages. Rows a pending folder delete holds stay, so a refused folder
+  // delete can still restore them, and so do live chats about a removed note.
+  _removeNeverSyncedTombstones() {
+    const neverSynced = `deleted_at IS NOT NULL AND cloud_id IS NULL AND cloud_create_attempted = 0
+      AND id NOT IN (SELECT entity_id FROM optimistic_folder_delete_rows WHERE entity_type = ?)`;
+    const notes = `SELECT id FROM notes WHERE ${neverSynced}`;
+    this.db.transaction(() => {
+      this._deleteSpeakerRowsForNotes(notes, "note");
+      this.db.prepare(`DELETE FROM notes WHERE id IN (${notes})`).run("note");
+      this._hardDeleteConversationsWhere(neverSynced, ["conversation"]);
     })();
   }
 

@@ -462,3 +462,60 @@ test("a chat deleted after a sync pass read it is never uploaded", async (t) => 
   assert.equal(cloud.logFor("/api/conversations/create").length, 0);
   assert.equal(rowCount(db, "agent_conversations", chat.id), 0);
 });
+
+// A delete as earlier versions recorded it, whether or not the row ever synced.
+function oldTombstone(db, table, id) {
+  db.db
+    .prepare(
+      `UPDATE ${table} SET deleted_at = datetime('now'), sync_status = 'pending', updated_at = datetime('now') WHERE id = ?`
+    )
+    .run(id);
+}
+
+test("the update removes never-synced deletes left by earlier versions and keeps rows in use", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const note = db.saveNote("Old zebracorn", "deleted before the update").note;
+  db.setSpeakerMapping(note.id, "speaker_0", null, "Alice");
+  const noteChat = db.createAgentConversation("Chat about the old note", note.id);
+  db.addAgentMessage(noteChat.id, "user", "still in use");
+  oldTombstone(db, "notes", note.id);
+  const chat = db.createAgentConversation("Old chat");
+  db.addAgentMessage(chat.id, "user", "deleted before the update");
+  oldTombstone(db, "agent_conversations", chat.id);
+  const synced = db.saveNote("Synced", "awaiting its cloud delete").note;
+  db.markNoteSynced(synced.id, "cloud-note-synced");
+  oldTombstone(db, "notes", synced.id);
+  const folder = db.createFolder("Being deleted", db.getPrivateSpaceId()).folder;
+  db.markFolderSynced(folder.id, "cloud-folder-held");
+  const held = db.saveNote("Held", "in a folder delete", "personal", null, null, folder.id).note;
+  assert.equal(db.deleteFolder(folder.id).success, true);
+
+  reopenWithoutCreateAttempts(db);
+
+  assert.equal(rowCount(db, "notes", note.id), 0);
+  assert.deepEqual(
+    db.db.prepare("SELECT rowid FROM notes_fts WHERE notes_fts MATCH ?").all("zebracorn"),
+    []
+  );
+  const mappings = db.db.prepare("SELECT COUNT(*) AS n FROM speaker_mappings WHERE note_id = ?");
+  assert.equal(mappings.get(note.id).n, 0);
+  assert.equal(rowCount(db, "agent_conversations", chat.id), 0);
+  assert.equal(db.getAgentMessages(chat.id).length, 0);
+  assert.equal(db.getAgentMessages(noteChat.id).length, 1);
+  assert.ok(db.getNote(synced.id).deleted_at);
+  assert.equal(rowCount(db, "notes", held.id), 1);
+});
+
+test("the cleanup of earlier deletes runs only with the update", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  reopenWithoutCreateAttempts(db);
+  const note = db.saveNote("Deleted after the update", "body").note;
+  oldTombstone(db, "notes", note.id);
+
+  db.db.close();
+  db.initDatabase();
+
+  assert.equal(rowCount(db, "notes", note.id), 1);
+});
