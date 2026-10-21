@@ -4618,6 +4618,7 @@
       "neverRun": "Se muestra, nunca se ejecuta",
       "uninstall": "Desinstalar",
       "uninstallConfirm": "¿Desinstalar {{name}}? Se eliminará de este equipo.",
+      "uninstallConfirmSynced": "¿Desinstalar {{name}}? Se eliminará de este equipo y de tus otros dispositivos.",
       "problem": "Esta habilidad no se puede usar hasta que se corrija: {{reason}}",
       "tryNow": "Probar ahora"
     },
@@ -4642,6 +4643,7 @@
     "manage": {
       "title": "Gestionar habilidades",
       "description": "Activa o desactiva habilidades, o elimina las que no uses. Cada una se guarda en este equipo.",
+      "descriptionBackedUp": "Activa o desactiva habilidades, o elimina las que no uses. Cada una se guarda en este equipo y en tu Respaldo en la nube.",
       "personal": "Personal",
       "noMatches": "Ninguna habilidad coincide con \"{{query}}\".",
       "none": "Aún no hay habilidades."
@@ -4781,6 +4783,9 @@
       "pasteNote": "Pega sin pulsar Enter, así tú decides cuándo ejecutarlo.",
       "pasted": "Pegado",
       "pasteFailed": "No se pudo pegar. El texto está en tu portapapeles."
+    },
+    "sync": {
+      "tooLarge": "Demasiado grande para respaldar"
     }
   },
   "calendar": {

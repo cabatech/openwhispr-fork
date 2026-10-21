@@ -7,6 +7,7 @@ const { createRendererServer, installBrowserGlobals } = require("../lib/renderer
 const {
   ariaLabel,
   click,
+  cloudBackup,
   label,
   mountSkillsComponent,
   pressEscape,
@@ -21,12 +22,16 @@ const FILES = [
   { path: "scripts/export.sh", size: 11, text: true, script: true },
 ];
 
-async function openDetail(t, { summary = skill("meeting-prep"), confirm = false, api = {} } = {}) {
+async function openDetail(
+  t,
+  { summary = skill("meeting-prep"), confirm = false, api = {}, backup = false } = {}
+) {
   const calls = { openChange: [], uninstalled: 0, read: [], clipboard: [], switched: [] };
   const mounted = await mountSkillsComponent(t, {
     modulePath: "/components/skills/SkillDetailDialog.tsx",
     exportName: "SkillDetailDialog",
     skills: [summary],
+    mocks: cloudBackup(backup),
     api: {
       skillsGet: async (name) => ({ ...summary, name, markdown: MARKDOWN, files: FILES }),
       skillsSetEnabled: async (name, enabled) => {
@@ -247,5 +252,19 @@ test("the reveal label follows the platform", async (t) => {
       "controlPanel.history.showInFolderWindows",
       "controlPanel.history.showInFolderLinux",
     ]
+  );
+});
+
+test("with Cloud backup on, Uninstall says it is also removed from other devices", async (t) => {
+  const { container } = await openDetail(t, {
+    backup: true,
+    summary: skill("meeting-prep", { displayName: "Meeting prep" }),
+  });
+
+  await click(button(container, "skills.detail.uninstall"));
+
+  assert.match(
+    label(alert(container)),
+    /^skills\.detail\.uninstallConfirmSynced\{"name":"Meeting prep"\}/
   );
 });

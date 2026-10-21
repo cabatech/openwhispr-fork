@@ -6,6 +6,7 @@ import { SettingsPanel } from "../ui/SettingsSection";
 import { Toggle } from "../ui/toggle";
 import { IntegrationsPane } from "../integrations/IntegrationsPane";
 import { setSkillEnabled, useSkillsStore } from "../../stores/skillsStore";
+import { useCloudBackupActive } from "../../hooks/useCloudBackupActive";
 import { SkillActionsMenu } from "./SkillActionsMenu";
 import { NeedsFixLabel, SkillTile } from "./SkillCards";
 import { SkillSearchInput } from "./SkillSearchInput";
@@ -19,6 +20,7 @@ interface ManageSkillsScreenProps {
 export function ManageSkillsScreen({ onOpenSkill, onBack }: ManageSkillsScreenProps): ReactElement {
   const { t } = useTranslation();
   const skills = useSkillsStore((state) => state.skills);
+  const backedUp = useCloudBackupActive();
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
   const shown = skills.filter(
@@ -37,7 +39,7 @@ export function ManageSkillsScreen({ onOpenSkill, onBack }: ManageSkillsScreenPr
         />
       }
       title={t("skills.manage.title")}
-      description={t("skills.manage.description")}
+      description={t(backedUp ? "skills.manage.descriptionBackedUp" : "skills.manage.description")}
       actions={<SkillSearchInput value={query} onChange={setQuery} />}
     >
       {shown.length === 0 ? (
@@ -73,6 +75,11 @@ export function ManageSkillsScreen({ onOpenSkill, onBack }: ManageSkillsScreenPr
                   </div>
                 </button>
                 {!skill.valid && <NeedsFixLabel />}
+                {backedUp && skill.tooLargeToSync && (
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {t("skills.sync.tooLarge")}
+                  </span>
+                )}
                 <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
                   {t("skills.manage.personal")}
                 </Badge>
