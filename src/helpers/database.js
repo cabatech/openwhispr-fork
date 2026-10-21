@@ -2328,13 +2328,15 @@ class DatabaseManager {
     return { sql: "deleted_at IS NULL AND datetime(updated_at) < ?", params: [cutoff] };
   }
 
-  // Meeting notes from before the cutoff that still hold a transcript. Team space
-  // notes belong to their workspace, so a personal retention period leaves them alone.
+  // Meeting notes unchanged since before the cutoff that still hold a transcript. A
+  // recording resumed into an older note moves updated_at, so its fresh transcript never
+  // expires by the note's creation date. Team space notes belong to their workspace, so
+  // a personal retention period leaves them alone.
   _expiredMeetingTranscriptsWhere(cutoff) {
     const accountScope = this._accountScopeCondition("notes");
     return {
       sql: `deleted_at IS NULL AND note_type = 'meeting' AND COALESCE(transcript, '') <> ''
-        AND datetime(created_at) < ? AND ${accountScope.sql}
+        AND datetime(updated_at) < ? AND ${accountScope.sql}
         AND NOT EXISTS (SELECT 1 FROM spaces team WHERE team.id = notes.space_id AND team.kind = 'team')`,
       params: [cutoff, ...accountScope.params],
     };

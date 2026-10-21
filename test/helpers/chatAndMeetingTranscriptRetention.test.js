@@ -215,6 +215,18 @@ test("an old meeting transcript is cleared while the note, its notes and summary
   assert.equal(speakerRowCount(db, recent), 2);
 });
 
+test("a meeting note recorded into again recently keeps its transcript", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+
+  const resumed = insertNote(db, { daysAgo: 60 });
+  // A recording resumed into the note today writes its transcript back.
+  db.updateNote(resumed, { transcript: TRANSCRIPT });
+
+  assert.deepEqual(db.clearMeetingTranscriptsExpiredBefore(30).ids, []);
+  assert.equal(noteRow(db, resumed).transcript, TRANSCRIPT);
+});
+
 test("clearing a meeting transcript queues nothing for cloud sync", (t) => {
   const db = createDb(t);
   if (!db) return;
@@ -283,7 +295,8 @@ test("the clean-up removes old chats and transcripts once a period is chosen", (
 
   assert.equal(chatRow(db, chat), undefined);
   assert.equal(noteRow(db, note).transcript, null);
-  // Open windows drop the chat and stop showing the transcript.
+  // Open windows drop the chat and stop showing the transcript. The note goes out as
+  // note-synced, which updates windows without pushing it: the cloud keeps its copy.
   assert.equal(sent.length, 2);
   assert.ok(
     sent.some(({ channel, data }) => channel === "conversation-deleted" && data.id === chat)
@@ -291,7 +304,7 @@ test("the clean-up removes old chats and transcripts once a period is chosen", (
   assert.ok(
     sent.some(
       ({ channel, data }) =>
-        channel === "note-updated" && data.id === note && data.transcript === null
+        channel === "note-synced" && data.id === note && data.transcript === null
     )
   );
 });
