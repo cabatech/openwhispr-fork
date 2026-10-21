@@ -1,5 +1,6 @@
-// A local tombstone must outlive a pull, and delete pushes must never reach the
-// cloud for rows that were never synced.
+// A local tombstone must outlive a pull, a note or chat no create request has
+// carried leaves the device when it is deleted, and delete pushes must never
+// reach the cloud for rows that were never synced.
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -50,6 +51,43 @@ function silenceConsoleErrors(t) {
 function attempted(db, table, id) {
   return db.db.prepare(`SELECT cloud_create_attempted AS flag FROM ${table} WHERE id = ?`).get(id)
     .flag;
+}
+
+function rowCount(db, table, id) {
+  return db.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE id = ?`).get(id).n;
+}
+
+function batchCreatedClientIds(cloud) {
+  return cloud
+    .logFor("/api/notes/batch-create")
+    .flatMap((call) => call.body.notes.map((row) => row.client_note_id));
+}
+
+// Runs act() once, right after the first sync read that returns the note.
+function afterPendingRead(api, noteId, act) {
+  const read = api.getPendingNotes;
+  api.getPendingNotes = async (spaceKind) => {
+    const pending = await read(spaceKind);
+    if (pending.some((row) => row.id === noteId)) {
+      api.getPendingNotes = read;
+      act();
+    }
+    return pending;
+  };
+}
+
+// Runs act() once, after the cloud answered the first matching request and
+// before the sync pass sees the answer.
+function afterCloudAnswers(api, matches, act) {
+  const send = api.cloudApiRequest;
+  api.cloudApiRequest = async (opts) => {
+    const answer = await send(opts);
+    if (matches(opts)) {
+      api.cloudApiRequest = send;
+      act();
+    }
+    return answer;
+  };
 }
 
 // The database as a release without create attempts left it; reopening runs
@@ -240,25 +278,141 @@ test("a note given a new identity after a sync pass read it is not sent under th
   silenceConsoleErrors(t);
   const note = db.saveNote("Forked mid-pass", "body").note;
   const oldClientId = note.client_note_id;
-  const readPending = api.getPendingNotes;
-  api.getPendingNotes = async (spaceKind) => {
-    const pending = await readPending(spaceKind);
-    if (pending.some((row) => row.id === note.id)) {
-      api.getPendingNotes = readPending;
-      db.updateNote(note.id, { client_note_id: randomUUID(), cloud_id: null });
-    }
-    return pending;
-  };
+  afterPendingRead(api, note.id, () =>
+    db.updateNote(note.id, { client_note_id: randomUUID(), cloud_id: null })
+  );
 
   await service.syncAll(true);
   await service.syncAll(true);
 
-  const sent = cloud
-    .logFor("/api/notes/batch-create")
-    .flatMap((call) => call.body.notes.map((row) => row.client_note_id));
-  assert.equal(sent.includes(oldClientId), false);
+  assert.equal(batchCreatedClientIds(cloud).includes(oldClientId), false);
   assert.equal(cloud.note(oldClientId), null);
   const synced = db.getNote(note.id);
   assert.equal(synced.sync_status, "synced");
   assert.equal(cloud.note(synced.client_note_id).id, synced.cloud_id);
+});
+
+test("deleting a never-synced note removes it with its chats, speaker names and search words", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const note = db.saveNote(
+    "Board meeting zebracorn",
+    "Confidential zebracorn plan",
+    "meeting"
+  ).note;
+  db.setSpeakerMapping(note.id, "speaker_0", null, "Alice");
+  db.saveNoteSpeakerEmbeddings(note.id, {
+    speaker_0: Buffer.from(new Float32Array([0.1, 0.2]).buffer),
+  });
+  const localChat = db.createAgentConversation("Local chat", note.id);
+  db.addAgentMessage(localChat.id, "user", "zebracorn?");
+  const syncedChat = db.createAgentConversation("Synced chat", note.id);
+  db.markConversationSynced(syncedChat.id, "cloud-conv-synced");
+  db.addAgentMessage(syncedChat.id, "user", "synced zebracorn");
+
+  assert.deepEqual(db.deleteNote(note.id), { success: true, id: note.id });
+
+  assert.equal(rowCount(db, "notes", note.id), 0);
+  assert.deepEqual(
+    db.db.prepare("SELECT rowid FROM notes_fts WHERE notes_fts MATCH ?").all("zebracorn"),
+    []
+  );
+  for (const table of ["speaker_mappings", "note_speaker_embeddings"]) {
+    const rows = db.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE note_id = ?`);
+    assert.equal(rows.get(note.id).n, 0);
+  }
+  assert.equal(rowCount(db, "agent_conversations", localChat.id), 0);
+  assert.equal(db.getAgentMessages(localChat.id).length, 0);
+  assert.ok(db.getPendingConversationDeletes().some((chat) => chat.id === syncedChat.id));
+  assert.equal(db.getAgentMessages(syncedChat.id).length, 0);
+  assert.deepEqual(db.deleteNote(note.id), { success: false, id: note.id });
+});
+
+test("a note whose create was sent stays a tombstone a late create receipt turns into a cloud delete", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const note = db.saveNote("Sent", "body").note;
+  const snapshot = db.getNote(note.id);
+  db.markNoteCreatesAttempted([note.client_note_id]);
+
+  assert.deepEqual(db.deleteNote(note.id), { success: true, id: note.id });
+  assert.ok(db.getNote(note.id).deleted_at);
+  const receipt = db.acknowledgeNoteCreate(
+    note.id,
+    snapshot,
+    "cloud-late",
+    "2026-10-21T10:00:00.000Z",
+    null
+  );
+  assert.equal(receipt.outcome, "pending");
+  assert.ok(
+    db.getPendingNoteDeletes().some((row) => row.id === note.id && row.cloud_id === "cloud-late")
+  );
+});
+
+test("deleting a note of another local account changes nothing", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  db.setActiveAccountId("account-a");
+  const note = db.saveNote("Account A note", "body").note;
+  db.setActiveAccountId("account-b");
+
+  assert.deepEqual(db.deleteNote(note.id), { success: false, id: note.id });
+  assert.equal(rowCount(db, "notes", note.id), 1);
+  db.setActiveAccountId("account-a");
+  assert.equal(db.getNote(note.id).deleted_at, null);
+});
+
+for (const path of ["/api/notes/batch-create", "/api/notes/create"]) {
+  test(`a note deleted while its first create is in flight is deleted in the cloud and stays gone (${path})`, async (t) => {
+    const ctx = await setup(t);
+    if (!ctx) return;
+    const { db, cloud, api, service } = ctx;
+    silenceConsoleErrors(t);
+    const note = db.saveNote("In flight", "secret zebracorn").note;
+    afterCloudAnswers(
+      api,
+      (opts) => opts.path === path,
+      () => db.deleteNote(note.id)
+    );
+
+    if (path === "/api/notes/create") await service.pushNote(note.id);
+    await service.syncAll(true);
+    await service.syncAll(true);
+
+    assert.equal(db.getNoteByClientId(note.client_note_id), null);
+    assert.ok(cloud.note(note.client_note_id).deleted_at);
+  });
+}
+
+test("a note deleted after a sync pass read it is never uploaded", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const { db, cloud, api, service } = ctx;
+  silenceConsoleErrors(t);
+  const note = db.saveNote("Read, then deleted", "body").note;
+  afterPendingRead(api, note.id, () => db.deleteNote(note.id));
+
+  await service.syncAll(true);
+  await service.syncAll(true);
+
+  assert.equal(batchCreatedClientIds(cloud).includes(note.client_note_id), false);
+  assert.equal(cloud.note(note.client_note_id), null);
+  assert.equal(db.getNoteByClientId(note.client_note_id), null);
+});
+
+test("a note deleted before the legacy upload sends it is never uploaded", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const { db, cloud, api } = ctx;
+  silenceConsoleErrors(t);
+  const note = db.saveNote("Listed, then deleted", "body").note;
+  const listed = db.getNote(note.id);
+  db.deleteNote(note.id);
+  api.getNotes = async () => [listed];
+
+  await require("../../src/stores/noteStore.ts").startMigration();
+
+  assert.equal(cloud.logFor("/api/notes/batch-create").length, 0);
+  assert.equal(cloud.note(note.client_note_id), null);
 });

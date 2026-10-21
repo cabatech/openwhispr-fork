@@ -3449,14 +3449,17 @@ class DatabaseManager {
       delete updates.cloud_revision;
       delete updates.cloud_create_rejected;
       delete updates.cloud_create_pending;
-      if (
-        updates.cloud_id === null ||
-        (updates.client_note_id && updates.client_note_id !== previous.client_note_id)
-      ) {
+      delete updates.cloud_create_attempted;
+      const newIdentity =
+        updates.client_note_id && updates.client_note_id !== previous.client_note_id;
+      if (updates.cloud_id === null || newIdentity) {
         updates.cloud_revision = null;
         updates.cloud_create_rejected = 0;
         updates.cloud_create_pending = null;
       }
+      // A new identity has never been sent. A note that only lost its cloud link
+      // keeps its identity, which an earlier create may have stored.
+      if (newIdentity) updates.cloud_create_attempted = 0;
       if (updates.folder_id != null) {
         // D2: a note's space always follows its folder's space.
         const folder = this._getFolderInAccountScope(updates.folder_id);
@@ -3496,6 +3499,7 @@ class DatabaseManager {
         "cloud_revision",
         "cloud_create_rejected",
         "cloud_create_pending",
+        "cloud_create_attempted",
         "title",
         "content",
         "enhanced_content",
@@ -4274,7 +4278,7 @@ class DatabaseManager {
             .map((row) => row.id);
           if (preservedIds.length > 0) {
             const relocateNote = this.db.prepare(
-              "UPDATE notes SET space_id = ?, folder_id = NULL, client_note_id = ?, cloud_id = NULL, cloud_updated_at = NULL, cloud_revision = NULL, cloud_create_rejected = 0, cloud_create_pending = NULL, owner_user_id = NULL, updated_by_user_id = NULL, sync_status = 'pending', left_team = 0, is_shared = 0, share_token = NULL, updated_at = datetime('now') WHERE id = ?"
+              "UPDATE notes SET space_id = ?, folder_id = NULL, client_note_id = ?, cloud_id = NULL, cloud_updated_at = NULL, cloud_revision = NULL, cloud_create_rejected = 0, cloud_create_pending = NULL, cloud_create_attempted = 0, owner_user_id = NULL, updated_by_user_id = NULL, sync_status = 'pending', left_team = 0, is_shared = 0, share_token = NULL, updated_at = datetime('now') WHERE id = ?"
             );
             const detachNoteConversation = this.db.prepare(
               "UPDATE agent_conversations SET space_id = NULL, folder_id = NULL WHERE note_id = ?"
@@ -4590,6 +4594,17 @@ class DatabaseManager {
         throw new Error("Database not initialized");
       }
       const accountScope = this._accountScopeCondition("notes");
+      const note = this.db
+        .prepare(
+          `SELECT cloud_id, cloud_create_attempted FROM notes
+           WHERE id = ? AND deleted_at IS NULL AND ${accountScope.sql}`
+        )
+        .get(id, ...accountScope.params);
+      // No create request has carried this note, so the server cannot hold it:
+      // it leaves the device now, with its chats and speaker rows. Any other
+      // note stays a tombstone until its cloud delete lands or a late create
+      // receipt links it.
+      if (note && !note.cloud_id && !note.cloud_create_attempted) return this.hardDeleteNote(id);
       const stmt = this.db.prepare(
         `UPDATE notes
          SET deleted_at = datetime('now'), sync_status = 'pending', updated_at = datetime('now')
@@ -7450,7 +7465,7 @@ class DatabaseManager {
         this._deleteSpeakerRowsForNotes(serverOwnedChildren, id);
         this.db.prepare(`DELETE FROM notes WHERE id IN (${serverOwnedChildren})`).run(id);
         const relocateNote = this.db.prepare(
-          "UPDATE notes SET space_id = ?, folder_id = ?, client_note_id = ?, cloud_id = NULL, cloud_updated_at = NULL, cloud_revision = NULL, cloud_create_rejected = 0, cloud_create_pending = NULL, owner_user_id = NULL, updated_by_user_id = NULL, sync_status = 'pending', left_team = 0, is_shared = 0, share_token = NULL, updated_at = datetime('now') WHERE id = ?"
+          "UPDATE notes SET space_id = ?, folder_id = ?, client_note_id = ?, cloud_id = NULL, cloud_updated_at = NULL, cloud_revision = NULL, cloud_create_rejected = 0, cloud_create_pending = NULL, cloud_create_attempted = 0, owner_user_id = NULL, updated_by_user_id = NULL, sync_status = 'pending', left_team = 0, is_shared = 0, share_token = NULL, updated_at = datetime('now') WHERE id = ?"
         );
         const detachNoteConversation = this.db.prepare(
           "UPDATE agent_conversations SET space_id = NULL, folder_id = NULL WHERE note_id = ?"

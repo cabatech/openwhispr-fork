@@ -255,6 +255,7 @@ test("getNotesForSpace includes foldered notes, unlike the root-only getNotes", 
 
   const rootNote = db.saveNote("Root", "", "personal", null, null, null, space.id).note;
   const folderNote = db.saveNote("Foldered", "", "personal", null, null, folder.id, space.id).note;
+  db.markNoteSynced(folderNote.id, "cloud-note-foldered");
   db.deleteNote(folderNote.id);
   const keptNote = db.saveNote("Kept", "", "personal", null, null, folder.id, space.id).note;
 
@@ -276,6 +277,7 @@ test("getNoteIdsInFolder excludes deleted notes", (t) => {
 
   const kept = db.saveNote("Kept", "", "personal", null, null, folder.id, space.id).note;
   const removed = db.saveNote("Removed", "", "personal", null, null, folder.id, space.id).note;
+  db.markNoteSynced(removed.id, "cloud-note-removed");
   db.deleteNote(removed.id);
 
   assert.deepEqual(db.getNoteIdsInFolder(folder.id), [kept.id]);
@@ -292,6 +294,7 @@ test("getNoteIdsInScope validates vector candidates against the current SQLite s
   const engFiled = db.saveNote("Eng filed", "", "personal", null, null, engFolder.id, eng.id).note;
   const designRoot = db.saveNote("Design root", "", "personal", null, null, null, design.id).note;
   const deleted = db.saveNote("Deleted", "", "personal", null, null, null, eng.id).note;
+  db.markNoteSynced(deleted.id, "cloud-note-deleted");
   db.deleteNote(deleted.id);
 
   assert.deepEqual(new Set(db.getNoteIdsInScope(eng.id)), new Set([engRoot.id, engFiled.id]));
@@ -512,6 +515,7 @@ test("purge rejects late writes and conversations for stale parents", (t) => {
   assert.ok(db.createAgentConversation("Unscoped chat"), "global chats remain valid");
 
   const deletedNote = db.saveNote("Soft-deleted", "body").note;
+  db.markNoteSynced(deletedNote.id, "cloud-note-soft-deleted");
   db.deleteNote(deletedNote.id);
   assert.equal(db.createAgentConversation("Deleted note chat", deletedNote.id), null);
 
