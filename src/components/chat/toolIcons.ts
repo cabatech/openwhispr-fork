@@ -38,4 +38,5 @@ export const toolIcons: Record<string, typeof Search> = {
   linear_create_issue: CheckCircle,
   linear_comment: MessageSquare,
   load_skill: SkillStack,
+  propose_skill: SkillStack,
 };

@@ -4079,6 +4079,7 @@
       "create_noteStatus": "Creating note...",
       "update_noteStatus": "Updating note...",
       "load_skillStatus": "Loading skill…",
+      "propose_skillStatus": "Preparing the skill…",
       "copiedToClipboard": "Copied to your clipboard",
       "openNote": "Open note",
       "unknownTool": "Unknown tool: {{name}}",
@@ -4844,6 +4845,24 @@
     },
     "chat": {
       "usingSkill": "Using skill · {{name}}"
+    },
+    "approval": {
+      "createHeader": "Create skill",
+      "newSkill": "New skill",
+      "replacesExisting": "You already have this skill. Saving updates it.",
+      "nameLabel": "Skill name",
+      "descriptionLabel": "When it's used",
+      "seeFull": "See full skill",
+      "save": "Save skill",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "openSkill": "Open skill",
+      "skippedCreate": "Skipped. Nothing was saved.",
+      "updated": "Updated",
+      "undo": "Undo",
+      "undone": "Undone. The skill is back as it was.",
+      "failed": "Couldn't save the skill.",
+      "notSaved": "Nothing was saved."
     }
   },
   "notesView": {

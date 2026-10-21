@@ -226,6 +226,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   skillsCheckProposal: (request) => ipcRenderer.invoke("skills-check-proposal", request),
   skillsSaveProposal: (proposal) => ipcRenderer.invoke("skills-save-proposal", proposal),
   skillsMarkUsed: (name) => ipcRenderer.invoke("skills-mark-used", name),
+  skillsUndo: (name, versionId) => ipcRenderer.invoke("skills-undo", name, versionId),
   onSkillsChanged: (callback) => {
     const listener = () => callback?.();
     ipcRenderer.on("skills-changed", listener);

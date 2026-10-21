@@ -21,7 +21,13 @@ import { HelpEvidence } from "./GroundedHelpEvidence";
 import { extractHelpEvidence } from "./helpEvidence";
 import { toolIcons } from "./toolIcons";
 import { ApprovalCard } from "./ApprovalCard";
+import { SkillApprovalCard } from "./SkillApprovalCard";
 import { approvalKey, useConnectorApprovalStore } from "../../stores/connectorApprovalStore";
+import { useSkillApprovalStore } from "../../stores/skillApprovalStore";
+
+// Their card stands in for their step: once the call is over, a call that showed no card
+// (the proposal went back to the model to fix) leaves nothing behind.
+const SKILL_CARD_TOOLS = new Set(["propose_skill"]);
 
 interface ChatMessageProps {
   messageId: string;
@@ -145,10 +151,13 @@ function ToolCallStep({ toolCall }: { toolCall: ToolCallInfo }) {
 // Subscribes to its own approval entry only, so editing one card doesn't
 // re-render every message in the thread.
 function ToolCallItem({ messageId, toolCall }: { messageId: string; toolCall: ToolCallInfo }) {
-  const approval = useConnectorApprovalStore(
-    (state) => state.entries[approvalKey(messageId, toolCall.id)]
-  );
-  return approval ? <ApprovalCard entry={approval} /> : <ToolCallStep toolCall={toolCall} />;
+  const key = approvalKey(messageId, toolCall.id);
+  const approval = useConnectorApprovalStore((state) => state.entries[key]);
+  const skillApproval = useSkillApprovalStore((state) => state.entries[key]);
+  if (approval) return <ApprovalCard entry={approval} />;
+  if (skillApproval) return <SkillApprovalCard entry={skillApproval} />;
+  if (SKILL_CARD_TOOLS.has(toolCall.name) && toolCall.status !== "executing") return null;
+  return <ToolCallStep toolCall={toolCall} />;
 }
 
 function NoteCard({

@@ -1733,6 +1733,11 @@ declare global {
       }) => Promise<SkillProposalCheck | SkillInvalidRequest>;
       skillsSaveProposal?: (proposal: SkillProposal) => Promise<SkillSaveResult>;
       skillsMarkUsed?: (name: string) => Promise<void>;
+      /** Puts back the copy a save or update kept, then forgets it. */
+      skillsUndo?: (
+        name: string,
+        versionId: string
+      ) => Promise<{ ok: true } | { ok: false; error: SkillWriteError } | SkillInvalidRequest>;
       onSkillsChanged?: (callback: () => void) => () => void;
       setAutoLearnEnabled?: (enabled: boolean) => void;
       onCorrectionsLearned?: (callback: (words: string[]) => void) => () => void;

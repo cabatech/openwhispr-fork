@@ -108,6 +108,7 @@ const TOOL_GROUPS: Record<string, string> = {
   update_dictionary: "The user's snippets and dictionary",
   copy_to_clipboard: "Clipboard",
   load_skill: "The user's skills",
+  propose_skill: "The user's skills",
 };
 
 // A skill is the user's own guidance, but its text may come from anywhere (an upload), so
