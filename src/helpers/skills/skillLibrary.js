@@ -434,7 +434,9 @@ class SkillLibrary {
       this._install(name, files);
       return { name };
     }
-    const versionId = this._withVersion(name, () => this._writeSkillFolder(name, files));
+    const versionId = this._withVersion(name, () => this._writeSkillFolder(name, files), {
+      enabledAfter: true,
+    });
     this._stamp(name, files, { enabled: true });
     return { name, versionId };
   }
@@ -471,8 +473,11 @@ class SkillLibrary {
       path: file.path,
       data: fs.readFileSync(file.fullPath),
     }));
+    // The switch goes back too, unless the user changed it after the save.
+    const enabledNow = this.database.getSkillStates().find((s) => s.name === name)?.enabled;
+    const putBack = enabledNow === written.enabledAfter ? { enabled: written.enabled } : {};
     this._writeSkillFolder(name, files);
-    this._stamp(name, files, { enabled: written.enabled });
+    this._stamp(name, files, putBack);
     this._removeQuietly(versionDir);
     this._removeQuietly(`${versionDir}.json`);
     return true;
@@ -622,7 +627,7 @@ class SkillLibrary {
   // Keeps a version, then writes; a failed write leaves the skill and its versions as they were.
   // Beside the version goes what the write left and whether the skill was on, so Undo can tell
   // whether the skill changed since and put its switch back too.
-  _withVersion(name, write) {
+  _withVersion(name, write, { enabledAfter } = {}) {
     const enabled = this.database.getSkillStates().find((state) => state.name === name)?.enabled;
     const versionId = this.saveVersion(name);
     const versionDir = path.join(this.versionsDir, name, versionId);
@@ -632,7 +637,11 @@ class SkillLibrary {
       this._removeQuietly(versionDir);
       throw error;
     }
-    const written = { hash: this._folderHash(name), enabled: enabled === true };
+    const written = {
+      hash: this._folderHash(name),
+      enabled: enabled === true,
+      enabledAfter: enabledAfter ?? enabled === true,
+    };
     fs.writeFileSync(`${versionDir}.json`, JSON.stringify(written));
     return versionId;
   }

@@ -173,6 +173,16 @@ test("Undo puts back whether the replaced skill was switched on", (t) => {
   assert.equal(database.getSkillStates()[0].enabled, false);
 });
 
+test("Undo keeps a switch the user changed after the save", (t) => {
+  const { library, database } = playbook(t);
+  const { versionId } = library.applyUpdate({ ...SSO, files: [] });
+  database.setSkillEnabled(NAME, false);
+
+  assert.equal(library.undo(NAME, versionId), true);
+
+  assert.equal(library.scan()[0].enabled, false);
+});
+
 test("only the five newest versions are kept", (t) => {
   const { library, versionsDir } = playbook(t);
 
