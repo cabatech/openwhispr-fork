@@ -116,6 +116,7 @@ import {
 } from "./ui/SettingsSection";
 import type { InferenceModeOption } from "./ui/SettingsSection";
 import { useSettingsLayout } from "./ui/useSettingsLayout";
+import { TabPanel } from "./ui/TabPanel";
 import { useUsage } from "../hooks/useUsage";
 import { cn } from "./lib/utils";
 import { GRADIENT_CIRCLE } from "./ui/gradientCircle";
@@ -927,10 +928,6 @@ function VADLabelWithInfo({ label, description }: { label: string; description: 
   );
 }
 
-function TabPanel({ active, children }: { active: boolean; children: React.ReactNode }) {
-  return <div className={active ? undefined : "hidden"}>{children}</div>;
-}
-
 // "Gabriel Stein" → "GS"; single names fall back to their first letter.
 function nameInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -1387,8 +1384,6 @@ export default function SettingsPage({
     isWlroots: boolean;
     isCosmic: boolean;
     requiresWlCopy: boolean;
-    hasXclip: boolean;
-    hasXsel: boolean;
     isNixOS: boolean;
   } | null>(null);
   const [ydotoolGuideKey, setYdotoolGuideKey] = useState<string | null>(null);
@@ -3815,35 +3810,12 @@ EOF`,
                     },
                   ];
 
-                  if (ydotoolStatus.isKde) {
-                    checks.push({
-                      key: "hasXclip",
-                      label: "xclip",
-                      ok: ydotoolStatus.hasXclip || ydotoolStatus.hasXsel || false,
-                      required: true,
-                      desc: t("settingsPage.general.waylandPaste.xclipDesc", {
-                        defaultValue: "Clipboard tool for KDE Wayland paste (xclip or xsel)",
-                      }),
-                      steps: [
-                        {
-                          title: t("settingsPage.general.waylandPaste.guide.xclip.step1Title", {
-                            defaultValue: "Install xclip",
-                          }),
-                          cmds: [
-                            { cmd: "sudo dnf install xclip  # Fedora" },
-                            { cmd: "sudo apt install xclip  # Debian/Ubuntu" },
-                          ],
-                        },
-                      ],
-                    });
-                  }
-
-                  if (ydotoolStatus.requiresWlCopy) {
+                  if (ydotoolStatus.requiresWlCopy || ydotoolStatus.isKde) {
                     checks.push({
                       key: "hasWlCopy",
                       label: "wl-copy",
                       ok: ydotoolStatus.hasWlCopy,
-                      required: true,
+                      required: ydotoolStatus.requiresWlCopy || ydotoolStatus.isKde,
                       desc: t("settingsPage.general.waylandPaste.wlCopyDesc"),
                       steps: [
                         {

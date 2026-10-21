@@ -867,3 +867,40 @@ for (const failing of ["flush", "base"]) {
     await unmount();
   });
 }
+
+// The note header's date and attendees dropdown in the tree the component returned.
+function findElementOfType(tree, type) {
+  let found = null;
+  walk(tree, (node) => {
+    if (!found && node.type === type) found = node;
+  });
+  return found;
+}
+
+test("the note header hands its event link to the dropdown, changeable only by editors", async (t) => {
+  const { render, latest, unmount, vite } = await loadNoteEditor(t, "viewer");
+  const { default: NoteParticipants } = await vite.ssrLoadModule(
+    "/components/notes/NoteParticipants.tsx"
+  );
+  try {
+    const linkedEvent = { id: "evt-1", summary: "Standup" };
+    await render(undefined, {
+      note: { ...NOTE, cloud_id: "shared-note", calendar_event_id: "evt-1" },
+      linkedEvent,
+    });
+    const viewer = findElementOfType(latest(), NoteParticipants).props;
+    assert.equal(viewer.canEdit, false, "a viewer of a shared note can't change the link");
+    assert.equal(viewer.ownedByUser, false, "someone else's note");
+    assert.equal(viewer.linkedEventId, "evt-1");
+    assert.equal(viewer.linkedEvent, linkedEvent);
+    assert.equal(viewer.noteCreatedAt, NOTE.created_at);
+
+    await render(undefined, { note: { ...NOTE, calendar_event_id: "" } });
+    const owner = findElementOfType(latest(), NoteParticipants).props;
+    assert.equal(owner.canEdit, true, "the user's own note is editable");
+    assert.equal(owner.ownedByUser, true);
+    assert.equal(owner.linkedEventId, null, "an unlinked note's blank id reaches it as no link");
+  } finally {
+    await unmount();
+  }
+});

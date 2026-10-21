@@ -1368,6 +1368,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   calendarGetAvailability: (request) => ipcRenderer.invoke("calendar-get-availability", request),
   gcalGetEvent: (eventId) => ipcRenderer.invoke("gcal-get-event", eventId),
+  calendarGetLinkableEvents: () => ipcRenderer.invoke("calendar-get-linkable-events"),
 
   // Microsoft Calendar
   mcalStartOAuth: () => ipcRenderer.invoke("mcal-start-oauth"),

@@ -579,6 +579,30 @@
           "supportsVision": true
         },
         {
+          "id": "claude-opus-5-5",
+          "name": "Claude Opus 5.5",
+          "description": "Latest Opus model for complex reasoning, 1M context",
+          "descriptionKey": "models.descriptions.cloud.anthropic_claude_opus_5_5",
+          "supportsTemperature": false,
+          "supportsVision": true
+        },
+        {
+          "id": "claude-sonnet-5-5",
+          "name": "Claude Sonnet 5.5",
+          "description": "Latest Sonnet: fast and capable for everyday work, 1M context",
+          "descriptionKey": "models.descriptions.cloud.anthropic_claude_sonnet_5_5",
+          "supportsTemperature": false,
+          "supportsVision": true
+        },
+        {
+          "id": "claude-haiku-5-5",
+          "name": "Claude Haiku 5.5",
+          "description": "Fastest, lowest-cost Claude model, 1M context",
+          "descriptionKey": "models.descriptions.cloud.anthropic_claude_haiku_5_5",
+          "supportsTemperature": false,
+          "supportsVision": true
+        },
+        {
           "id": "claude-sonnet-5",
           "name": "Claude Sonnet 5",
           "description": "Fast, capable agentic model at lower cost",
@@ -605,7 +629,7 @@
         {
           "id": "claude-opus-5",
           "name": "Claude Opus 5",
-          "description": "Most capable Opus model, 1M context",
+          "description": "Previous Opus flagship, 1M context",
           "descriptionKey": "models.descriptions.cloud.anthropic_claude_opus_5",
           "supportsTemperature": false,
           "supportsVision": true
