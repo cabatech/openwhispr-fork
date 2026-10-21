@@ -62,7 +62,9 @@ test("a retention period chosen in another window arrives as a number", async (t
   const { storage, useSettingsStore } = await startSettings(t, { storageListeners });
 
   for (const key of ["chatRetentionDays", "meetingTranscriptRetentionDays"]) {
-    for (const listener of storageListeners) listener({ key, newValue: "30", storageArea: storage });
+    for (const listener of storageListeners) {
+      listener({ key, newValue: "30", storageArea: storage });
+    }
     assert.equal(useSettingsStore.getState()[key], 30, key);
   }
 });

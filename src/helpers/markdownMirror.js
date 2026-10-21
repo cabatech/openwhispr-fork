@@ -230,6 +230,20 @@ class MarkdownMirror {
     }
   }
 
+  deleteTranscript(noteId) {
+    for (const file of this._globTranscriptFiles(noteId)) {
+      try {
+        fs.unlinkSync(file);
+      } catch (err) {
+        debugLogger.error(
+          "Failed to delete transcript file",
+          { noteId, file, error: err.message },
+          "note-files"
+        );
+      }
+    }
+  }
+
   ensureFolder(folderName) {
     if (!this._baseRealPath) return;
     try {

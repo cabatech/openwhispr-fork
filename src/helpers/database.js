@@ -2267,9 +2267,7 @@ class DatabaseManager {
         throw new Error("Database not initialized");
       }
       // Resolve the cutoff once so the ids we report are exactly the rows we purge.
-      const cutoff = this.db
-        .prepare("SELECT datetime('now', ?) AS cutoff")
-        .get(`-${retentionDays} days`).cutoff;
+      const cutoff = this._retentionCutoff(retentionDays);
       const expired = this.db
         .prepare("SELECT id FROM transcriptions WHERE deleted_at IS NULL AND created_at < ?")
         .all(cutoff)
@@ -2311,6 +2309,119 @@ class DatabaseManager {
     } catch (error) {
       debugLogger.error(
         "Error purging expired transcriptions",
+        { error: error.message },
+        "database"
+      );
+      throw error;
+    }
+  }
+
+  _retentionCutoff(retentionDays) {
+    return this.db.prepare("SELECT datetime('now', ?) AS cutoff").get(`-${retentionDays} days`)
+      .cutoff;
+  }
+
+  // Chats idle since before the cutoff. updated_at moves with every message, so a
+  // long chat still in use never expires by its start date; datetime() reads the
+  // ISO timestamps cloud rows carry as well as SQLite's own.
+  _expiredConversationsWhere(cutoff) {
+    return { sql: "deleted_at IS NULL AND datetime(updated_at) < ?", params: [cutoff] };
+  }
+
+  // Meeting notes from before the cutoff that still hold a transcript. Team space
+  // notes belong to their workspace, so a personal retention period leaves them alone.
+  _expiredMeetingTranscriptsWhere(cutoff) {
+    const accountScope = this._accountScopeCondition("notes");
+    return {
+      sql: `deleted_at IS NULL AND note_type = 'meeting' AND COALESCE(transcript, '') <> ''
+        AND datetime(created_at) < ? AND ${accountScope.sql}
+        AND NOT EXISTS (SELECT 1 FROM spaces team WHERE team.id = notes.space_id AND team.kind = 'team')`,
+      params: [cutoff, ...accountScope.params],
+    };
+  }
+
+  countConversationsExpiredBefore(retentionDays) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const where = this._expiredConversationsWhere(this._retentionCutoff(retentionDays));
+      return this.db
+        .prepare(`SELECT COUNT(*) AS count FROM agent_conversations WHERE ${where.sql}`)
+        .get(...where.params).count;
+    } catch (error) {
+      debugLogger.error(
+        "Error counting expired conversations",
+        { error: error.message },
+        "database"
+      );
+      throw error;
+    }
+  }
+
+  /** Removes chats idle past the retention window, with every message. Synced chats
+   *  tombstone so the cloud copy and other devices follow on the next sync. */
+  deleteConversationsExpiredBefore(retentionDays) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const where = this._expiredConversationsWhere(this._retentionCutoff(retentionDays));
+      return this.db.transaction(() => {
+        const ids = this.db
+          .prepare(`SELECT id FROM agent_conversations WHERE ${where.sql}`)
+          .all(...where.params)
+          .map((row) => row.id);
+        this._retireConversationsWhere(where.sql, where.params, { scrubSyncedMessages: true });
+        return { ids };
+      })();
+    } catch (error) {
+      debugLogger.error(
+        "Error purging expired conversations",
+        { error: error.message },
+        "database"
+      );
+      throw error;
+    }
+  }
+
+  countMeetingTranscriptsExpiredBefore(retentionDays) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const where = this._expiredMeetingTranscriptsWhere(this._retentionCutoff(retentionDays));
+      return this.db
+        .prepare(`SELECT COUNT(*) AS count FROM notes WHERE ${where.sql}`)
+        .get(...where.params).count;
+    } catch (error) {
+      debugLogger.error(
+        "Error counting expired meeting transcripts",
+        { error: error.message },
+        "database"
+      );
+      throw error;
+    }
+  }
+
+  /** Clears the transcript and speaker labels from meeting notes past the retention
+   *  window; the note, its own notes and summary stay. On this computer only: the row
+   *  is not queued for sync, so a backed-up copy stays in the cloud. */
+  clearMeetingTranscriptsExpiredBefore(retentionDays) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const where = this._expiredMeetingTranscriptsWhere(this._retentionCutoff(retentionDays));
+      return this.db.transaction(() => {
+        const ids = this.db
+          .prepare(`SELECT id FROM notes WHERE ${where.sql}`)
+          .all(...where.params)
+          .map((row) => row.id);
+        const noteIds = JSON.stringify(ids);
+        this._deleteSpeakerRowsForNotes("SELECT value FROM json_each(?)", noteIds);
+        this.db
+          .prepare(
+            "UPDATE notes SET transcript = NULL WHERE id IN (SELECT value FROM json_each(?))"
+          )
+          .run(noteIds);
+        return { ids };
+      })();
+    } catch (error) {
+      debugLogger.error(
+        "Error clearing expired meeting transcripts",
         { error: error.message },
         "database"
       );

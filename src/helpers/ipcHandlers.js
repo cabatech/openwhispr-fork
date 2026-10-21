@@ -897,7 +897,10 @@ class IPCHandlers {
   // is the only authority there is. Mid-scan arrival needs no separate check:
   // a policy that resolves "always_off" flips the switch, which the loop reads.
   _mayStartAnalyticsHistoryReconstruction() {
-    if (!this._canReconstructAnalyticsHistory()) return false;
+    return this._canReconstructAnalyticsHistory() && this._isLocalHistoryPolicyKnown();
+  }
+
+  _isLocalHistoryPolicyKnown() {
     if (this._retentionSettings.localHistoryPolicyResolved === true) return true;
     return !this._hasActiveAccountScope();
   }
@@ -1305,7 +1308,12 @@ class IPCHandlers {
   }
 
   _runRetentionCleanup() {
-    const { audioRetentionDays, transcriptRetentionDays } = this._retentionSettings;
+    const {
+      audioRetentionDays,
+      transcriptRetentionDays,
+      chatRetentionDays,
+      meetingTranscriptRetentionDays,
+    } = this._retentionSettings;
     try {
       if (transcriptRetentionDays > 0) {
         const { ids, analyticsPurged } =
@@ -1318,6 +1326,27 @@ class IPCHandlers {
       }
       if (audioRetentionDays > 0) {
         this.audioStorageManager.cleanupExpiredAudio(audioRetentionDays, this.databaseManager);
+      }
+      // A workspace that always keeps history sends 0 for both, but only once its
+      // policy has arrived; until then these periods are only the user's.
+      if (!this._isLocalHistoryPolicyKnown()) return;
+      if (chatRetentionDays > 0) {
+        const { ids } = this.databaseManager.deleteConversationsExpiredBefore(chatRetentionDays);
+        for (const id of ids) {
+          if (this.vectorIndex?.isReady?.()) {
+            this.vectorIndex.deleteConversationChunks(id).catch(() => {});
+          }
+          broadcastToWindows("conversation-deleted", { id });
+        }
+      }
+      if (meetingTranscriptRetentionDays > 0) {
+        const { ids } = this.databaseManager.clearMeetingTranscriptsExpiredBefore(
+          meetingTranscriptRetentionDays
+        );
+        for (const id of ids) {
+          if (this._noteFilesEnabled) require("./markdownMirror").deleteTranscript(id);
+          broadcastToWindows("note-updated", this.databaseManager.getNote(id));
+        }
       }
     } catch (error) {
       debugLogger.error("Retention cleanup failed", { error: error.message }, "audio-storage");
