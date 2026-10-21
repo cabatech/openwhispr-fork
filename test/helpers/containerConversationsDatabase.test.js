@@ -987,3 +987,33 @@ test("rows held by a pending folder delete survive a repeated delete and roll ba
   assert.equal(db.getNote(note.id).deleted_at, null);
   assert.equal(db.getAgentConversation(chat.id).messages.length, 1);
 });
+
+test("a chat whose create was sent stays a tombstone for its late receipt when its note is removed", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const note = db.saveNote("Never synced", "body").note;
+  const chat = db.createAgentConversation("Chat in flight", note.id);
+  db.addAgentMessage(chat.id, "user", "sent with the create");
+  const sent = db.getAgentConversation(chat.id);
+  db.markConversationCreateAttempted(chat.id);
+
+  assert.deepEqual(db.deleteNote(note.id), { success: true, id: note.id });
+  assert.equal(db.getAgentMessages(chat.id).length, 0);
+
+  const receipt = db.acknowledgeConversationCreate(
+    chat.id,
+    {
+      client_conversation_id: sent.client_conversation_id,
+      title: sent.title,
+      updated_at: sent.updated_at,
+      message_count: sent.messages.length,
+    },
+    "cloud-conv-late"
+  );
+  assert.equal(receipt.outcome, "delete-pending");
+  assert.ok(
+    db
+      .getPendingConversationDeletes()
+      .some((pending) => pending.id === chat.id && pending.cloud_id === "cloud-conv-late")
+  );
+});
