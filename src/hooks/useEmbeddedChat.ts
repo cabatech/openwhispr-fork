@@ -85,6 +85,7 @@ export function useEmbeddedChat({
     onConversationCreated: (id) => {
       setConversationId(id);
     },
+    onConversationDeleted: () => setConversationId(null),
   });
 
   const transcript = noteTranscript ?? "";

@@ -1159,6 +1159,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   addAgentMessage: (conversationId, role, content, metadata) =>
     ipcRenderer.invoke("db-add-agent-message", conversationId, role, content, metadata),
   getAgentMessages: (conversationId) => ipcRenderer.invoke("db-get-agent-messages", conversationId),
+  onConversationDeleted: (callback) => {
+    const listener = (_event, data) => callback?.(data);
+    ipcRenderer.on("conversation-deleted", listener);
+    return () => ipcRenderer.removeListener("conversation-deleted", listener);
+  },
   getAgentConversationsWithPreview: (limit, offset, includeArchived) =>
     ipcRenderer.invoke("db-get-agent-conversations-with-preview", limit, offset, includeArchived),
   searchAgentConversations: (query, limit) =>

@@ -52,6 +52,7 @@ export function useContainerChat({
 
   const persistence = useChatPersistence({
     onConversationCreated: (id) => setConversationId(id),
+    onConversationDeleted: () => setConversationId(null),
   });
 
   const containerContext = useMemo(() => {

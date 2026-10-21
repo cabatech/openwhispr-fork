@@ -3021,6 +3021,7 @@ declare global {
           created_at: string;
         }>
       >;
+      onConversationDeleted?: (callback: (payload: { id: number }) => void) => () => void;
       getAgentConversationsWithPreview?: (
         limit?: number,
         offset?: number,

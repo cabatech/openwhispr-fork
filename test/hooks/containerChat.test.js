@@ -22,7 +22,8 @@ const MOCKS = {
     }
   `,
   "/chat/useChatPersistence": `
-    export function useChatPersistence() {
+    export function useChatPersistence(options) {
+      globalThis.__persistenceOptions = options;
       return {
         messages: [],
         setMessages() {},
@@ -43,6 +44,7 @@ async function renderContainerChat(t) {
     if (root) await React.act(async () => root.unmount());
     delete globalThis.__finishSend;
     delete globalThis.__calls;
+    delete globalThis.__persistenceOptions;
   });
   installBrowserGlobals(t);
   const container = installHookDom(t);
@@ -72,6 +74,18 @@ test("switching container conversations cancels the running reply before loading
 
   // A reply still streaming would otherwise save into conversation 42 when it settles.
   assert.deepEqual(globalThis.__calls, ["cancel", "load:42"]);
+});
+
+test("an open container chat deleted elsewhere is no longer the active one", async (t) => {
+  const chat = await renderContainerChat(t);
+  await React.act(async () => {
+    await chat.current.switchConversation(42);
+  });
+  assert.equal(chat.current.activeConversationId, 42);
+
+  await React.act(async () => globalThis.__persistenceOptions.onConversationDeleted());
+
+  assert.equal(chat.current.activeConversationId, null);
 });
 
 test("picking the open container conversation leaves its reply running", async (t) => {
