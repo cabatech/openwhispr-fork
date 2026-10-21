@@ -97,6 +97,10 @@ function skillBatches<T>(entries: T[]): T[][] {
   return batches;
 }
 
+// How a skills pull went: the names it couldn't write, "failed" when it stopped early, or
+// "unsupported" on an API without skills routes.
+type SkillPullResult = { unwritten: Set<string> } | "failed" | "unsupported";
+
 function isHttpStatus(err: unknown, status: number): boolean {
   return err instanceof CloudApiError && err.status === status;
 }
@@ -2980,14 +2984,16 @@ export class SyncService {
     }
 
     // Unlike snippets, the pull goes first: a skill this computer has never sent meets a copy
-    // of the same name from another device there, and the newer of the two wins. An API from
-    // before skills answers 404 on every skills route: nothing to do there.
-    if (!(await this.pullSkills())) return;
-    await this.pushPendingSkills();
+    // of the same name from another device there, and the newer of the two wins. So no such
+    // skill is sent until a pull has compared it. An API from before skills answers 404 on
+    // every skills route: nothing to do there.
+    const pulled = await this.pullSkills();
+    if (pulled === "unsupported") return;
+    await this.pushPendingSkills(pulled);
     await this.pushSkillDeletes();
   }
 
-  private async pushPendingSkills(): Promise<void> {
+  private async pushPendingSkills(pulled: Exclude<SkillPullResult, "unsupported">): Promise<void> {
     const pending = (await window.electronAPI.getPendingSkills?.()) ?? [];
     const updates = [];
     const creates = [];
@@ -3002,7 +3008,7 @@ export class SyncService {
         files: exported.files,
       };
       if (row.cloud_id) updates.push({ cloudId: row.cloud_id, entry });
-      else
+      else if (pulled !== "failed" && !pulled.unwritten.has(row.name))
         creates.push({
           ...entry,
           client_skill_id: row.client_skill_id,
@@ -3083,14 +3089,13 @@ export class SyncService {
     }
   }
 
-  // False when the API has no skills routes.
-  private async pullSkills(): Promise<boolean> {
+  private async pullSkills(): Promise<SkillPullResult> {
     try {
       const since = localStorage.getItem("lastSyncedAt.skills") ?? undefined;
       const sinceId = localStorage.getItem("lastSyncedAt.skills.id") ?? undefined;
       let changed = false;
       // A skill that couldn't be written holds the cursor back, so the next pass tries it again.
-      let failed = false;
+      const unwritten = new Set<string>();
 
       let cursor: string | undefined = since;
       let cursorId: string | undefined = sinceId;
@@ -3132,7 +3137,7 @@ export class SyncService {
           try {
             if (await window.electronAPI.applySkillFromCloud?.(cloudEntry)) changed = true;
           } catch (err) {
-            failed = true;
+            unwritten.add(cloudEntry.name);
             console.error("Skill pull could not write a skill:", err);
           }
         }
@@ -3145,14 +3150,17 @@ export class SyncService {
         cursorId = last.id;
       }
 
-      if (maxUpdatedAt && !failed) localStorage.setItem("lastSyncedAt.skills", maxUpdatedAt);
-      if (maxId && !failed) localStorage.setItem("lastSyncedAt.skills.id", maxId);
+      if (unwritten.size === 0) {
+        if (maxUpdatedAt) localStorage.setItem("lastSyncedAt.skills", maxUpdatedAt);
+        if (maxId) localStorage.setItem("lastSyncedAt.skills.id", maxId);
+      }
       if (changed) await window.electronAPI.broadcastSkillsUpdated?.();
+      return { unwritten };
     } catch (err) {
-      if (isHttpStatus(err, 404)) return false;
+      if (isHttpStatus(err, 404)) return "unsupported";
       console.error("Skill pull failed:", err);
+      return "failed";
     }
-    return true;
   }
 
   private async buildLocalToCloudFolderMap(): Promise<{

@@ -135,8 +135,10 @@ function sizeProblem(files, limits = SKILL_LIMITS) {
 function toCloudFile({ path: relPath, data }) {
   const base64 = data.toString("base64");
   const text = data.toString("utf8");
+  // A NUL anywhere goes as base64: the server's JSON storage can't hold one in text.
   const asText =
     isTextFile(data) &&
+    !data.includes(0) &&
     Buffer.from(text, "utf8").equals(data) &&
     Buffer.byteLength(JSON.stringify(text)) <= base64.length + 2;
   return asText

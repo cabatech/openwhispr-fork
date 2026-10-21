@@ -364,3 +364,39 @@ test("one skill that can't be written doesn't stop the others, and is tried agai
   await ctx.service.syncSkillsNow();
   assert.deepEqual(listDir(ctx.skillsDir), ["first-one", "second-one"]);
 });
+
+test("an edit made while a skill's first push is in flight is kept and sent next", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const name = create(ctx.library, "Meeting prep");
+  whileSending(ctx, "POST /api/skills/batch-create", () => {
+    writeFolder(ctx.skillsDir, name, { "SKILL.md": skillText(name, "Use it.", "Edited.\n") });
+    ctx.library.scan();
+    // The server stamps the create after the edit, as when the edit lands mid-request.
+    ctx.cloud.setClock(() => new Date(Date.now() + 60_000).toISOString());
+  });
+
+  await ctx.service.syncSkillsNow();
+  await ctx.service.syncSkillsNow();
+
+  assert.equal(skillFile(ctx.skillsDir, name), skillText(name, "Use it.", "Edited.\n"));
+  assert.match(cloudByName(ctx.cloud)[name].files[0].content, /Edited\./);
+  assert.deepEqual(pendingNames(ctx.db), []);
+});
+
+test("a pull that fails sends no skill this computer has never sent", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  silence(t);
+  writeFolder(ctx.skillsDir, "recap", { "SKILL.md": skillText("recap", "Does it.", "Old.\n") });
+  ctx.library.scan();
+  ctx.cloud.setClock(() => new Date(Date.now() + 60_000).toISOString());
+  seedRemote(ctx, "recap", "Newer.\n");
+  ctx.cloud.failNext("/api/skills/list", { status: 500 });
+
+  await ctx.service.syncSkillsNow();
+  assert.match(cloudByName(ctx.cloud).recap.files[0].content, /Newer\./);
+
+  await ctx.service.syncSkillsNow();
+  assert.equal(skillFile(ctx.skillsDir, "recap"), skillText("recap", "Does it.", "Newer.\n"));
+});

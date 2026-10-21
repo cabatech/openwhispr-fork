@@ -99,6 +99,24 @@ test("text that JSON would inflate crosses as base64", (t) => {
   assert.ok(Buffer.byteLength(JSON.stringify(exported.files)) < 2 * 1024 * 1024);
 });
 
+test("a text file with a NUL byte anywhere crosses as base64", (t) => {
+  const ctx = setup(t);
+  if (!ctx) return;
+  const lateNul = Buffer.concat([Buffer.from("a".repeat(9000)), Buffer.from([0])]);
+  writeFolder(ctx.skillsDir, "late-nul", {
+    "SKILL.md": skillText("late-nul"),
+    "references/notes.md": lateNul,
+  });
+  ctx.library.scan();
+
+  const notes = ctx.library
+    .exportForCloud("late-nul")
+    .files.find((file) => file.path === "references/notes.md");
+
+  assert.equal(notes.encoding, "base64");
+  assert.deepEqual(Buffer.from(notes.content, "base64"), lateNul);
+});
+
 test("a skill that needs fixing, or isn't there, is not exported", (t) => {
   const ctx = setup(t);
   if (!ctx) return;

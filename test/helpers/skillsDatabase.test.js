@@ -129,6 +129,7 @@ test("an edit that lands during a push stays pending", (t) => {
   assert.equal(db.markSkillSynced("recap", "cloud-1", null, "h1", true).changes, 0);
   assert.equal(db.markSkillSynced("recap", "cloud-1", null, "h2", false).changes, 0);
   assert.deepEqual(pendingNames(db), ["recap"]);
+  assert.equal(syncRow(db, "recap").cloud_id, "cloud-1", "the edit is sent as an update next");
   assert.equal(db.markSkillSynced("recap", "cloud-1", null, "h2", true).changes, 1);
   assert.equal(syncRow(db, "recap").cloud_id, "cloud-1");
 });
