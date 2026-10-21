@@ -582,6 +582,29 @@ test("a skill cut to fit is left to load_skill, not marked loaded", async (t) =>
   assert.match(results[0].data, /^<skill_content name="weekly-recap"/);
 });
 
+test("a first skill cut to fit is still sent, and load_skill can give it whole", async (t) => {
+  const steps = Array.from({ length: 4_000 }, (_, index) => `Prep step ${index + 1} done.`);
+  const long = forModel("meeting-prep", "Meeting prep", steps.join("\n"));
+  const readable = { ...READABLE, "meeting-prep": long };
+  const { api } = skillsApi({ readable });
+  const { captured, sentMessages, reasoningService } = await renderChat(t, SKILLS_ON, {
+    electronAPI: api,
+  });
+  const results = [];
+  reasoningService.processTextStreamingCloud.mock.mockImplementation(async function* (m, c) {
+    sentMessages.push(m);
+    results.push(await c.executeToolCall("load_skill", '{"name":"meeting-prep"}', "call-8"));
+    yield { type: "done", finishReason: "stop" };
+  });
+
+  await captured.sendToAI("prep me", [userMessage("u1", "prep me")], {
+    attachedSkill: { name: "meeting-prep" },
+  });
+
+  assert.match(latestUserText(sentMessages[0]), /The rest of this skill was cut to fit/);
+  assert.match(results[0].data, /^<skill_content name="meeting-prep"/, "not 'already loaded'");
+});
+
 test("a local model above the 4B gate gets a 330-token catalog", async (t) => {
   const { estimateNoteTokens } = await import("../../src/helpers/noteChunking.js");
   const skills = Array.from({ length: 30 }, (_, index) =>
@@ -623,6 +646,15 @@ test("a sub-4B local model gets one picked skill and the surface hears which", a
   assert.equal(latestUserText(sentMessages[0]), withRequest(MEETING_PREP_BLOCK, PREP_REQUEST));
   assert.deepEqual(picked, [{ name: "meeting-prep", displayName: "Meeting prep" }]);
   assert.deepEqual(calls.reads, [{ name: "meeting-prep", withFiles: true }]);
+});
+
+test("the app never picks a skill the user took off the chat", async (t) => {
+  const { sentMessages, picked } = await sendPicking(t, {
+    options: { removedSkills: ["meeting-prep"] },
+  });
+
+  assert.equal(latestUserText(sentMessages[0]), PREP_REQUEST);
+  assert.deepEqual(picked, []);
 });
 
 test("a picked skill never adds more than 2,500 estimated tokens", async (t) => {

@@ -44,6 +44,7 @@ import {
   buildCreatorContext,
   buildSkillBlock,
   buildSkillCatalog,
+  fitSkillBlock,
   withSkillContext,
 } from "../../utils/skillContext";
 import { pickSkillForRequest } from "../../utils/localSkillPick";
@@ -562,7 +563,10 @@ export function useChatStreaming({
           registry === null &&
           !options?.attachedSkill &&
           options?.allowSkillPick !== false
-            ? pickSkillForRequest(userText, usableSkills)
+            ? pickSkillForRequest(
+                userText,
+                usableSkills.filter((skill) => !removedSkills.has(skill.name))
+              )
             : null;
         if (picked) {
           activeRefs = [
@@ -592,12 +596,12 @@ export function useChatStreaming({
               })}`
             : "";
           const blockOptions = { inlineFiles: registry === null };
-          const fitted = buildSkillBlock(
+          const { text: fitted, cut } = fitSkillBlock(
             skill,
             skillRoom - estimateNoteTokens(creatorContext),
             blockOptions
           );
-          const whole = fitted === buildSkillBlock(skill, Infinity, blockOptions);
+          const whole = !cut;
           // A model with tools reads a cut skill whole with load_skill, unless nothing came before
           // it to take its room.
           if (!whole && registry !== null && skillBlocks.length > 0) continue;

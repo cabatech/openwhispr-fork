@@ -239,3 +239,16 @@ test("the model-only turn puts the skill blocks before the user's request", () =
     "<block one>\n<block two>\n\nUser request:\nprep me for my 2pm"
   );
 });
+
+test("a skill whose file names are shortened to fit still counts as whole", () => {
+  const files = Array.from({ length: 60 }, (_, index) =>
+    file(`references/${"long-folder-name/".repeat(4)}note-${index}.md`)
+  );
+
+  const fitted = skillContext.fitSkillBlock(skill({ files }), 2_500, { inlineFiles: false });
+
+  assert.equal(fitted.cut, false);
+  assert.match(fitted.text, / and \d+ more \(/);
+  const tooSmall = skillContext.fitSkillBlock(skill({ files }), 40, { inlineFiles: false });
+  assert.equal(tooSmall.cut, true);
+});

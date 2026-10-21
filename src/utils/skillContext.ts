@@ -87,8 +87,17 @@ export function buildSkillCatalog(skills: SkillSummary[], maxTokens: number): st
 export function buildSkillBlock(
   skill: SkillForModel,
   maxTokens: number,
-  { inlineFiles }: { inlineFiles: boolean }
+  options: { inlineFiles: boolean }
 ): string {
+  return fitSkillBlock(skill, maxTokens, options).text;
+}
+
+/** buildSkillBlock, and whether its instructions or inline files were cut to fit. */
+export function fitSkillBlock(
+  skill: SkillForModel,
+  maxTokens: number,
+  { inlineFiles }: { inlineFiles: boolean }
+): { text: string; cut: boolean } {
   const open = `<skill_content name="${asAttribute(skill.name)}" title="${asAttribute(skill.displayName)}">`;
   const namesBudget = Math.floor(maxTokens / FILE_NAMES_SHARE);
   const close = ["</skill_content>", filesLine(skill.files, inlineFiles, namesBudget)]
@@ -108,12 +117,12 @@ export function buildSkillBlock(
 
   const body = asData(skill.body);
   const fitted = cutToFit(body, maxTokens - estimateNoteTokens(render("", 0)), SKILL_CUT);
-  if (fitted !== body) return render(fitted, 0);
+  if (fitted !== body) return { text: render(fitted, 0), cut: true };
   let included = 0;
   while (included < inline.length && estimateNoteTokens(render(body, included + 1)) <= maxTokens) {
     included += 1;
   }
-  return render(body, included);
+  return { text: render(body, included), cut: included < inline.length };
 }
 
 /**
