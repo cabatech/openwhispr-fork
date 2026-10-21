@@ -12,14 +12,14 @@ const {
   settle,
 } = require("../lib/skillsHarness");
 
-const CODE = "scripts/import-to-crm.sh --file acme.md\necho done";
+const CODE = "scripts/import-to-crm.sh --file acme.md";
 
-async function mountActions(t, { paste = false, pasteText } = {}) {
+async function mountActions(t, { code = CODE, paste = false, pasteText } = {}) {
   const calls = { clipboard: [], paste: [] };
   const mounted = await mountSkillsComponent(t, {
     modulePath: "/components/chat/CodeBlockActions.tsx",
     exportName: "CodeBlockActions",
-    props: { code: CODE, paste },
+    props: { code, paste },
     api: {
       writeClipboard: async (text) => {
         calls.clipboard.push(text);
@@ -39,12 +39,14 @@ async function mountActions(t, { paste = false, pasteText } = {}) {
 const toastTitles = (toasts) => toasts.map((toast) => toast.title);
 
 test("Copy writes the code unchanged", async (t) => {
-  const { calls, button } = await mountActions(t);
+  // Leading spaces and inner lines are part of the code.
+  const code = "  for f in *.md; do\n    wc -l \"$f\"\n  done";
+  const { calls, button } = await mountActions(t, { code });
 
   await click(button("common.copy"));
   await settle();
 
-  assert.deepEqual(calls.clipboard, [CODE]);
+  assert.deepEqual(calls.clipboard, [code]);
   assert.ok(button("common.copied"), "the button says it copied");
 });
 
@@ -120,4 +122,23 @@ test("the voice panel's code blocks add Paste into app and its small print", asy
   assert.ok(button("common.copy"));
   assert.ok(button("skills.code.paste"));
   assert.match(container.textContent, /skills\.code\.pasteNote/);
+});
+
+// A terminal without bracketed paste runs each pasted line as it lands.
+test("a block of several lines offers Copy only, even where Paste into app exists", async (t) => {
+  const { button, container } = await mountActions(t, { code: "ls\nrm -rf build", paste: true });
+
+  // Booleans: a failed assert on a node would try to print the whole DOM.
+  assert.equal(Boolean(button("common.copy")), true);
+  assert.equal(Boolean(button("skills.code.paste")), false);
+  assert.doesNotMatch(container.textContent, /skills\.code\.pasteNote/);
+});
+
+test("the actions stay out of a selection, and the small print isn't a paragraph", async (t) => {
+  const { container } = await mountActions(t, { paste: true });
+
+  const root = container.childNodes[0];
+  assert.match(root.getAttribute("class"), /\bselect-none\b/);
+  // A host's paragraph styles, such as the voice panel's, would resize it.
+  assert.equal(findAll(container, (node) => node.tagName === "P").length, 0);
 });

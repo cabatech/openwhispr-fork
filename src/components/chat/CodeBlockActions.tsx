@@ -5,7 +5,10 @@ import { Button } from "../ui/button";
 import { useToast } from "../ui/useToast";
 import { useCopyFeedback } from "../../hooks/useCopyFeedback";
 
-/** Copy for a code block in an answer, and Paste into app where a paste target exists. */
+/**
+ * Copy for a code block in an answer, and Paste into app where a paste target exists. Paste is
+ * for one line only: a terminal without bracketed paste runs each pasted line as it lands.
+ */
 export function CodeBlockActions({
   code,
   paste = false,
@@ -15,6 +18,7 @@ export function CodeBlockActions({
 }): ReactElement {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const canPaste = paste && !/[\r\n]/.test(code);
   // copyText writes the code exactly; copy() would trim its indentation.
   const { copied, copyText, confirmCopied } = useCopyFeedback(code);
 
@@ -36,7 +40,8 @@ export function CodeBlockActions({
   };
 
   return (
-    <div className="mb-2 min-w-0">
+    // Kept out of text selections, so selecting an answer never picks up its controls.
+    <div className="mb-2 min-w-0 select-none">
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="outline" onClick={() => void copy()}>
           {copied ? (
@@ -46,15 +51,18 @@ export function CodeBlockActions({
           )}
           {copied ? t("common.copied") : t("common.copy")}
         </Button>
-        {paste && (
+        {canPaste && (
           <Button size="sm" variant="outline" onClick={() => void pasteIntoApp()}>
             <Terminal className="h-3.5 w-3.5" />
             {t("skills.code.paste")}
           </Button>
         )}
       </div>
-      {paste && (
-        <p className="mt-1.5 text-[11px] text-muted-foreground/80">{t("skills.code.pasteNote")}</p>
+      {/* Not a <p>: a host's paragraph styles would resize it. */}
+      {canPaste && (
+        <div className="mt-1.5 text-[11px] text-muted-foreground/80">
+          {t("skills.code.pasteNote")}
+        </div>
       )}
     </div>
   );
