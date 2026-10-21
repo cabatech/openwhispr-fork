@@ -51,6 +51,14 @@ export function useAssistantPanel({
   const openGenerationRef = useRef(0);
   const commandIdRef = useRef(0);
   const conversationIdRef = useRef(conversationId);
+  // A conversation that is gone (deleted, or it failed to load) takes its skill choice with it.
+  if (
+    conversationId == null &&
+    conversationIdRef.current != null &&
+    skillChoice !== NO_SKILL_CHOICE
+  ) {
+    setSkillChoice(NO_SKILL_CHOICE);
+  }
   const selectionContextRef = useRef(null);
   const hasContentRef = useRef(false);
   const errorDownplayRequestedRef = useRef(false);

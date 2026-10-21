@@ -352,3 +352,17 @@ test("an update whose every field repeats its hint shows no card", async (t) => 
   assert.match((await result).data, /the skill's new text/);
 });
 
+test("a proposal that repeats its hints is checked as empty, so it never shows", async (t) => {
+  const electron = fakeElectron({ problems: [{ code: "missingDescription" }] });
+  const { propose, calls } = await setup(t, electron);
+  const echoed = {
+    ...ARGS,
+    description: "What the skill does and when to use it, in one or two sentences",
+    instructions: "The skill's instructions, as short headed sections",
+  };
+
+  await propose(echoed).result;
+
+  assert.equal(calls.check[0].proposal.description, "");
+  assert.equal(calls.check[0].proposal.instructions, "");
+});

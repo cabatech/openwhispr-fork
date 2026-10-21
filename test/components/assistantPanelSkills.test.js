@@ -330,5 +330,10 @@ test("the panel's owner keeps the skill choice through a close, and resets it", 
 
   await React.act(async () => assistant.handleConversationReset());
   assert.deepEqual(assistant.skillChoice, { picked: null, pickOff: false });
+
+  // A conversation that is gone (deleted, or it failed to load) takes its choice with it.
+  await React.act(async () => assistant.setSkillChoice(picked));
+  await React.act(async () => assistant.setConversationId(null));
+  assert.deepEqual(assistant.skillChoice, { picked: null, pickOff: false });
 });
 
