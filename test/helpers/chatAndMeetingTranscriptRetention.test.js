@@ -241,7 +241,19 @@ test("clearing a meeting transcript queues nothing for cloud sync", (t) => {
   assert.equal(after.updated_at, before.updated_at);
 });
 
-test("only meeting notes outside team spaces lose their transcript", (t) => {
+test("a recording started from a new note loses its transcript after the period", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+
+  // New note saves a personal note and records into it.
+  const recorded = insertNote(db, { daysAgo: 40, noteType: "personal" });
+
+  assert.deepEqual(db.clearMeetingTranscriptsExpiredBefore(30).ids, [recorded]);
+  assert.equal(noteRow(db, recorded).transcript, null);
+  assert.equal(noteRow(db, recorded).content, "My own notes");
+});
+
+test("notes in team spaces and uploaded audio keep their transcripts", (t) => {
   const db = createDb(t);
   if (!db) return;
 
@@ -251,6 +263,17 @@ test("only meeting notes outside team spaces lose their transcript", (t) => {
   assert.deepEqual(db.clearMeetingTranscriptsExpiredBefore(30).ids, []);
   assert.equal(noteRow(db, team).transcript, TRANSCRIPT);
   assert.equal(noteRow(db, upload).transcript, TRANSCRIPT);
+});
+
+test("another account's notes on this computer keep their transcripts", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+
+  const otherAccount = insertNote(db, { daysAgo: 40 });
+  db.db.prepare("UPDATE notes SET account_id = 'other-account' WHERE id = ?").run(otherAccount);
+
+  assert.deepEqual(db.clearMeetingTranscriptsExpiredBefore(30).ids, []);
+  assert.equal(noteRow(db, otherAccount).transcript, TRANSCRIPT);
 });
 
 test("the transcript count shown before a shorter period matches what is cleared", (t) => {
@@ -288,25 +311,33 @@ test("the clean-up removes old chats and transcripts once a period is chosen", (
   const db = createDb(t);
   if (!db) return;
 
-  const chat = insertChat(db, { activeDaysAgo: 10 });
-  const note = insertNote(db, { daysAgo: 10 });
+  const chats = [insertChat(db, { activeDaysAgo: 10 }), insertChat(db, { activeDaysAgo: 9 })];
+  const notes = [insertNote(db, { daysAgo: 10 }), insertNote(db, { daysAgo: 9 })];
 
   cleanup(db, { chatRetentionDays: 7, meetingTranscriptRetentionDays: 7 });
 
-  assert.equal(chatRow(db, chat), undefined);
-  assert.equal(noteRow(db, note).transcript, null);
-  // Open windows drop the chat and stop showing the transcript. The note goes out as
-  // note-synced, which updates windows without pushing it: the cloud keeps its copy.
-  assert.equal(sent.length, 2);
-  assert.ok(
-    sent.some(({ channel, data }) => channel === "conversation-deleted" && data.id === chat)
+  for (const chat of chats) assert.equal(chatRow(db, chat), undefined);
+  for (const note of notes) assert.equal(noteRow(db, note).transcript, null);
+  // One message per clean-up, not per item, so open windows refresh once.
+  assert.deepEqual(
+    sent.map(({ channel, data }) => [channel, [...data.ids].sort()]),
+    [
+      ["conversations-deleted", [...chats].sort()],
+      ["note-transcripts-cleared", [...notes].sort()],
+    ]
   );
-  assert.ok(
-    sent.some(
-      ({ channel, data }) =>
-        channel === "note-synced" && data.id === note && data.transcript === null
-    )
-  );
+});
+
+test("a clean-up that removes nothing tells no window", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+
+  insertChat(db, { activeDaysAgo: 1 });
+  insertNote(db, { daysAgo: 1 });
+
+  cleanup(db, { chatRetentionDays: 7, meetingTranscriptRetentionDays: 7 });
+
+  assert.deepEqual(sent, []);
 });
 
 test("a signed-in profile keeps chats and transcripts until its workspace policy is known", (t) => {

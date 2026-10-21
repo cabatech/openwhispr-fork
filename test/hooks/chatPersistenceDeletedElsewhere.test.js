@@ -29,7 +29,7 @@ async function mountPersistence(t) {
           saved.push({ id, role, content });
           return { id: saved.length };
         },
-        onConversationDeleted: (callback) => {
+        onConversationsDeleted: (callback) => {
           listeners.add(callback);
           return () => listeners.delete(callback);
         },
@@ -60,7 +60,7 @@ async function mountPersistence(t) {
     notified,
     deleteElsewhere: (id) =>
       React.act(async () => {
-        for (const listener of listeners) listener({ id });
+        for (const listener of listeners) listener({ ids: [id] });
       }),
   };
 }

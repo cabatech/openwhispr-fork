@@ -1960,6 +1960,7 @@ declare global {
       onNoteAdded?: (callback: (note: NoteItem) => void) => () => void;
       onNoteUpdated?: (callback: (note: NoteItem) => void) => () => void;
       onNoteDeleted?: (callback: (payload: { id: number }) => void) => () => void;
+      onNoteTranscriptsCleared?: (callback: (payload: { ids: number[] }) => void) => () => void;
       onNoteSynced?: (callback: (note: NoteItem) => void) => () => void;
       onFolderSynced?: (callback: (folder: FolderItem) => void) => () => void;
       onFolderDeleted?: (callback: (payload: { id: number }) => void) => () => void;
@@ -3021,7 +3022,7 @@ declare global {
           created_at: string;
         }>
       >;
-      onConversationDeleted?: (callback: (payload: { id: number }) => void) => () => void;
+      onConversationsDeleted?: (callback: (payload: { ids: number[] }) => void) => () => void;
       getAgentConversationsWithPreview?: (
         limit?: number,
         offset?: number,

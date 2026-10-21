@@ -170,3 +170,58 @@ test("an open note chat deleted elsewhere is no longer the active one", async (t
 
   assert.equal(chat.activeConversationId, null);
 });
+
+test("the note chat history drops a chat deleted elsewhere", async (t) => {
+  let root;
+  t.after(async () => {
+    if (root) await React.act(async () => root.unmount());
+    delete globalThis.__sent;
+    delete globalThis.__created;
+    delete globalThis.__persistenceOptions;
+  });
+  globalThis.__sent = [];
+  globalThis.__created = [];
+  let listed = [
+    { id: 1, title: "Earlier", updated_at: "" },
+    { id: 2, title: "Later", updated_at: "" },
+  ];
+  const listeners = [];
+  installBrowserGlobals(t, {
+    window: {
+      electronAPI: {
+        getConversationsForNote: async () => listed,
+        onConversationsDeleted: (callback) => {
+          listeners.push(callback);
+          return () => {};
+        },
+      },
+    },
+  });
+  const container = installInteractiveDom(t);
+  const vite = await createRendererServer(t, {
+    cachePrefix: "openwhispr-embedded-chat-history-deleted-test-",
+    mockModules: MOCKS,
+  });
+  const { useEmbeddedChat } = await vite.ssrLoadModule("/hooks/useEmbeddedChat.ts");
+  let chat;
+  function Harness() {
+    chat = useEmbeddedChat({ noteId: 5, folderId: null, noteTitle: "Kickoff", noteContent: "" });
+    return null;
+  }
+  root = createRoot(container);
+  await React.act(async () => root.render(React.createElement(Harness)));
+  assert.deepEqual(
+    chat.noteConversations.map(({ id }) => id),
+    [1, 2]
+  );
+
+  listed = [{ id: 2, title: "Later", updated_at: "" }];
+  await React.act(async () => {
+    for (const listener of listeners) listener({ ids: [1] });
+  });
+
+  assert.deepEqual(
+    chat.noteConversations.map(({ id }) => id),
+    [2]
+  );
+});

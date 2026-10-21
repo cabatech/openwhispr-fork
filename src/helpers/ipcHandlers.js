@@ -1332,22 +1332,20 @@ class IPCHandlers {
       if (!this._isLocalHistoryPolicyKnown()) return;
       if (chatRetentionDays > 0) {
         const { ids } = this.databaseManager.deleteConversationsExpiredBefore(chatRetentionDays);
-        for (const id of ids) {
-          if (this.vectorIndex?.isReady?.()) {
-            this.vectorIndex.deleteConversationChunks(id).catch(() => {});
-          }
-          broadcastToWindows("conversation-deleted", { id });
+        if (this.vectorIndex?.isReady?.()) {
+          for (const id of ids) this.vectorIndex.deleteConversationChunks(id).catch(() => {});
         }
+        if (ids.length) broadcastToWindows("conversations-deleted", { ids });
       }
       if (meetingTranscriptRetentionDays > 0) {
         const { ids } = this.databaseManager.clearMeetingTranscriptsExpiredBefore(
           meetingTranscriptRetentionDays
         );
-        for (const id of ids) {
-          if (this._noteFilesEnabled) require("./markdownMirror").deleteTranscript(id);
-          // note-synced, not note-updated: windows refresh without pushing the note,
-          // because the cloud keeps its copy.
-          broadcastToWindows("note-synced", this.databaseManager.getNote(id));
+        if (ids.length) {
+          if (this._noteFilesEnabled) require("./markdownMirror").deleteTranscripts(ids);
+          // Windows update only the notes they already show: these are old notes, and
+          // nothing here is pushed, because the cloud keeps its copy.
+          broadcastToWindows("note-transcripts-cleared", { ids });
         }
       }
     } catch (error) {
@@ -2998,7 +2996,7 @@ class IPCHandlers {
     ipcMain.handle("db-hard-delete-conversation", (_, id) => {
       const result = this.databaseManager.hardDeleteConversation(id);
       if (result?.success) {
-        setImmediate(() => broadcastToWindows("conversation-deleted", { id }));
+        setImmediate(() => broadcastToWindows("conversations-deleted", { ids: [id] }));
       }
       return result;
     });

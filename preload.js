@@ -342,6 +342,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("note-deleted", listener);
     return () => ipcRenderer.removeListener("note-deleted", listener);
   },
+  onNoteTranscriptsCleared: (callback) => {
+    const listener = (_event, data) => callback?.(data);
+    ipcRenderer.on("note-transcripts-cleared", listener);
+    return () => ipcRenderer.removeListener("note-transcripts-cleared", listener);
+  },
   onNoteSynced: (callback) => {
     const listener = (_event, note) => callback?.(note);
     ipcRenderer.on("note-synced", listener);
@@ -1159,10 +1164,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   addAgentMessage: (conversationId, role, content, metadata) =>
     ipcRenderer.invoke("db-add-agent-message", conversationId, role, content, metadata),
   getAgentMessages: (conversationId) => ipcRenderer.invoke("db-get-agent-messages", conversationId),
-  onConversationDeleted: (callback) => {
+  onConversationsDeleted: (callback) => {
     const listener = (_event, data) => callback?.(data);
-    ipcRenderer.on("conversation-deleted", listener);
-    return () => ipcRenderer.removeListener("conversation-deleted", listener);
+    ipcRenderer.on("conversations-deleted", listener);
+    return () => ipcRenderer.removeListener("conversations-deleted", listener);
   },
   getAgentConversationsWithPreview: (limit, offset, includeArchived) =>
     ipcRenderer.invoke("db-get-agent-conversations-with-preview", limit, offset, includeArchived),

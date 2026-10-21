@@ -143,6 +143,11 @@ export function useEmbeddedChat({
     return conversations ?? [];
   }, [noteId]);
 
+  useEffect(
+    () => window.electronAPI?.onConversationsDeleted?.(() => void fetchNoteConversations()),
+    [fetchNoteConversations]
+  );
+
   if (noteId !== prevNoteId) {
     setPrevNoteId(noteId);
     if (!noteId) {

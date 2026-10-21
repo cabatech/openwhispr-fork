@@ -123,7 +123,7 @@ export default function ConversationList({
 
   // Chats can be deleted outside this list, e.g. by a retention period.
   useEffect(
-    () => window.electronAPI?.onConversationDeleted?.(() => void loadConversations()),
+    () => window.electronAPI?.onConversationsDeleted?.(() => void loadConversations()),
     [loadConversations]
   );
 

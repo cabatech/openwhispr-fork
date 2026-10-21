@@ -25,7 +25,7 @@ test("a chat deleted elsewhere drops out of the list", async (t) => {
       electronAPI: {
         getAgentConversationsWithPreview: async (_limit, _offset, isArchived) =>
           isArchived ? [] : active,
-        onConversationDeleted: (callback) => {
+        onConversationsDeleted: (callback) => {
           listeners.push(callback);
           return () => {};
         },
@@ -58,7 +58,7 @@ test("a chat deleted elsewhere drops out of the list", async (t) => {
 
   active = [chat(2, "Budget review")];
   await React.act(async () => {
-    for (const listener of listeners) listener({ id: 1 });
+    for (const listener of listeners) listener({ ids: [1] });
   });
 
   assert.doesNotMatch(container.textContent, /Trip planning/);

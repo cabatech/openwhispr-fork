@@ -133,8 +133,10 @@ export function useChatPersistence(options: UseChatPersistenceOptions = {}): Cha
   // no-ops against the missing row.
   useEffect(
     () =>
-      window.electronAPI?.onConversationDeleted?.(({ id }) => {
-        if (id !== conversationIdRef.current) return;
+      window.electronAPI?.onConversationsDeleted?.(({ ids }) => {
+        if (conversationIdRef.current === null || !ids.includes(conversationIdRef.current)) {
+          return;
+        }
         handleNewChat();
         onConversationDeletedRef.current?.();
       }),

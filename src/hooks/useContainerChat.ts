@@ -102,6 +102,11 @@ export function useContainerChat({
     };
   }, [fetchConversations]);
 
+  useEffect(
+    () => window.electronAPI?.onConversationsDeleted?.(() => void fetchConversations()),
+    [fetchConversations]
+  );
+
   // useChatStreaming returns a fresh object every render; cancelStream is
   // stable. Leaving a conversation cancels its turn, as in useEmbeddedChat: a
   // reply still streaming would otherwise save into whichever conversation is
