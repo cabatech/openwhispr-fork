@@ -45,6 +45,8 @@ export interface SkillSummary {
   addedAt: string;
   updatedAt: string;
   lastUsedAt: string | null;
+  /** Over Cloud backup's caps, so it stays on this computer only. */
+  tooLargeToSync?: boolean;
 }
 
 export interface SkillFileInfo {
@@ -75,6 +77,46 @@ export interface SkillUploadPreview {
   displayName?: string;
   problems: SkillIssue<SkillProblemCode>[];
   warnings: SkillIssue<SkillWarningCode>[];
+}
+
+/** A skill's row in the local database, as the sync pass reads it. */
+export interface SkillSyncRow {
+  id: number;
+  name: string;
+  enabled: number;
+  content_hash: string | null;
+  client_skill_id: string;
+  cloud_id: string | null;
+  sync_status: "synced" | "pending";
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A skill's files for Cloud backup, or why it stays on this computer. */
+export type SkillCloudExport =
+  { files: CloudSkillFile[]; contentHash: string } | { tooLargeToSync: true } | null;
+
+export interface CloudSkillFile {
+  path: string;
+  encoding: "utf8" | "base64";
+  content: string;
+}
+
+/** A skill as the cloud's writes return it: everything but the files. */
+export interface CloudSkillMeta {
+  id: string;
+  client_skill_id: string | null;
+  name: string;
+  enabled: boolean;
+  content_hash: string;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CloudSkillEntry extends CloudSkillMeta {
+  files: CloudSkillFile[];
 }
 
 export type SkillWriteError = "noSpace" | "permission" | "unknown";

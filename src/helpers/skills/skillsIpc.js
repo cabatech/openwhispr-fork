@@ -201,6 +201,46 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
   ipcMain.handle("skills-mark-used", (_event, name) => {
     if (isSkillFolderName(name)) library.markUsed(name);
   });
+
+  // Cloud backup, driven by the renderer's SyncService as for snippets. A pull tells the
+  // windows once, at its end, through skills-broadcast-updated.
+  const { database } = library;
+  const isCloudEntry = (entry) => typeof entry?.name === "string";
+  ipcMain.handle("skills-get-pending", () => {
+    // A rescan first, so an edit or removal made outside the app is sent too.
+    library.scan();
+    return database.getPendingSkills();
+  });
+  ipcMain.handle("skills-get-pending-deletes", () => database.getPendingSkillDeletes());
+  ipcMain.handle("skills-export-for-cloud", (_event, name) =>
+    isSkillFolderName(name) ? library.exportForCloud(name) : null
+  );
+  ipcMain.handle("skills-get-for-cloud-merge", (_event, entry) =>
+    isCloudEntry(entry) ? database.getSkillForCloudMerge(entry) : null
+  );
+  ipcMain.handle("skills-apply-from-cloud", (_event, entry) =>
+    isCloudEntry(entry) ? library.applyFromCloud(entry) : false
+  );
+  ipcMain.handle(
+    "skills-mark-synced",
+    (_event, name, cloudId, serverUpdatedAt, expectedHash, expectedEnabled) => {
+      if (!isSkillFolderName(name) || typeof cloudId !== "string") return null;
+      return database.markSkillSynced(
+        name,
+        cloudId,
+        serverUpdatedAt,
+        expectedHash,
+        expectedEnabled
+      );
+    }
+  );
+  ipcMain.handle("skills-hard-delete", (_event, name) =>
+    isSkillFolderName(name) ? database.hardDeleteSkillState(name) : null
+  );
+  ipcMain.handle("skills-clear-cloud-id", (_event, name) =>
+    isSkillFolderName(name) ? database.clearSkillCloudId(name) : null
+  );
+  ipcMain.handle("skills-broadcast-updated", () => changed());
 }
 
 module.exports = { registerSkillsIpc };

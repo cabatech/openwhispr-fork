@@ -4,6 +4,7 @@ const path = require("path");
 const debugLogger = require("../debugLogger");
 const {
   SKILL_LIMITS,
+  SKILL_NAME_PATTERN,
   parseSkillMarkdown,
   validateSkillFiles,
   displayNameFor,
@@ -27,6 +28,9 @@ const MODEL_FILES_MAX_BYTES = 200 * 1024;
 const PROPOSAL_LIMITS = { maxFiles: 20, maxFileBytes: 200 * 1024, maxBytes: 1024 * 1024 };
 // Copies kept per skill for Undo, newest first; older ones are deleted.
 const VERSIONS_KEPT = 5;
+// What Cloud backup carries per skill, the same caps as the server's. A bigger skill stays on
+// this computer only.
+const SYNC_LIMITS = { maxFiles: 100, maxBytes: 1024 * 1024 };
 
 // A name the library can address on disk: one path segment that isn't hidden. Wider than
 // SKILL_NAME_PATTERN, so a folder dropped in under any name can still be shown and removed.
@@ -113,16 +117,43 @@ function toSummary(inspected, state) {
     enabled: state.enabled,
     valid: !problem,
     ...(problem ? { problem } : {}),
+    ...(inspected.tooLargeToSync ? { tooLargeToSync: true } : {}),
     addedAt: state.createdAt,
     updatedAt: state.updatedAt,
     lastUsedAt: state.lastUsedAt,
   };
 }
 
-function sizeProblem(files) {
-  if (files.length > SKILL_LIMITS.maxFiles) return { code: "tooManyFiles" };
+function sizeProblem(files, limits = SKILL_LIMITS) {
+  if (files.length > limits.maxFiles) return { code: "tooManyFiles" };
   const bytes = files.reduce((total, file) => total + file.data.length, 0);
-  return bytes > SKILL_LIMITS.maxBytes ? { code: "tooLarge" } : null;
+  return bytes > limits.maxBytes ? { code: "tooLarge" } : null;
+}
+
+// Text crosses as UTF-8 when it comes back byte for byte; anything else as base64.
+function toCloudFile({ path: relPath, data }) {
+  const text = data.toString("utf8");
+  return isTextFile(data) && Buffer.from(text, "utf8").equals(data)
+    ? { path: relPath, encoding: "utf8", content: text }
+    : { path: relPath, encoding: "base64", content: data.toString("base64") };
+}
+
+// A cloud skill's files as bytes, or null when the list isn't one this library would write.
+function fromCloudFiles(files) {
+  if (!Array.isArray(files)) return null;
+  const decoded = [];
+  for (const file of files) {
+    if (
+      typeof file?.path !== "string" ||
+      typeof file.content !== "string" ||
+      !["utf8", "base64"].includes(file.encoding) ||
+      !isSafeArchivePath(file.path)
+    ) {
+      return null;
+    }
+    decoded.push({ path: file.path, data: Buffer.from(file.content, file.encoding) });
+  }
+  return hasClashingPaths(decoded.map((file) => file.path)) ? null : decoded;
 }
 
 function readBuiltin(name) {
@@ -268,15 +299,7 @@ class SkillLibrary {
 
   uninstall(name) {
     if (!isSkillFolderName(name)) return;
-    const trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
-    try {
-      fs.renameSync(path.join(this.skillsDir, name), trash);
-    } catch (error) {
-      if (error.code !== "ENOENT") throw writeError(error);
-    }
-    this._removeQuietly(trash);
-    this._removeQuietly(path.join(this.versionsDir, name));
-    this.inspected.delete(name);
+    this._removeSkill(name);
     this.database.deleteSkillState(name);
   }
 
@@ -501,6 +524,45 @@ class SkillLibrary {
     this.database.markSkillUsed(name);
   }
 
+  // A skill's files for Cloud backup, with the hash they make. Null when there's no such skill or
+  // it needs fixing; tooLargeToSync when it is over the backup caps.
+  exportForCloud(name) {
+    if (!this._exists(name) || !isSkillFolderName(name)) return null;
+    const inspected = this._inspect(name);
+    if (inspected.problems.length > 0) return null;
+    if (inspected.tooLargeToSync) return { tooLargeToSync: true };
+    const files = walkSkillFolder(this.skillDir(name))
+      .files.sort(byPath)
+      .map((file) => ({ path: file.path, data: fs.readFileSync(file.fullPath) }));
+    return { files: files.map(toCloudFile), contentHash: contentHash(files) };
+  }
+
+  // A skill from Cloud backup: checked like one found on disk, then written in one swap. A
+  // tombstone removes the skill and its versions. False when the entry was skipped.
+  applyFromCloud(entry) {
+    const name = entry?.name;
+    const skip = (reason) => {
+      debugLogger.warn("Skipped a skill from Cloud backup", { name, reason }, "skills");
+      return false;
+    };
+    if (!isSkillFolderName(name) || !SKILL_NAME_PATTERN.test(name)) return skip("name");
+    if (entry.deleted_at) {
+      this._removeSkill(name);
+      this.database.upsertSkillStateFromCloud(entry, null);
+      return true;
+    }
+    const files = fromCloudFiles(entry.files);
+    if (!files) return skip("files");
+    if (sizeProblem(files, SYNC_LIMITS)) return skip("size");
+    const { problems } = validateSkillFiles(files, { folderName: name, source: "disk" });
+    if (problems.length > 0) return skip(problems[0].code);
+    const hash = contentHash(files);
+    if (this._diskHash(name) !== hash) this._writeSkillFolder(name, files);
+    this.inspected.delete(name);
+    this.database.upsertSkillStateFromCloud(entry, hash);
+    return true;
+  }
+
   _inspect(name) {
     let walked;
     try {
@@ -529,6 +591,7 @@ class SkillLibrary {
       ...validateSkillFiles(files, { folderName: name, source: "disk" }),
       hash: contentHash(files),
       fingerprint: walked.fingerprint,
+      tooLargeToSync: sizeProblem(files, SYNC_LIMITS) !== null,
     };
     this.inspected.set(name, inspected);
     return inspected;
@@ -651,6 +714,27 @@ class SkillLibrary {
     return contentHash(
       walked.files.map((file) => ({ path: file.path, data: fs.readFileSync(file.fullPath) }))
     );
+  }
+
+  // The hash of what is on disk, or null when there's no readable skill folder.
+  _diskHash(name) {
+    try {
+      return this.skillDir(name) ? this._folderHash(name) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  _removeSkill(name) {
+    const trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
+    try {
+      fs.renameSync(path.join(this.skillsDir, name), trash);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw writeError(error);
+    }
+    this._removeQuietly(trash);
+    this._removeQuietly(path.join(this.versionsDir, name));
+    this.inspected.delete(name);
   }
 
   _install(name, files) {

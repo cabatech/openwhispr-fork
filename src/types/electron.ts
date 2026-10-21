@@ -37,6 +37,8 @@ import type {
   NoteAttendeesRequest,
 } from "./connectors";
 import type {
+  CloudSkillEntry,
+  SkillCloudExport,
   SkillCommitResult,
   SkillCreateInput,
   SkillDetail,
@@ -47,6 +49,7 @@ import type {
   SkillRef,
   SkillSaveResult,
   SkillSummary,
+  SkillSyncRow,
   SkillUpdate,
   SkillUploadItem,
   SkillUploadPreview,
@@ -3819,6 +3822,22 @@ declare global {
       hardDeleteSnippet?: (id: number) => Promise<{ success: boolean; id: number }>;
       clearSnippetCloudId?: (id: number) => Promise<{ success: boolean }>;
       broadcastSnippetsUpdated?: () => Promise<{ success: boolean }>;
+
+      getPendingSkills?: () => Promise<SkillSyncRow[]>;
+      getPendingSkillDeletes?: () => Promise<SkillSyncRow[]>;
+      exportSkillForCloud?: (name: string) => Promise<SkillCloudExport>;
+      getSkillForCloudMerge?: (cloudEntry: CloudSkillEntry) => Promise<SkillSyncRow | null>;
+      applySkillFromCloud?: (cloudEntry: CloudSkillEntry) => Promise<boolean>;
+      markSkillSynced?: (
+        name: string,
+        cloudId: string,
+        serverUpdatedAt: string | undefined,
+        expectedHash: string,
+        expectedEnabled: boolean
+      ) => Promise<{ success: boolean; changes: number }>;
+      hardDeleteSkill?: (name: string) => Promise<{ success: boolean }>;
+      clearSkillCloudId?: (name: string) => Promise<{ success: boolean }>;
+      broadcastSkillsUpdated?: () => Promise<void>;
     };
 
     api?: {
