@@ -1635,6 +1635,10 @@ declare global {
         dataRetentionEnabled: boolean;
         localHistoryPolicyResolved: boolean;
       }) => void;
+      retentionPreview: (
+        kind: "chats" | "meetingTranscripts",
+        days: number
+      ) => Promise<{ count: number }>;
       retryTranscription: (
         id: number,
         settings?: {

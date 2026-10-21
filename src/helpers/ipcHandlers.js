@@ -896,6 +896,18 @@ class IPCHandlers {
   // signed out the policy store stays idle forever and the user's own preference
   // is the only authority there is. Mid-scan arrival needs no separate check:
   // a policy that resolves "always_off" flips the switch, which the loop reads.
+  // How many items a shorter period would remove now, for its confirmation.
+  _previewRetention(kind, days) {
+    if (!Number.isInteger(days) || days <= 0) throw new Error("Invalid retention period");
+    if (kind === "chats") {
+      return { count: this.databaseManager.countConversationsExpiredBefore(days) };
+    }
+    if (kind === "meetingTranscripts") {
+      return { count: this.databaseManager.countMeetingTranscriptsExpiredBefore(days) };
+    }
+    throw new Error("Unknown retention kind");
+  }
+
   _mayStartAnalyticsHistoryReconstruction() {
     return this._canReconstructAnalyticsHistory() && this._isLocalHistoryPolicyKnown();
   }
@@ -2039,6 +2051,8 @@ class IPCHandlers {
         },
       })
     );
+
+    ipcMain.handle("retention-preview", (event, kind, days) => this._previewRetention(kind, days));
 
     ipcMain.handle("delete-all-audio", async () => {
       const result = this.audioStorageManager.deleteAllAudio();

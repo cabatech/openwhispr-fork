@@ -6,6 +6,7 @@ const {
   installBrowserGlobals,
   installHookDom,
 } = require("../lib/rendererTestHarness");
+const { managedPolicy } = require("../helpers/harness/policyFixtures");
 
 // The main process sweeps on the periods each sync carries, so this pins what the
 // renderer sends. SSR cannot run useEffect, so the settings provider is mounted for real.
@@ -40,9 +41,10 @@ async function mountSettings(t, initialStorage) {
   const vite = await createRendererServer(t, {
     cachePrefix: "openwhispr-retention-settings-sync-test-",
   });
-  const [{ SettingsProvider }, { useSettingsStore }] = await Promise.all([
+  const [{ SettingsProvider }, { useSettingsStore }, { usePolicyStore }] = await Promise.all([
     vite.ssrLoadModule("/hooks/useSettings.ts"),
     vite.ssrLoadModule("/stores/settingsStore.ts"),
+    vite.ssrLoadModule("/stores/policyStore.ts"),
   ]);
 
   const { createRoot } = require("react-dom/client");
@@ -50,7 +52,7 @@ async function mountSettings(t, initialStorage) {
   await React.act(async () => root.render(React.createElement(SettingsProvider, null, null)));
   rootRef.current = root;
 
-  return { syncs, useSettingsStore };
+  return { syncs, useSettingsStore, usePolicyStore };
 }
 
 test("the main process is told the chat and meeting transcript periods", async (t) => {
@@ -71,4 +73,20 @@ test("changing a chat or meeting transcript period syncs it again", async (t) =>
 
   await React.act(async () => useSettingsStore.getState().setMeetingTranscriptRetentionDays(30));
   assert.equal(syncs.at(-1).meetingTranscriptRetentionDays, 30);
+});
+
+test("a workspace that always keeps history keeps chats and transcripts forever", async (t) => {
+  const { syncs, usePolicyStore } = await mountSettings(t, {
+    chatRetentionDays: "14",
+    meetingTranscriptRetentionDays: "60",
+  });
+  const policy = managedPolicy();
+  policy.dataRetention.localHistoryMode = "always_on";
+
+  await React.act(async () =>
+    usePolicyStore.setState({ status: "managed", appVersion: "1.10.0", policy })
+  );
+
+  assert.equal(syncs.at(-1).chatRetentionDays, 0);
+  assert.equal(syncs.at(-1).meetingTranscriptRetentionDays, 0);
 });

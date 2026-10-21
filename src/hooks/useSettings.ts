@@ -16,6 +16,7 @@ import type {
 import type { Snippet } from "../utils/snippets";
 import {
   effectiveAudioRetentionDays,
+  effectiveHistoryRetentionDays,
   effectiveLocalHistoryEnabled,
   isLocalHistoryPolicyResolved,
   isPolicySettled,
@@ -208,6 +209,12 @@ function useSettingsInternal() {
   const enforcedAudioRetentionDays = usePolicyStore((policyState) =>
     effectiveAudioRetentionDays(policyState, audioRetentionDays)
   );
+  const enforcedChatRetentionDays = usePolicyStore((policyState) =>
+    effectiveHistoryRetentionDays(policyState, chatRetentionDays)
+  );
+  const enforcedMeetingTranscriptRetentionDays = usePolicyStore((policyState) =>
+    effectiveHistoryRetentionDays(policyState, meetingTranscriptRetentionDays)
+  );
   // Sent alongside the periods because the main process reconstructs Insights
   // history from stored transcripts, and that must answer to the same switch.
   const enforcedDataRetentionEnabled = usePolicyStore((policyState) =>
@@ -220,16 +227,16 @@ function useSettingsInternal() {
     window.electronAPI?.syncRetentionSettings?.({
       audioRetentionDays: enforcedAudioRetentionDays,
       transcriptRetentionDays,
-      chatRetentionDays,
-      meetingTranscriptRetentionDays,
+      chatRetentionDays: enforcedChatRetentionDays,
+      meetingTranscriptRetentionDays: enforcedMeetingTranscriptRetentionDays,
       dataRetentionEnabled: enforcedDataRetentionEnabled,
       localHistoryPolicyResolved,
     });
   }, [
     enforcedAudioRetentionDays,
     transcriptRetentionDays,
-    chatRetentionDays,
-    meetingTranscriptRetentionDays,
+    enforcedChatRetentionDays,
+    enforcedMeetingTranscriptRetentionDays,
     enforcedDataRetentionEnabled,
     localHistoryPolicyResolved,
   ]);

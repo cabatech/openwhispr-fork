@@ -314,6 +314,26 @@ test("a signed-in profile keeps chats and transcripts until its workspace policy
   assert.equal(noteRow(db, note).transcript, null);
 });
 
+test("the preview counts what a shorter period would remove", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+
+  insertChat(db, { activeDaysAgo: 40 });
+  insertNote(db, { daysAgo: 40 });
+  insertNote(db, { daysAgo: 45 });
+  const handlers = Object.assign(Object.create(IPCHandlers.prototype), { databaseManager: db });
+
+  assert.deepEqual(handlers._previewRetention("chats", 30), { count: 1 });
+  assert.deepEqual(handlers._previewRetention("meetingTranscripts", 30), { count: 2 });
+  for (const [kind, days] of [
+    ["notes", 30],
+    ["chats", 0],
+    ["chats", "30"],
+  ]) {
+    assert.throws(() => handlers._previewRetention(kind, days), `${kind} ${days}`);
+  }
+});
+
 test("a cleared transcript's Markdown copy is removed with it", (t) => {
   const db = createDb(t);
   if (!db) return;
