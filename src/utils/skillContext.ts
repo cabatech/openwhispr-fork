@@ -93,6 +93,21 @@ export function buildSkillBlock(
   return render(body, included);
 }
 
+/** What the built-in skill creator needs to know: the user's skills, their apps, tool use. */
+export function buildCreatorContext(
+  skills: SkillSummary[],
+  connectedApps: string[],
+  { canUseTools, maxTokens }: { canUseTools: boolean; maxTokens: number }
+): string {
+  return [
+    skills.length > 0
+      ? `The user's skills (name: when to use it):\n${buildSkillCatalog(skills, maxTokens)}`
+      : "The user has no skills yet.",
+    `Connected apps: ${connectedApps.length > 0 ? connectedApps.join(", ") : "none"}`,
+    ...(canUseTools ? [] : ["This model can't call tools."]),
+  ].join("\n");
+}
+
 /** One file of a skill, read with load_skill. */
 export function buildSkillFileBlock(skill: SkillForModel, path: string, maxTokens: number): string {
   const content = asData(skill.files.find((file) => file.path === path)?.content ?? "");

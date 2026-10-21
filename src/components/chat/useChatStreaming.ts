@@ -33,8 +33,18 @@ import {
   appendScreenContextSuffix,
   getAgentSystemPrompt,
 } from "../../config/prompts";
-import { resolveUnavailableCapabilities } from "../../config/agentCapabilities";
+import { CONNECTOR_NAMES, resolveUnavailableCapabilities } from "../../config/agentCapabilities";
 import type { ToneAppCategory } from "../../config/toneStyle";
+import { refreshSkills, useSkillsStore } from "../../stores/skillsStore";
+import { estimateNoteTokens } from "../../helpers/noteChunking";
+import {
+  SKILL_CATALOG_MAX_TOKENS,
+  SKILL_CONTEXT_MAX_TOKENS,
+  buildCreatorContext,
+  buildSkillBlock,
+  withSkillContext,
+} from "../../utils/skillContext";
+import type { SkillRef, SkillSummary } from "../../types/skills";
 import { getDictionaryHintWords } from "../../utils/snippets";
 import { noteAttendeesContext, withoutAttendeesFence } from "../../utils/noteAttendees";
 import { FULL_TRANSCRIPT_MAX_TOKENS } from "../../utils/transcriptEvidence";
@@ -150,6 +160,8 @@ interface UseChatStreamingOptions {
   nameUnavailableCapabilities?: boolean;
   /** Disable product-help tools on guided surfaces such as the onboarding demo. */
   productHelpEnabled?: boolean;
+  /** The user's skills reach the model. Off unless a surface opts in. */
+  skillsEnabled?: boolean;
   /**
    * The note's meeting (note chat). Its attendees are listed for the model
    * only in a send that offers connector tools, so recipients come from them.
@@ -178,6 +190,8 @@ export interface SendToAIOptions {
   plainTextResponse?: boolean;
   /** Tone & Style: the kind of app a caret-destined answer will be typed into. */
   destinationAppCategory?: ToneAppCategory;
+  /** A skill the user attached to this chat; its text joins the model-only copy of this turn. */
+  attachedSkill?: SkillRef;
   /** Per-request completion hook used to deliver a finished voice response. */
   onComplete?: (result: {
     assistantId: string;
@@ -222,6 +236,7 @@ export function useChatStreaming({
   allowConnectors = false,
   nameUnavailableCapabilities = true,
   productHelpEnabled = true,
+  skillsEnabled = false,
   noteMeeting,
   onStreamComplete,
   onResponseContent,
@@ -414,6 +429,20 @@ export function useChatStreaming({
         const localModelCanUseTool =
           isLocalProvider && estimateModelSizeB(llmConfig.model) >= LOCAL_TOOL_MIN_PARAMS_B;
         const supportsTools = isCloudAgent || !isLocalProvider || localModelCanUseTool;
+        // A local or LAN model may have a 16k context; hosted models have room to spare.
+        const contextTier =
+          !isCloudAgent && (isLocalProvider || isLanAgent) ? "selfHosted" : "hosted";
+
+        let usableSkills: SkillSummary[] = [];
+        const activeRefs: SkillRef[] =
+          skillsEnabled && options?.attachedSkill ? [options.attachedSkill] : [];
+        if (skillsEnabled) {
+          // Read fresh: a skill switched off or edited since the last send is never offered.
+          await refreshSkills();
+          usableSkills = useSkillsStore
+            .getState()
+            .skills.filter((skill) => skill.enabled && skill.valid);
+        }
 
         const scope = searchScopeRef.current;
         const policy = usePolicyStore.getState();
@@ -423,12 +452,12 @@ export function useChatStreaming({
           settings.gcalConnected || settings.mcalConnected || settings.appleCalendarConnected;
         const webSearchEnabled = isWebSearchAllowed(policy);
         const connectorPlan = hasConnectorPlan(getUsageState(), readIsSubscribed());
+        const connectorsAvailable =
+          allowConnectors && settings.isSignedIn && connectorPlan && isConnectorsAllowed(policy);
         let registry: ToolRegistry | null = null;
         let connectorsOffered = false;
         if (supportsTools) {
           const scopeKey = scope ? `${scope.spaceId}:${scope.folderId ?? ""}` : "";
-          const connectorsAvailable =
-            allowConnectors && settings.isSignedIn && connectorPlan && isConnectorsAllowed(policy);
           // The first send in a window must not miss a connector that is already connected.
           if (connectorsAvailable) await ensureConnectorStatus();
           const connectors = connectorsAvailable
@@ -493,6 +522,37 @@ export function useChatStreaming({
           },
         });
 
+        // The attached skill's text rides only in the model's copy of this turn, rebuilt on
+        // every send, so the chat and its saved history keep just what the user typed.
+        const skillBlocks: string[] = [];
+        let skillRoom: number = SKILL_CONTEXT_MAX_TOKENS[contextTier];
+        for (const ref of activeRefs) {
+          // Switched off or broken since it was attached.
+          if (!ref.builtin && !usableSkills.some((skill) => skill.name === ref.name)) continue;
+          const skill = await window.electronAPI?.skillsReadForModel?.({
+            ...ref,
+            withFiles: registry === null,
+          });
+          if (!skill) continue;
+          const connectedApps = connectorsAvailable
+            ? readyConnectorIds().map((id) => CONNECTOR_NAMES[id] ?? id)
+            : [];
+          const creatorContext = ref.builtin
+            ? `\n${buildCreatorContext(usableSkills, connectedApps, {
+                canUseTools: registry !== null,
+                maxTokens: SKILL_CATALOG_MAX_TOKENS[contextTier],
+              })}`
+            : "";
+          const block =
+            buildSkillBlock(skill, skillRoom - estimateNoteTokens(creatorContext), {
+              inlineFiles: registry === null,
+            }) + creatorContext;
+          skillRoom -= estimateNoteTokens(block);
+          skillBlocks.push(block);
+          if (skillRoom <= 0) break;
+        }
+        if (cancelled() || !mountedRef.current) return;
+
         // A note's chat is about its note: other notes up front would compete with
         // it, and search_notes still reaches them when it doesn't answer.
         const [ragContext, attendeesContext] = await Promise.all([
@@ -504,9 +564,7 @@ export function useChatStreaming({
         // by whole-note actions, which work from the complete source.
         const maxTranscriptTokens =
           registry?.get("get_note") && !options?.requestText
-            ? FULL_TRANSCRIPT_MAX_TOKENS[
-                !isCloudAgent && (isLocalProvider || isLanAgent) ? "selfHosted" : "hosted"
-              ]
+            ? FULL_TRANSCRIPT_MAX_TOKENS[contextTier]
             : Infinity;
         const currentNote: OpenNoteContext =
           typeof openNoteRef.current === "function"
@@ -554,6 +612,14 @@ export function useChatStreaming({
           transformLastUserMessage(history, (message) =>
             typeof message.content === "string"
               ? { ...message, content: buildAgentRequestText(message.content, selectedContext) }
+              : null
+          );
+        }
+
+        if (skillBlocks.length > 0) {
+          transformLastUserMessage(history, (message) =>
+            typeof message.content === "string"
+              ? { ...message, content: withSkillContext(message.content, skillBlocks) }
               : null
           );
         }
@@ -875,6 +941,7 @@ export function useChatStreaming({
       allowConnectors,
       nameUnavailableCapabilities,
       productHelpEnabled,
+      skillsEnabled,
       t,
       setMessages,
       onStreamComplete,
