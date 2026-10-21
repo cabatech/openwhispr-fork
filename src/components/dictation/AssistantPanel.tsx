@@ -50,7 +50,10 @@ import {
 } from "../../helpers/assistantResponseDelivery";
 import { buildAssistantCommandSendOptions } from "./assistantCommandOptions";
 import { ApprovalCard } from "../chat/ApprovalCard";
+import { SkillApprovalCard } from "../chat/SkillApprovalCard";
+import { SkillChip } from "../chat/SkillChip";
 import { approvalKey, useConnectorApprovalStore } from "../../stores/connectorApprovalStore";
+import { useSkillApprovalStore } from "../../stores/skillApprovalStore";
 
 export interface AssistantCommand {
   id: number;
@@ -129,6 +132,7 @@ export function AssistantPanel({
     // Spoken commands answer on the Voice Assistant scope, not the Chat one.
     inferenceScope: "dictationAgent",
     allowConnectors: true,
+    skillsEnabled: true,
     onStreamComplete: (_assistantId, content, toolCalls) => {
       void persistence.saveAssistantMessage(content, toolCalls);
     },
@@ -144,6 +148,20 @@ export function AssistantPanel({
   );
 
   const [submissionInFlight, setSubmissionInFlight] = useState(false);
+  // A skill the app picked for a model without tools; later sends keep it until it's removed,
+  // and then nothing else is picked in this conversation.
+  const [pickedSkill, setPickedSkill] = useState<{ name: string; displayName: string } | null>(
+    null
+  );
+  const [skillPickOff, setSkillPickOff] = useState(false);
+  const skillSendOptions = useCallback(
+    () => ({
+      attachedSkill: pickedSkill ? { name: pickedSkill.name } : undefined,
+      allowSkillPick: !skillPickOff,
+      onSkillPicked: setPickedSkill,
+    }),
+    [pickedSkill, skillPickOff]
+  );
   const sendMessage = useChatMessageSender({
     conversationId: persistence.conversationId,
     persistence,
@@ -240,7 +258,7 @@ export function AssistantPanel({
       setSelectedContext(null);
       onSelectionContextChange(null);
     }
-    void sendMessage(pendingCommand.text, sendOptions)
+    void sendMessage(pendingCommand.text, { ...sendOptions, ...skillSendOptions() })
       .then((sent) => {
         if (sent) {
           onCommandConsumed(commandId);
@@ -280,19 +298,23 @@ export function AssistantPanel({
     onResponseContent,
     confirmCopied,
     sendMessage,
+    skillSendOptions,
     setMessages,
     t,
   ]);
 
   const approvalEntries = useConnectorApprovalStore((state) => state.entries);
-  const panelApprovals = latestAssistantMessage
-    ? (latestAssistantMessage.toolCalls ?? [])
-        .map((toolCall) => approvalEntries[approvalKey(latestAssistantMessage.id, toolCall.id)])
-        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+  const skillApprovalEntries = useSkillApprovalStore((state) => state.entries);
+  const latestToolKeys = latestAssistantMessage
+    ? (latestAssistantMessage.toolCalls ?? []).map((toolCall) =>
+        approvalKey(latestAssistantMessage.id, toolCall.id)
+      )
     : [];
-  const approvalAwaitingUser = panelApprovals.some(
-    (entry) => entry.state === "pending" || entry.state === "committing"
-  );
+  const panelApprovals = latestToolKeys.flatMap((key) => approvalEntries[key] ?? []);
+  const panelSkillApprovals = latestToolKeys.flatMap((key) => skillApprovalEntries[key] ?? []);
+  const approvalAwaitingUser =
+    panelApprovals.some((entry) => entry.state === "pending" || entry.state === "committing") ||
+    panelSkillApprovals.some((entry) => entry.state === "pending" || entry.state === "saving");
   const isToolExecuting = Boolean(streaming.activeToolName) && !approvalAwaitingUser;
   const isBusy = resolveAssistantPanelBusy({
     agentState: streaming.agentState,
@@ -343,6 +365,8 @@ export function AssistantPanel({
     persistence.handleNewChat();
     onConversationIdChange(null);
     clearSelectedContext();
+    setPickedSkill(null);
+    setSkillPickOff(false);
     displayedMessageRef.current = undefined;
     onConversationReset();
   }, [
@@ -359,10 +383,21 @@ export function AssistantPanel({
       if (!historyReady) return;
       const context = selectedContext;
       if (context) clearSelectedContext();
-      void sendMessage(text, context ? { selectedContext: context } : undefined);
+      void sendMessage(text, {
+        ...(context && { selectedContext: context }),
+        ...skillSendOptions(),
+      });
     },
-    [clearSelectedContext, historyReady, selectedContext, sendMessage]
+    [clearSelectedContext, historyReady, selectedContext, sendMessage, skillSendOptions]
   );
+
+  const composerAreaRef = useRef<HTMLDivElement | null>(null);
+  const removePickedSkill = useCallback(() => {
+    setPickedSkill(null);
+    setSkillPickOff(true);
+    // The × is gone with the chip, so the cursor goes back to the composer.
+    composerAreaRef.current?.querySelector("textarea")?.focus();
+  }, []);
 
   const showEmptyState =
     historyReady &&
@@ -521,7 +556,10 @@ export function AssistantPanel({
         </div>
       </header>
 
-      <div className="relative mx-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/40 bg-surface-1 shadow-inner">
+      <div
+        ref={composerAreaRef}
+        className="relative mx-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/40 bg-surface-1 shadow-inner"
+      >
         <main
           data-panel-scroll-region
           className="agent-chat-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4"
@@ -573,6 +611,9 @@ export function AssistantPanel({
             {panelApprovals.map((entry) => (
               <ApprovalCard key={entry.key} entry={entry} />
             ))}
+            {panelSkillApprovals.map((entry) => (
+              <SkillApprovalCard key={entry.key} entry={entry} />
+            ))}
             {thinking && (
               <div role="status">
                 <span className="sr-only">{t("agentMode.input.thinking")}</span>
@@ -598,6 +639,15 @@ export function AssistantPanel({
           }
           autoFocus={historyReady && open && messages.length === 0}
           className="px-3 pb-3"
+          leadingRow={
+            pickedSkill && (
+              <SkillChip
+                key={pickedSkill.name}
+                name={pickedSkill.displayName}
+                onRemove={removePickedSkill}
+              />
+            )
+          }
         />
 
         {showContentFlourish && (

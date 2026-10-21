@@ -318,6 +318,11 @@ test("a request text or selection and an attached skill compose in that order", 
   );
 });
 
+// The chat shows the creator's opening question before the user's first message.
+const OPENING =
+  'The chat opened by asking the user: "What do you do over and over? ' +
+  'Talk me through the last time, or pick a note to start from."';
+
 test("the attached creator learns the user's skills, connected apps and tool use", async (t) => {
   const creator = { attachedSkill: { name: "skill-creator", builtin: true } };
   const cloud = skillsApi();
@@ -337,7 +342,7 @@ test("the attached creator learns the user's skills, connected apps and tool use
   assert.ok(block.startsWith('<skill_content name="skill-creator" title="Skill creator">\n'));
   assert.ok(
     block.endsWith(
-      "</skill_content>\nThe user's skills (name: when to use it):\n" +
+      `</skill_content>\n${OPENING}\nThe user's skills (name: when to use it):\n` +
         "- meeting-prep: Briefs me before meetings.\n- weekly-recap: Recaps my week on Fridays.\n" +
         "Connected apps: Slack"
     ),
@@ -359,7 +364,7 @@ test("the attached creator learns the user's skills, connected apps and tool use
   await noTools.captured.sendToAI("Make a skill", [userMessage("u1", "Make a skill")], creator);
   assert.ok(
     latestUserText(noTools.sentMessages[0]).includes(
-      "</skill_content>\nThe user has no skills yet.\nConnected apps: none\n" +
+      `</skill_content>\n${OPENING}\nThe user has no skills yet.\nConnected apps: none\n` +
         "This model can't call tools.\n\nUser request:\nMake a skill"
     )
   );

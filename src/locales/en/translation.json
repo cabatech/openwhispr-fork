@@ -4690,6 +4690,7 @@
       "manage": "Manage skills",
       "add": "Add",
       "addMenu": {
+        "createWithAssistant": "Create with assistant",
         "create": "Create skill",
         "upload": "Upload skill"
       },
@@ -4725,7 +4726,8 @@
       "neverRun": "Shown, never run",
       "uninstall": "Uninstall",
       "uninstallConfirm": "Uninstall {{name}}? It's removed from this computer.",
-      "problem": "This skill can't be used until it's fixed: {{reason}}"
+      "problem": "This skill can't be used until it's fixed: {{reason}}",
+      "tryNow": "Try now"
     },
     "menu": {
       "copyMarkdown": "Copy markdown",
@@ -4794,7 +4796,8 @@
       "submit": "Create",
       "unsaved": "You have unsaved changes",
       "keepEditing": "Keep editing",
-      "discard": "Discard"
+      "discard": "Discard",
+      "draftWithAssistant": "Draft with assistant"
     },
     "problems": {
       "missingName": "Needs a name at the top",
@@ -4845,7 +4848,13 @@
       }
     },
     "chat": {
-      "usingSkill": "Using skill · {{name}}"
+      "chipRemove": "Remove {{name}} from this chat",
+      "placeholderWith": "Ask anything — this chat uses {{name}}",
+      "usingSkill": "Using skill · {{name}}",
+      "creatorName": "Skill creator",
+      "creatorOpening": "What do you do over and over? Talk me through the last time, or pick a note to start from.",
+      "draftPrompt": "Help me finish this skill.\nName: {{name}}\nDescription: {{description}}",
+      "noneYet": "(none yet)"
     },
     "approval": {
       "createHeader": "Create skill",

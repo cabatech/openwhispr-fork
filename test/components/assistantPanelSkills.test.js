@@ -1,0 +1,262 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const React = require("react");
+const { renderToStaticMarkup } = require("react-dom/server");
+const { createRendererServer, installBrowserGlobals } = require("../lib/rendererTestHarness");
+const { installInteractiveDom } = require("../lib/interactiveDom");
+const { SKILLS_MOCKS, ariaLabel, click, findAll, settle } = require("../lib/skillsHarness");
+
+const noop = () => {};
+
+// The voice panel with its chat hooks replaced: sends are recorded with their options, and
+// the composer renders its leading row so a chip is real and clickable.
+function panelMocks({ realMarkdown = false } = {}) {
+  return {
+    "react-i18next": SKILLS_MOCKS["react-i18next"],
+    "/ui/useToast": `export function useToast() { return { toast() {} }; }`,
+    "/chat/useChatPersistence": `
+      export function useChatPersistence() {
+        return {
+          messages: globalThis.__panelMessages,
+          setMessages() {},
+          conversationId: null,
+          async createConversation() { return 1; },
+          async loadConversation() {},
+          saveUserMessage() {},
+          saveAssistantMessage() {},
+          handleNewChat() {},
+        };
+      }
+    `,
+    "/chat/useChatStreaming": `
+      export function useChatStreaming(options) {
+        globalThis.__panelStreamingOptions = options;
+        return {
+          agentState: "idle",
+          activeToolName: globalThis.__panelActiveToolName ?? null,
+          toolStatus: "",
+          cancelStream() {},
+        };
+      }
+    `,
+    "/chat/useChatMessageSender": `
+      export function useChatMessageSender() {
+        return async (text, options) => {
+          globalThis.__panelSends.push({ text, options });
+          return true;
+        };
+      }
+    `,
+    "/chat/ChatInput": `
+      import { createElement } from "react";
+      export function ChatInput(props) {
+        globalThis.__panelInput = props;
+        return createElement("div", null, props.leadingRow, createElement("textarea"));
+      }
+    `,
+    "/chat/SkillApprovalCard": `
+      import { createElement } from "react";
+      import { useSkillChatActions } from "/components/chat/skillChatActions.ts";
+      export function SkillApprovalCard({ entry }) {
+        const { openSkill } = useSkillChatActions();
+        return createElement("div", {
+          "data-skill-card": entry.toolCallId,
+          "data-open-skill": openSkill ? "yes" : "no",
+        });
+      }
+    `,
+    "/hooks/useWindowDrag": `
+      export function useWindowDrag() { return { handleMouseDown() {}, handleMouseUp() {} }; }
+    `,
+    "/hooks/useCopyFeedback": `
+      export function useCopyFeedback() {
+        const copyText = async () => true;
+        return { copied: false, async copy() {}, copyText, confirmCopied() {} };
+      }
+    `,
+    "/stores/settingsStore": `
+      const state = { voiceAgentKey: [] };
+      export function useSettingsStore(selector) { return selector(state); }
+    `,
+    "/utils/hotkeys": `export function formatHotkeyListLabel() { return ""; }`,
+    ...(realMarkdown
+      ? {}
+      : {
+          "/ui/MarkdownRenderer": `
+            import React from "react";
+            export function MarkdownRenderer({ content }) {
+              return React.createElement("div", null, content);
+            }
+          `,
+        }),
+  };
+}
+
+const PANEL_PROPS = {
+  onCommandConsumed: noop,
+  onCommandDiscarded: noop,
+  onCommandSettled: noop,
+  initialConversationId: null,
+  onConversationIdChange: noop,
+  voiceState: "idle",
+  thinking: false,
+  open: true,
+  footerPhase: "pill",
+  horizontalDirection: "right",
+  onClose: noop,
+  onBusyChange: noop,
+  onResponseReadyChange: noop,
+  onResponseContent: noop,
+  onConversationReset: noop,
+  onSelectionContextChange: noop,
+};
+
+// Browser globals (and, for a mount, the DOM) come first: react-dom reads them as it loads.
+async function loadPanel(t, { messages = [], activeToolName = null, realMarkdown } = {}) {
+  globalThis.__panelMessages = messages;
+  globalThis.__panelActiveToolName = activeToolName;
+  globalThis.__panelSends = [];
+  t.after(() => {
+    for (const key of [
+      "__panelMessages",
+      "__panelActiveToolName",
+      "__panelSends",
+      "__panelStreamingOptions",
+      "__panelInput",
+    ]) {
+      delete globalThis[key];
+    }
+  });
+  const vite = await createRendererServer(t, {
+    cachePrefix: "openwhispr-assistant-panel-skills-test-",
+    noExternal: ["react-i18next"],
+    mockModules: panelMocks({ realMarkdown }),
+  });
+  const { AssistantPanel } = await vite.ssrLoadModule("/components/dictation/AssistantPanel.tsx");
+  return { vite, AssistantPanel };
+}
+
+async function mountPanel(t, props, options) {
+  let root = null;
+  t.after(async () => {
+    if (root) await React.act(async () => root.unmount());
+  });
+  // The tool-activity line rotates on an interval while a tool runs.
+  installBrowserGlobals(t, { window: { setInterval: () => 1, clearInterval() {} } });
+  const container = installInteractiveDom(t);
+  const { createRoot } = require("react-dom/client");
+  const loaded = await loadPanel(t, options);
+  root = createRoot(container);
+  await React.act(async () =>
+    root.render(React.createElement(loaded.AssistantPanel, { ...PANEL_PROPS, ...props }))
+  );
+  await settle();
+  return { ...loaded, container };
+}
+
+const COMMAND = {
+  id: 1,
+  text: "Prep my 3pm with Dana",
+  attachment: null,
+  selectedContext: null,
+  delivery: null,
+};
+
+test("the voice panel shows a picked skill's chip", async (t) => {
+  const { container } = await mountPanel(t, { pendingCommand: COMMAND });
+  const chip = () =>
+    findAll(container, (node) => ariaLabel(node).startsWith("skills.chat.chipRemove"))[0];
+  const typed = async (text) => {
+    await React.act(async () => globalThis.__panelInput.onTextSubmit(text));
+    await settle();
+    return globalThis.__panelSends.at(-1).options;
+  };
+
+  assert.equal(globalThis.__panelStreamingOptions.skillsEnabled, true);
+  const [spoken] = globalThis.__panelSends;
+  assert.equal(spoken.text, COMMAND.text);
+  assert.equal(spoken.options.allowSkillPick, true);
+  assert.equal(chip(), undefined);
+
+  await React.act(async () =>
+    spoken.options.onSkillPicked({ name: "meeting-prep", displayName: "Meeting prep" })
+  );
+  assert.equal(
+    ariaLabel(chip()),
+    `skills.chat.chipRemove${JSON.stringify({ name: "Meeting prep" })}`
+  );
+  assert.deepEqual((await typed("And the 4pm")).attachedSkill, { name: "meeting-prep" });
+
+  await click(chip());
+
+  assert.equal(chip(), undefined);
+  const afterRemove = await typed("And the 5pm");
+  assert.equal(afterRemove.attachedSkill, undefined);
+  assert.equal(afterRemove.allowSkillPick, false);
+});
+
+test("the voice panel renders skill cards", async (t) => {
+  const messages = [
+    { id: "user-1", role: "user", content: "Make that a skill", isStreaming: false },
+    {
+      id: "assistant-1",
+      role: "assistant",
+      content: "",
+      isStreaming: true,
+      toolCalls: [{ id: "call-1", name: "propose_skill", arguments: "{}", status: "executing" }],
+    },
+  ];
+  const { vite, container } = await mountPanel(
+    t,
+    { pendingCommand: null },
+    { messages, activeToolName: "propose_skill" }
+  );
+  const store = await vite.ssrLoadModule("/stores/skillApprovalStore.ts");
+  const { approvalKey } = await vite.ssrLoadModule("/stores/connectorApprovalStore.ts");
+  const key = approvalKey("assistant-1", "call-1");
+  await React.act(async () =>
+    store.useSkillApprovalStore.setState({
+      entries: {
+        [key]: {
+          key,
+          kind: "create",
+          messageId: "assistant-1",
+          toolCallId: "call-1",
+          name: "weekly-report",
+          state: "pending",
+          draft: { title: "Weekly report", description: "d", instructions: "i" },
+          original: { title: "Weekly report", description: "d", instructions: "i" },
+        },
+      },
+    })
+  );
+
+  const [card] = findAll(container, (node) => node.getAttribute("data-skill-card") === "call-1");
+  assert.ok(card, "the card is shown");
+  assert.equal(card.getAttribute("data-open-skill"), "no", "no Open skill in this window");
+  assert.equal(
+    findAll(container, (node) => node.getAttribute("data-tool-invocation") !== null).length,
+    0,
+    "a card waiting on the user is not covered by the tool overlay"
+  );
+});
+
+test("voice panel code blocks offer Paste into app", async (t) => {
+  const messages = [
+    {
+      id: "assistant-1",
+      role: "assistant",
+      content: "Run this:\n\n```sh\nls -la\n```\n",
+      isStreaming: false,
+    },
+  ];
+  installBrowserGlobals(t);
+  const { AssistantPanel } = await loadPanel(t, { messages, realMarkdown: true });
+
+  const markup = renderToStaticMarkup(
+    React.createElement(AssistantPanel, { ...PANEL_PROPS, pendingCommand: null })
+  );
+
+  assert.match(markup, /skills\.code\.paste/);
+  assert.match(markup, /common\.copy/);
+});

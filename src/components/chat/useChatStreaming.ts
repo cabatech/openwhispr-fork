@@ -583,6 +583,7 @@ export function useChatStreaming({
             ? `\n${buildCreatorContext(usableSkills, connectedApps, {
                 canUseTools: registry !== null,
                 maxTokens: SKILL_CATALOG_MAX_TOKENS[contextTier],
+                opening: t("skills.chat.creatorOpening"),
               })}`
             : "";
           const block =

@@ -111,6 +111,20 @@ export interface SkillRef {
   builtin?: boolean;
 }
 
+/** How the Skills page opens a chat: with one skill attached, or with the skill creator. */
+export type SkillChatStart =
+  | { kind: "try"; name: string; displayName: string }
+  | { kind: "create"; draft?: { title: string; description: string } };
+
+/** A chat start on its way to the chat view; a new id is a new request. */
+export type SkillChatRequest = SkillChatStart & { id: number };
+
+/** Open skill, from a chat: the Skills page opens that skill. A new id is a new request. */
+export interface SkillOpenRequest {
+  id: number;
+  name: string;
+}
+
 /** A skill as the assistant reads it. */
 export interface SkillForModel {
   name: string;

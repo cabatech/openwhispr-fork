@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type KeyboardEvent, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, FileText, Plus, X } from "../icons";
+import { AlertTriangle, FileText, Plus, Sparkles, X } from "../icons";
 import { Button } from "../ui/button";
 import { Breadcrumb } from "../ui/Breadcrumb";
 import { Input, INPUT_CLASS } from "../ui/input";
@@ -39,9 +39,15 @@ function fieldFor(code: SkillProblemCode): Field | null {
 interface CreateSkillScreenProps {
   onCreated: (name: string) => void;
   onBack: () => void;
+  /** Hands the name and description to the skill creator chat; the draft stays here. */
+  onDraftWithAssistant?: (draft: { title: string; description: string }) => void;
 }
 
-export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps): ReactElement {
+export function CreateSkillScreen({
+  onCreated,
+  onBack,
+  onDraftWithAssistant,
+}: CreateSkillScreenProps): ReactElement {
   const { t } = useTranslation();
   const { toast } = useToast();
   const draft = useSkillsStore((state) => state.createDraft) ?? EMPTY_DRAFT;
@@ -329,6 +335,22 @@ export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps)
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2">
+            {onDraftWithAssistant && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  onDraftWithAssistant({
+                    title: draft.title.trim(),
+                    description: draft.description.trim(),
+                  })
+                }
+                className="-ms-2"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {t("skills.create.draftWithAssistant")}
+              </Button>
+            )}
             <div className="flex-1" />
             <Button variant="ghost" size="sm" onClick={requestLeave}>
               {t("common.cancel")}

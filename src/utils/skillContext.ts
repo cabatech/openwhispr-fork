@@ -93,13 +93,17 @@ export function buildSkillBlock(
   return render(body, included);
 }
 
-/** What the built-in skill creator needs to know: the user's skills, their apps, tool use. */
+/**
+ * What the built-in skill creator needs to know: the question the chat opened with (shown, never
+ * saved), the user's skills, their apps, tool use.
+ */
 export function buildCreatorContext(
   skills: SkillSummary[],
   connectedApps: string[],
-  { canUseTools, maxTokens }: { canUseTools: boolean; maxTokens: number }
+  { canUseTools, maxTokens, opening }: { canUseTools: boolean; maxTokens: number; opening: string }
 ): string {
   return [
+    `The chat opened by asking the user: "${opening}"`,
     skills.length > 0
       ? `The user's skills (name: when to use it):\n${buildSkillCatalog(skills, maxTokens)}`
       : "The user has no skills yet.",
