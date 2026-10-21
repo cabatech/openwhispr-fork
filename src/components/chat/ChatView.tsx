@@ -155,27 +155,37 @@ export default function ChatView({
   const handledRequestId = useRef<number | null>(null);
   useEffect(() => {
     if (!skillRequest || handledRequestId.current === skillRequest.id) return;
-    handledRequestId.current = skillRequest.id;
-    startNewChat();
-    const skill: AttachedSkill =
-      skillRequest.kind === "try"
-        ? { ref: { name: skillRequest.name }, displayName: skillRequest.displayName }
-        : {
-            ref: { name: "skill-creator", builtin: true },
-            displayName: t("skills.chat.creatorName"),
-          };
-    setAttachedSkill(skill);
-    if (skillRequest.kind === "create" && skillRequest.draft) {
-      const { title, description } = skillRequest.draft;
-      void sendWithSkill(
-        t("skills.chat.draftPrompt", {
-          name: title || t("skills.chat.noneYet"),
-          description: description || t("skills.chat.noneYet"),
-        }),
-        skill
-      );
-    }
-    onSkillRequestHandled?.();
+    const request = skillRequest;
+    // Handled once this commit is done: React's development build mounts twice, and the first
+    // mount's chat session ends with it, which would drop a draft sent from it.
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      handledRequestId.current = request.id;
+      startNewChat();
+      const skill: AttachedSkill =
+        request.kind === "try"
+          ? { ref: { name: request.name }, displayName: request.displayName }
+          : {
+              ref: { name: "skill-creator", builtin: true },
+              displayName: t("skills.chat.creatorName"),
+            };
+      setAttachedSkill(skill);
+      if (request.kind === "create" && request.draft) {
+        const { title, description } = request.draft;
+        void sendWithSkill(
+          t("skills.chat.draftPrompt", {
+            name: title || t("skills.chat.noneYet"),
+            description: description || t("skills.chat.noneYet"),
+          }),
+          skill
+        );
+      }
+      onSkillRequestHandled?.();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [skillRequest, startNewChat, sendWithSkill, onSkillRequestHandled, t]);
 
   const skillChatActions = useMemo(() => ({ openSkill: onOpenSkill }), [onOpenSkill]);

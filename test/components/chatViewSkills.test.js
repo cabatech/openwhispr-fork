@@ -242,3 +242,51 @@ test("a request is handled once, however often the chat re-renders", async (t) =
   assert.equal(globalThis.__newChats, 1);
   assert.equal(chip(), undefined);
 });
+
+// React's development build mounts, unmounts and remounts once; the real persistence ends a
+// session on unmount, which would drop a send started during the first mount.
+test("Draft with assistant sends once under React's development double mount", async (t) => {
+  let root = null;
+  const created = [];
+  t.after(async () => {
+    if (root) await React.act(async () => root.unmount());
+    for (const key of ["__sends", "__chatInput", "__conversationList", "__chatStreamingOptions"]) {
+      delete globalThis[key];
+    }
+  });
+  installBrowserGlobals(t, {
+    window: {
+      electronAPI: {
+        createAgentConversation: async (title) => {
+          created.push(title);
+          return { id: 7 };
+        },
+        addAgentMessage: async () => {},
+      },
+    },
+  });
+  const container = installInteractiveDom(t);
+  globalThis.__sends = [];
+  const { createRoot } = require("react-dom/client");
+  const { "/useChatPersistence": _persistence, ...mockModules } = MOCKS;
+  const vite = await createRendererServer(t, {
+    cachePrefix: "openwhispr-chat-view-skills-strict-test-",
+    noExternal: ["react-i18next"],
+    mockModules,
+  });
+  const { default: ChatView } = await vite.ssrLoadModule("/components/chat/ChatView.tsx");
+  const draft = { title: "Weekly report", description: "Sums up my week." };
+  const view = React.createElement(ChatView, {
+    skillRequest: { id: 4, kind: "create", draft },
+    onSkillRequestHandled() {},
+  });
+
+  root = createRoot(container);
+  await React.act(async () => root.render(React.createElement(React.StrictMode, null, view)));
+  await settle();
+  await settle();
+
+  assert.equal(globalThis.__sends.length, 1);
+  assert.equal(created.length, 1, "one conversation, and no empty one left behind");
+});
+
