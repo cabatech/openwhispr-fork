@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const React = require("react");
 const { createRendererServer, installBrowserGlobals } = require("../lib/rendererTestHarness");
 const { installInteractiveDom } = require("../lib/interactiveDom");
-const { SKILLS_MOCKS, ariaLabel, click, findAll, label, settle } = require("../lib/skillsHarness");
+const { SKILLS_MOCKS, ariaLabel, click, findAll, settle } = require("../lib/skillsHarness");
 
 // ChatView with its real message sender. The streaming hook records each send and its
 // options; the composer renders its leading row, so the chip is real and clickable.
