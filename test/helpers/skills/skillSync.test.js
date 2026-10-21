@@ -77,6 +77,28 @@ test("a skill exports byte for byte: text as UTF-8, everything else as base64", 
   assert.equal(other.database.getSkillStates()[0].contentHash, exported.contentHash);
 });
 
+test("text that JSON would inflate crosses as base64", (t) => {
+  const ctx = setup(t);
+  if (!ctx) return;
+  const controls = Buffer.alloc(600_000, 0x01);
+  writeFolder(ctx.skillsDir, "controls", {
+    "SKILL.md": skillText("controls"),
+    "references/log.txt": controls,
+  });
+  ctx.library.scan();
+
+  const exported = ctx.library.exportForCloud("controls");
+
+  const log = exported.files.find((file) => file.path === "references/log.txt");
+  assert.deepEqual(log, {
+    path: "references/log.txt",
+    encoding: "base64",
+    content: controls.toString("base64"),
+  });
+  assert.equal(exported.files.find((file) => file.path === "SKILL.md").encoding, "utf8");
+  assert.ok(Buffer.byteLength(JSON.stringify(exported.files)) < 2 * 1024 * 1024);
+});
+
 test("a skill that needs fixing, or isn't there, is not exported", (t) => {
   const ctx = setup(t);
   if (!ctx) return;
@@ -85,6 +107,23 @@ test("a skill that needs fixing, or isn't there, is not exported", (t) => {
 
   assert.equal(ctx.library.exportForCloud("broken"), null);
   assert.equal(ctx.library.exportForCloud("missing"), null);
+});
+
+test("a skill with a path the cloud can't store is not exported", (t) => {
+  const ctx = setup(t);
+  if (!ctx) return;
+  writeFolder(ctx.skillsDir, "odd-path", {
+    "SKILL.md": skillText("odd-path"),
+    "references/a\\b.md": "x",
+  });
+  writeFolder(ctx.skillsDir, "long-path", {
+    "SKILL.md": skillText("long-path"),
+    [`references/${"d/".repeat(260)}a.md`]: "x",
+  });
+  ctx.library.scan();
+
+  assert.equal(ctx.library.exportForCloud("odd-path"), null);
+  assert.equal(ctx.library.exportForCloud("long-path"), null);
 });
 
 test("a skill folder that is a link is never exported", (t) => {

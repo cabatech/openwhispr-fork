@@ -45,6 +45,8 @@ const { app } = require("electron");
 const MAX_SNIPPET_TRIGGER_LENGTH = 100;
 // A skill state write that changes something Cloud backup carries (or brings a removed name
 // back). SQLite evaluates it against the row as it was before the update.
+// Skill changes are stamped to the millisecond: a pull compares them with the server's own.
+const SKILL_NOW = "strftime('%Y-%m-%d %H:%M:%f', 'now')";
 const SKILL_CHANGED =
   "(deleted_at IS NOT NULL OR (@enabled IS NOT NULL AND enabled IS NOT @enabled) OR " +
   "(@contentHash IS NOT NULL AND content_hash IS NOT @contentHash))";
@@ -3208,17 +3210,22 @@ class DatabaseManager {
     try {
       if (!this.db) throw new Error("Database not initialized");
       const toIso = (value) => parseDbTimestamp(value)?.toISOString() ?? null;
-      return this.db
-        .prepare("SELECT * FROM skills WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC")
-        .all()
-        .map((row) => ({
-          name: row.name,
-          enabled: row.enabled === 1,
-          contentHash: row.content_hash,
-          lastUsedAt: toIso(row.last_used_at),
-          createdAt: toIso(row.created_at),
-          updatedAt: toIso(row.updated_at),
-        }));
+      return (
+        this.db
+          // julianday reads both the local and the cloud's ISO timestamps, which sort apart as text.
+          .prepare(
+            "SELECT * FROM skills WHERE deleted_at IS NULL ORDER BY julianday(created_at) DESC, id DESC"
+          )
+          .all()
+          .map((row) => ({
+            name: row.name,
+            enabled: row.enabled === 1,
+            contentHash: row.content_hash,
+            lastUsedAt: toIso(row.last_used_at),
+            createdAt: toIso(row.created_at),
+            updatedAt: toIso(row.updated_at),
+          }))
+      );
     } catch (error) {
       debugLogger.error("Error getting skill states", { error: error.message }, "database");
       throw error;
@@ -3232,13 +3239,15 @@ class DatabaseManager {
       if (!this.db) throw new Error("Database not initialized");
       this.db
         .prepare(
-          `INSERT INTO skills (name, enabled, content_hash, client_skill_id, sync_status)
-           VALUES (@name, COALESCE(@enabled, 1), @contentHash, @clientId, 'pending')
+          `INSERT INTO skills
+             (name, enabled, content_hash, client_skill_id, sync_status, created_at, updated_at)
+           VALUES (@name, COALESCE(@enabled, 1), @contentHash, @clientId, 'pending',
+             ${SKILL_NOW}, ${SKILL_NOW})
            ON CONFLICT(name) DO UPDATE SET
              enabled = COALESCE(@enabled, enabled),
              content_hash = COALESCE(@contentHash, content_hash),
              sync_status = CASE WHEN ${SKILL_CHANGED} THEN 'pending' ELSE sync_status END,
-             updated_at = CASE WHEN ${SKILL_CHANGED} THEN datetime('now') ELSE updated_at END,
+             updated_at = CASE WHEN ${SKILL_CHANGED} THEN ${SKILL_NOW} ELSE updated_at END,
              deleted_at = NULL`
         )
         .run({
@@ -3260,7 +3269,7 @@ class DatabaseManager {
         .prepare(
           `UPDATE skills SET
              sync_status = CASE WHEN enabled IS NOT @enabled THEN 'pending' ELSE sync_status END,
-             updated_at = CASE WHEN enabled IS NOT @enabled THEN datetime('now') ELSE updated_at END,
+             updated_at = CASE WHEN enabled IS NOT @enabled THEN ${SKILL_NOW} ELSE updated_at END,
              enabled = @enabled
            WHERE name = @name AND deleted_at IS NULL`
         )
@@ -3288,7 +3297,7 @@ class DatabaseManager {
       if (!this.db) throw new Error("Database not initialized");
       this.db
         .prepare(
-          `UPDATE skills SET deleted_at = datetime('now'), updated_at = datetime('now'),
+          `UPDATE skills SET deleted_at = ${SKILL_NOW}, updated_at = ${SKILL_NOW},
              sync_status = 'pending'
            WHERE name = ? AND cloud_id IS NOT NULL AND deleted_at IS NULL`
         )

@@ -130,13 +130,22 @@ function sizeProblem(files, limits = SKILL_LIMITS) {
   return bytes > limits.maxBytes ? { code: "tooLarge" } : null;
 }
 
-// Text crosses as UTF-8 when it comes back byte for byte; anything else as base64.
+// Text crosses as UTF-8 when it comes back byte for byte and isn't larger as JSON than base64
+// would be (control characters escape to six bytes each); anything else as base64.
 function toCloudFile({ path: relPath, data }) {
+  const base64 = data.toString("base64");
   const text = data.toString("utf8");
-  return isTextFile(data) && Buffer.from(text, "utf8").equals(data)
+  const asText =
+    isTextFile(data) &&
+    Buffer.from(text, "utf8").equals(data) &&
+    Buffer.byteLength(JSON.stringify(text)) <= base64.length + 2;
+  return asText
     ? { path: relPath, encoding: "utf8", content: text }
-    : { path: relPath, encoding: "base64", content: data.toString("base64") };
+    : { path: relPath, encoding: "base64", content: base64 };
 }
+
+// The server stores paths of at most 512 characters, with forward slashes only.
+const isCloudPath = (relPath) => relPath.length <= 512 && !relPath.includes("\\");
 
 // A cloud skill's files as bytes, or null when the list isn't one this library would write.
 function fromCloudFiles(files) {
@@ -532,8 +541,10 @@ class SkillLibrary {
     const inspected = this._inspect(name);
     if (inspected.problems.length > 0) return null;
     if (inspected.tooLargeToSync) return { tooLargeToSync: true };
-    const files = walkSkillFolder(this.skillDir(name))
-      .files.sort(byPath)
+    const walked = walkSkillFolder(this.skillDir(name));
+    if (walked.unreadable || !walked.files.every((file) => isCloudPath(file.path))) return null;
+    const files = walked.files
+      .sort(byPath)
       .map((file) => ({ path: file.path, data: fs.readFileSync(file.fullPath) }));
     return { files: files.map(toCloudFile), contentHash: contentHash(files) };
   }
@@ -547,6 +558,8 @@ class SkillLibrary {
       return false;
     };
     if (!isSkillFolderName(name) || !SKILL_NAME_PATTERN.test(name)) return skip("name");
+    // One too large to back up stays as it is here; the cloud never had this copy of it.
+    if (this.skillDir(name) && this._inspect(name).tooLargeToSync) return skip("tooLargeToSync");
     if (entry.deleted_at) {
       this._removeSkill(name);
       this.database.upsertSkillStateFromCloud(entry, null);

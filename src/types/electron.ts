@@ -38,6 +38,7 @@ import type {
 } from "./connectors";
 import type {
   CloudSkillEntry,
+  CloudSkillMeta,
   SkillCloudExport,
   SkillCommitResult,
   SkillCreateInput,
@@ -3826,7 +3827,7 @@ declare global {
       getPendingSkills?: () => Promise<SkillSyncRow[]>;
       getPendingSkillDeletes?: () => Promise<SkillSyncRow[]>;
       exportSkillForCloud?: (name: string) => Promise<SkillCloudExport>;
-      getSkillForCloudMerge?: (cloudEntry: CloudSkillEntry) => Promise<SkillSyncRow | null>;
+      getSkillForCloudMerge?: (cloudEntry: CloudSkillMeta) => Promise<SkillSyncRow | null>;
       applySkillFromCloud?: (cloudEntry: CloudSkillEntry) => Promise<boolean>;
       markSkillSynced?: (
         name: string,

@@ -2979,14 +2979,15 @@ export class SyncService {
       throw new Error(`Skill IPC bindings missing — preload out of date: ${missing.join(", ")}`);
     }
 
-    // An API from before skills answers 404 on every skills route: nothing to do there.
-    if (!(await this.pushPendingSkills())) return;
+    // Unlike snippets, the pull goes first: a skill this computer has never sent meets a copy
+    // of the same name from another device there, and the newer of the two wins. An API from
+    // before skills answers 404 on every skills route: nothing to do there.
+    if (!(await this.pullSkills())) return;
+    await this.pushPendingSkills();
     await this.pushSkillDeletes();
-    await this.pullSkills();
   }
 
-  // False when the API has no skills routes.
-  private async pushPendingSkills(): Promise<boolean> {
+  private async pushPendingSkills(): Promise<void> {
     const pending = (await window.electronAPI.getPendingSkills?.()) ?? [];
     const updates = [];
     const creates = [];
@@ -3042,20 +3043,27 @@ export class SyncService {
         for (const local of batch) {
           const server = byName.get(local.name);
           if (!server) continue;
-          await window.electronAPI.markSkillSynced?.(
+          const result = await window.electronAPI.markSkillSynced?.(
             local.name,
             server.id,
             server.updated_at,
             local.content_hash,
             local.enabled
           );
+          if (result?.changes !== 0) continue;
+          // Edited meanwhile, it is sent again next pass. Uninstalled meanwhile, the copy
+          // that got through must go too, or the next pull would bring it back.
+          const row = await window.electronAPI.getSkillForCloudMerge?.(server);
+          if (!row || row.deleted_at) {
+            await SkillsService.delete(server.id).catch((deleteErr) =>
+              console.error("Skill orphan cleanup failed:", deleteErr)
+            );
+          }
         }
       } catch (err) {
-        if (isHttpStatus(err, 404)) return false;
         console.error("Skill batch create failed:", err);
       }
     }
-    return true;
   }
 
   private async pushSkillDeletes(): Promise<void> {
@@ -3075,11 +3083,14 @@ export class SyncService {
     }
   }
 
-  private async pullSkills(): Promise<void> {
+  // False when the API has no skills routes.
+  private async pullSkills(): Promise<boolean> {
     try {
       const since = localStorage.getItem("lastSyncedAt.skills") ?? undefined;
       const sinceId = localStorage.getItem("lastSyncedAt.skills.id") ?? undefined;
       let changed = false;
+      // A skill that couldn't be written holds the cursor back, so the next pass tries it again.
+      let failed = false;
 
       let cursor: string | undefined = since;
       let cursorId: string | undefined = sinceId;
@@ -3106,15 +3117,23 @@ export class SyncService {
             maxId = cloudEntry.id;
           }
 
-          // As for snippets: a delete wins, except over a skill this computer has never sent.
+          // A delete wins, as for snippets, except over a skill this computer has never sent.
+          // A change waiting to be sent wins over the cloud's copy (the push that follows
+          // replaces it); a skill never sent meets the cloud's copy, and the newer one wins.
+          const pending = local?.sync_status === "pending";
           const shouldApply = cloudEntry.deleted_at
-            ? !!local && !local.deleted_at && !(local.sync_status === "pending" && !local.cloud_id)
+            ? !!local && !local.deleted_at && !(pending && !local.cloud_id)
             : !local ||
-              cloudTs > normalizeTimestamp(local.updated_at) ||
-              (local.sync_status !== "pending" &&
-                (!local.cloud_id || local.cloud_id !== cloudEntry.id));
-          if (shouldApply && (await window.electronAPI.applySkillFromCloud?.(cloudEntry))) {
-            changed = true;
+              (pending
+                ? !local.cloud_id && cloudTs > normalizeTimestamp(local.updated_at)
+                : cloudTs > normalizeTimestamp(local.updated_at) ||
+                  local.cloud_id !== cloudEntry.id);
+          if (!shouldApply) continue;
+          try {
+            if (await window.electronAPI.applySkillFromCloud?.(cloudEntry)) changed = true;
+          } catch (err) {
+            failed = true;
+            console.error("Skill pull could not write a skill:", err);
           }
         }
 
@@ -3126,12 +3145,14 @@ export class SyncService {
         cursorId = last.id;
       }
 
-      if (maxUpdatedAt) localStorage.setItem("lastSyncedAt.skills", maxUpdatedAt);
-      if (maxId) localStorage.setItem("lastSyncedAt.skills.id", maxId);
+      if (maxUpdatedAt && !failed) localStorage.setItem("lastSyncedAt.skills", maxUpdatedAt);
+      if (maxId && !failed) localStorage.setItem("lastSyncedAt.skills.id", maxId);
       if (changed) await window.electronAPI.broadcastSkillsUpdated?.();
     } catch (err) {
-      if (!isHttpStatus(err, 404)) console.error("Skill pull failed:", err);
+      if (isHttpStatus(err, 404)) return false;
+      console.error("Skill pull failed:", err);
     }
+    return true;
   }
 
   private async buildLocalToCloudFolderMap(): Promise<{

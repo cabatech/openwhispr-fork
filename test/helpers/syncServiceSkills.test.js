@@ -238,3 +238,129 @@ test("an older API without /api/skills (404 on list) is skipped without error", 
   );
   assert.equal(localStorageStub.getItem("lastSyncedAt.skills"), null);
 });
+
+// Runs `during` once, while the first request matching `route` is with the server.
+function whileSending(ctx, route, during) {
+  const send = ctx.api.cloudApiRequest;
+  let done = false;
+  ctx.api.cloudApiRequest = async (opts) => {
+    if (!done && `${opts.method} ${opts.path}`.startsWith(route)) {
+      done = true;
+      await during();
+    }
+    return send(opts);
+  };
+}
+
+const skillFile = (skillsDir, name) =>
+  fs.readFileSync(path.join(skillsDir, name, "SKILL.md"), "utf8");
+const cloudSkillMd = (name, body) => [
+  { path: "SKILL.md", encoding: "utf8", content: skillText(name, "Does it.", body) },
+];
+// A skill saved on another device, as the cloud holds it.
+const seedRemote = (ctx, name, body, enabled = true) =>
+  ctx.cloud.seedSkill({ name, enabled, content_hash: "h", files: cloudSkillMd(name, body) });
+
+test("uninstalling a skill while its first push is in flight doesn't bring it back", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const name = create(ctx.library, "Meeting prep");
+  whileSending(ctx, "POST /api/skills/batch-create", () => ctx.library.uninstall(name));
+
+  await ctx.service.syncSkillsNow();
+  await ctx.service.syncSkillsNow();
+
+  assert.deepEqual(listDir(ctx.skillsDir), []);
+  assert.ok(cloudByName(ctx.cloud)[name].deleted_at, "the copy that got through is deleted");
+});
+
+test("a first push doesn't overwrite a newer copy from another device", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  writeFolder(ctx.skillsDir, "recap", { "SKILL.md": skillText("recap", "Does it.", "Old.\n") });
+  ctx.library.scan();
+  ctx.cloud.setClock(() => new Date(Date.now() + 60_000).toISOString());
+  seedRemote(ctx, "recap", "Newer.\n");
+
+  await ctx.service.syncSkillsNow();
+
+  assert.equal(skillFile(ctx.skillsDir, "recap"), skillText("recap", "Does it.", "Newer.\n"));
+  assert.match(cloudByName(ctx.cloud).recap.files[0].content, /Newer\./);
+  assert.deepEqual(pendingNames(ctx.db), []);
+});
+
+test("a first push does overwrite an older copy from another device", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  ctx.cloud.setClock(() => "2026-01-01T09:00:00.000Z");
+  seedRemote(ctx, "recap", "Old.\n");
+  ctx.cloud.setClock(() => new Date().toISOString());
+  writeFolder(ctx.skillsDir, "recap", { "SKILL.md": skillText("recap", "Does it.", "Mine.\n") });
+  ctx.library.scan();
+
+  await ctx.service.syncSkillsNow();
+
+  assert.match(cloudByName(ctx.cloud).recap.files[0].content, /Mine\./);
+  assert.equal(skillFile(ctx.skillsDir, "recap"), skillText("recap", "Does it.", "Mine.\n"));
+});
+
+test("an edit made while its push is in flight is kept and sent next", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const name = create(ctx.library, "Meeting prep");
+  await ctx.service.syncSkillsNow();
+  const edit = (body) => {
+    writeFolder(ctx.skillsDir, name, { "SKILL.md": skillText(name, "Use it.", body) });
+    ctx.library.scan();
+  };
+  edit("First edit.\n");
+  whileSending(ctx, "PATCH /api/skills/update", () => edit("Latest edit.\n"));
+
+  await ctx.service.syncSkillsNow();
+  assert.equal(skillFile(ctx.skillsDir, name), skillText(name, "Use it.", "Latest edit.\n"));
+  assert.deepEqual(pendingNames(ctx.db), [name]);
+
+  await ctx.service.syncSkillsNow();
+  assert.match(cloudByName(ctx.cloud)[name].files[0].content, /Latest edit\./);
+  assert.deepEqual(pendingNames(ctx.db), []);
+});
+
+test("a skill too large to back up is never replaced from the cloud", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  writeFolder(ctx.skillsDir, "big-one", {
+    "SKILL.md": skillText("big-one"),
+    "references/big.md": "x".repeat(1024 * 1024),
+  });
+  ctx.library.scan();
+  ctx.cloud.setClock(() => new Date(Date.now() + 60_000).toISOString());
+  seedRemote(ctx, "big-one", "Small.\n", false);
+
+  await ctx.service.syncSkillsNow();
+
+  assert.deepEqual(listDir(path.join(ctx.skillsDir, "big-one", "references")), ["big.md"]);
+});
+
+test("one skill that can't be written doesn't stop the others, and is tried again", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  silence(t);
+  for (const name of ["first-one", "second-one"]) {
+    seedRemote(ctx, name, "Hi.\n");
+  }
+  const apply = ctx.api.applySkillFromCloud;
+  let failOnce = true;
+  ctx.api.applySkillFromCloud = async (entry) => {
+    if (entry.name === "first-one" && failOnce) {
+      failOnce = false;
+      throw Object.assign(new Error("Couldn't write the skill: EBUSY"), { code: "unknown" });
+    }
+    return apply(entry);
+  };
+
+  await ctx.service.syncSkillsNow();
+  assert.deepEqual(listDir(ctx.skillsDir), ["second-one"]);
+
+  await ctx.service.syncSkillsNow();
+  assert.deepEqual(listDir(ctx.skillsDir), ["first-one", "second-one"]);
+});

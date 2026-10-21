@@ -213,3 +213,40 @@ test("a skill from the cloud is stored as synced, and its tombstone as a synced 
   assert.deepEqual(db.getPendingSkillDeletes(), []);
   assert.equal(syncRow(db, "recap").sync_status, "synced");
 });
+
+test("skills from the cloud and from this computer list newest first together", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  db.upsertSkillStateFromCloud(
+    {
+      id: "c1",
+      client_skill_id: "other",
+      name: "pulled",
+      enabled: true,
+      deleted_at: null,
+      created_at: "2026-10-21T08:00:00.000Z",
+      updated_at: "2026-10-21T08:00:00.000Z",
+    },
+    "h1"
+  );
+  db.upsertSkillState("made-here", { contentHash: "h2" });
+  db.db.prepare("UPDATE skills SET created_at = ? WHERE name = ?").run(
+    "2026-10-21 09:00:00",
+    "made-here"
+  );
+
+  assert.deepEqual(
+    db.getSkillStates().map((state) => state.name),
+    ["made-here", "pulled"]
+  );
+});
+
+test("a local change is stamped to the millisecond", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  db.upsertSkillState("recap", { contentHash: "h1" });
+  db.upsertSkillState("recap", { contentHash: "h2" });
+
+  const row = db.db.prepare("SELECT updated_at FROM skills WHERE name = 'recap'").get();
+  assert.match(row.updated_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
+});
