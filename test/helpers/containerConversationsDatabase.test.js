@@ -442,6 +442,7 @@ test("live cloud upserts never rehydrate local conversation tombstones", (t) => 
   );
 
   const inFlightCreate = db.createAgentConversation("Delete raced create");
+  assert.equal(db.markConversationCreateAttempted(inFlightCreate.id).success, true);
   assert.equal(db.deleteAgentConversation(inFlightCreate.id).success, true);
   assert.equal(db.markConversationSynced(inFlightCreate.id, "cloud-conv-late-ack").success, true);
   const queuedLateAck = db.db
@@ -949,4 +950,40 @@ test("relocateRevokedFolder moves or retires the folder's conversations", (t) =>
       .n,
     0
   );
+});
+
+test("deleting a never-synced chat removes it with every message", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const chat = db.createAgentConversation("Private chat");
+  db.addAgentMessage(chat.id, "user", "one");
+  db.addAgentMessage(chat.id, "assistant", "two");
+
+  assert.deepEqual(db.deleteAgentConversation(chat.id), { success: true });
+
+  assert.equal(
+    db.db.prepare("SELECT COUNT(*) AS n FROM agent_conversations WHERE id = ?").get(chat.id).n,
+    0
+  );
+  assert.equal(db.getAgentMessages(chat.id).length, 0);
+  assert.deepEqual(db.deleteAgentConversation(chat.id), { success: false });
+});
+
+test("rows held by a pending folder delete survive a repeated delete and roll back intact", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const space = createTestTeamSpace(db, { name: "Eng" }).space;
+  const folder = db.createFolder("Docs", space.id).folder;
+  db.markFolderSynced(folder.id, "cloud-folder-held");
+  const note = db.saveNote("Held draft", "never uploaded", "personal", null, null, folder.id).note;
+  const chat = db.createAgentConversation("Held chat", null, space.id, folder.id);
+  db.addAgentMessage(chat.id, "user", "keep me");
+  assert.equal(db.deleteFolder(folder.id).success, true);
+
+  assert.equal(db.deleteNote(note.id).success, false);
+  db.deleteAgentConversation(chat.id);
+
+  assert.equal(db.restoreFolderAfterDeniedDelete(folder.id).success, true);
+  assert.equal(db.getNote(note.id).deleted_at, null);
+  assert.equal(db.getAgentConversation(chat.id).messages.length, 1);
 });

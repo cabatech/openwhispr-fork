@@ -416,3 +416,49 @@ test("a note deleted before the legacy upload sends it is never uploaded", async
   assert.equal(cloud.logFor("/api/notes/batch-create").length, 0);
   assert.equal(cloud.note(note.client_note_id), null);
 });
+
+test("a chat deleted while its create is in flight is deleted in the cloud, retrying a failed delete", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const { db, cloud, api, service } = ctx;
+  silenceConsoleErrors(t);
+  const chat = db.createAgentConversation("In flight");
+  db.addAgentMessage(chat.id, "user", "secret zebracorn");
+  afterCloudAnswers(
+    api,
+    (opts) => opts.path === "/api/conversations/create",
+    () => db.deleteAgentConversation(chat.id)
+  );
+  cloud.failNext("DELETE /api/conversations/delete", { status: 503, error: "offline" });
+
+  await service.syncAll(true);
+  await service.syncAll(true);
+
+  const deletes = cloud.logFor("/api/conversations/delete").map((call) => call.body.id);
+  assert.equal(deletes.length, 2);
+  assert.equal(deletes[0], deletes[1]);
+  assert.equal(rowCount(db, "agent_conversations", chat.id), 0);
+});
+
+test("a chat deleted after a sync pass read it is never uploaded", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const { db, cloud, api, service } = ctx;
+  silenceConsoleErrors(t);
+  const chat = db.createAgentConversation("Read, then deleted");
+  db.addAgentMessage(chat.id, "user", "hello");
+  const read = api.getAgentConversation;
+  api.getAgentConversation = async (id) => {
+    const row = await read(id);
+    if (id === chat.id) {
+      api.getAgentConversation = read;
+      db.deleteAgentConversation(chat.id);
+    }
+    return row;
+  };
+
+  await service.syncAll(true);
+
+  assert.equal(cloud.logFor("/api/conversations/create").length, 0);
+  assert.equal(rowCount(db, "agent_conversations", chat.id), 0);
+});
