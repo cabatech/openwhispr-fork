@@ -5,7 +5,7 @@ export interface HistoryMessage {
   content: string | Array<Record<string, unknown>>;
 }
 
-const HISTORY_LIMIT = 20;
+export const HISTORY_LIMIT = 20;
 const TRACE_ARG_MAX_CHARS = 80;
 const TRACE_OPENING = "[Tools used:";
 const ECHOED_TRACE = /^\s*\[Tools used:[^\]\n]*\]\s*/;
