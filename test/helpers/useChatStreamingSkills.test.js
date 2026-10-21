@@ -529,3 +529,82 @@ test("a local model above the 4B gate gets a 330-token catalog", async (t) => {
   for (const skill of skills) assert.match(catalog, new RegExp(`^- ${skill.name}(:|$)`, "m"));
   assert.match(catalog, /^- skill-1: Handles task number 1 well\.$/m);
 });
+
+// ---- One skill picked by the app for a model without tools ----
+
+const PREP_REQUEST = "prep me for my 2pm meeting";
+
+async function sendPicking(t, { skills, settings = LOCAL_SMALL, readable, options = {} } = {}) {
+  const { api, calls } = skillsApi({ skills, readable });
+  const chat = await renderChat(t, SKILLS_ON, { settings, electronAPI: api });
+  const picked = [];
+  await chat.captured.sendToAI(PREP_REQUEST, [userMessage("u1", PREP_REQUEST)], {
+    onSkillPicked: (skill) => picked.push(skill),
+    ...options,
+  });
+  return { ...chat, calls, picked };
+}
+
+test("a sub-4B local model gets one picked skill and the surface hears which", async (t) => {
+  const { sentMessages, calls, picked } = await sendPicking(t);
+
+  assert.equal(latestUserText(sentMessages[0]), withRequest(MEETING_PREP_BLOCK, PREP_REQUEST));
+  assert.deepEqual(picked, [{ name: "meeting-prep", displayName: "Meeting prep" }]);
+  assert.deepEqual(calls.reads, [{ name: "meeting-prep", withFiles: true }]);
+});
+
+test("a picked skill never adds more than 2,500 estimated tokens", async (t) => {
+  const { estimateNoteTokens } = await import("../../src/helpers/noteChunking.js");
+  const body = Array.from({ length: 2_000 }, (_, index) => `Step ${index + 1}: check it.`);
+  const readable = {
+    "meeting-prep": forModel("meeting-prep", "Meeting prep", body.join("\n")),
+  };
+
+  const { sentMessages } = await sendPicking(t, { readable });
+
+  const [block] = latestUserText(sentMessages[0]).split("\n\nUser request:\n");
+  assert.ok(estimateNoteTokens(block) <= 2_500, String(estimateNoteTokens(block)));
+  assert.ok(block.includes("[The rest of this skill was cut to fit.]"));
+});
+
+test("the local pick never picks a disabled skill", async (t) => {
+  const skills = [{ ...SKILLS[0], enabled: false }, SKILLS[1]];
+
+  const { sentMessages, calls, picked } = await sendPicking(t, { skills });
+
+  assert.equal(latestUserText(sentMessages[0]), PREP_REQUEST);
+  assert.deepEqual([calls.reads, picked], [[], []]);
+});
+
+test("an attached skill turns the pick off", async (t) => {
+  const options = { attachedSkill: { name: "weekly-recap" } };
+
+  const { sentMessages, calls, picked } = await sendPicking(t, { options });
+
+  assert.match(latestUserText(sentMessages[0]), /^<skill_content name="weekly-recap"/);
+  assert.deepEqual(calls.reads, [{ name: "weekly-recap", withFiles: true }]);
+  assert.deepEqual(picked, []);
+});
+
+test("allowSkillPick false picks nothing", async (t) => {
+  const { sentMessages, calls, picked } = await sendPicking(t, {
+    options: { allowSkillPick: false },
+  });
+
+  assert.equal(latestUserText(sentMessages[0]), PREP_REQUEST);
+  assert.deepEqual([calls.reads, picked], [[], []]);
+});
+
+test("an unparsed model id counts as no tools and picks", async (t) => {
+  const settings = {
+    chatAgentMode: "local",
+    chatAgentProvider: "gemma",
+    chatAgentModel: "gemma-4-e2b-it-q4_k_m",
+  };
+
+  const { sentMessages, offeredTools, picked } = await sendPicking(t, { settings });
+
+  assert.deepEqual(offeredTools[0], []);
+  assert.equal(latestUserText(sentMessages[0]), withRequest(MEETING_PREP_BLOCK, PREP_REQUEST));
+  assert.deepEqual(picked, [{ name: "meeting-prep", displayName: "Meeting prep" }]);
+});

@@ -46,6 +46,7 @@ import {
   buildSkillCatalog,
   withSkillContext,
 } from "../../utils/skillContext";
+import { pickSkillForRequest } from "../../utils/localSkillPick";
 import type { SkillRef, SkillSummary } from "../../types/skills";
 import { getDictionaryHintWords } from "../../utils/snippets";
 import { noteAttendeesContext, withoutAttendeesFence } from "../../utils/noteAttendees";
@@ -194,6 +195,10 @@ export interface SendToAIOptions {
   destinationAppCategory?: ToneAppCategory;
   /** A skill the user attached to this chat; its text joins the model-only copy of this turn. */
   attachedSkill?: SkillRef;
+  /** False once the user removed an app-picked skill from this chat. */
+  allowSkillPick?: boolean;
+  /** The app picked a skill for a model without tools; the surface shows its chip. */
+  onSkillPicked?: (skill: { name: string; displayName: string }) => void;
   /** Per-request completion hook used to deliver a finished voice response. */
   onComplete?: (result: {
     assistantId: string;
@@ -438,7 +443,7 @@ export function useChatStreaming({
           !isCloudAgent && (isLocalProvider || isLanAgent) ? "selfHosted" : "hosted";
 
         let usableSkills: SkillSummary[] = [];
-        const activeRefs: SkillRef[] = skillsEnabled
+        let activeRefs: SkillRef[] = skillsEnabled
           ? activeSkillNames(allMessages, options?.attachedSkill)
           : [];
         if (skillsEnabled) {
@@ -546,6 +551,20 @@ export function useChatStreaming({
         // The text of the skills this conversation uses (the attached one, and those loaded
         // in the history the model sees) rides only in the model's copy of this turn, rebuilt
         // on every send, so the chat and its saved history keep just what the user typed.
+        // A model without tools can't load a skill, so the app picks at most one for it.
+        const picked =
+          skillsEnabled &&
+          registry === null &&
+          !options?.attachedSkill &&
+          options?.allowSkillPick !== false
+            ? pickSkillForRequest(userText, usableSkills)
+            : null;
+        if (picked) {
+          activeRefs = [
+            { name: picked.name },
+            ...activeRefs.filter((ref) => ref.builtin || ref.name !== picked.name),
+          ];
+        }
         const skillBlocks: string[] = [];
         const carried = new Set<string>();
         let skillRoom: number = SKILL_CONTEXT_MAX_TOKENS[contextTier];
@@ -577,6 +596,9 @@ export function useChatStreaming({
         }
         if (cancelled() || !mountedRef.current) return;
         carriedSkillNamesRef.current = carried;
+        if (picked && carried.has(picked.name)) {
+          options?.onSkillPicked?.({ name: picked.name, displayName: picked.displayName });
+        }
 
         // A note's chat is about its note: other notes up front would compete with
         // it, and search_notes still reaches them when it doesn't answer.
