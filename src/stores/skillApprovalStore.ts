@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { ToolExecutionContext } from "../services/tools/ToolRegistry";
-import type { SkillProposal, SkillUpdate } from "../types/skills";
+import type { SkillIssue, SkillProblemCode, SkillProposal, SkillUpdate } from "../types/skills";
 import { APPROVAL_TTL_MS, approvalKey } from "./connectorApprovalStore";
 import { playSkillIcon } from "./skillsStore";
 
@@ -28,6 +28,8 @@ interface SkillApprovalBase {
   state: SkillApprovalState;
   /** The copy Undo restores, after a save that replaced a skill's folder. */
   versionId?: string;
+  /** Why main refused the last Save; the card stays open so the user can fix it. */
+  problems?: SkillIssue<SkillProblemCode>[];
 }
 
 /** A new skill. One named like a skill the user has updates it. */
@@ -78,6 +80,8 @@ interface PendingResolution {
   resolve: (outcome: SkillApprovalOutcome) => void;
   timer: ReturnType<typeof setTimeout>;
   detach: () => void;
+  /** The turn ended or the card expired while a save was running. */
+  ended?: "conversation_ended" | "expired";
 }
 
 // Promise resolvers stay outside zustand state: they are not renderable.
@@ -93,11 +97,11 @@ function entryFor(key: string): SkillApprovalEntry | undefined {
   return useSkillApprovalStore.getState().entries[key];
 }
 
+type SkillCreatePatch = Pick<SkillCreateApproval, "replacesExisting">;
+
 function patchEntry(
   key: string,
-  patch:
-    | Partial<SkillApprovalBase & Pick<SkillCreateApproval, "replacesExisting">>
-    | { draft: SkillProposal | SkillUpdate }
+  patch: Partial<SkillApprovalBase & SkillCreatePatch> | { draft: SkillProposal | SkillUpdate }
 ): void {
   useSkillApprovalStore.setState((state) => {
     const entry = state.entries[key];
@@ -124,8 +128,22 @@ function settle(
 // The turn ending and expiry only withdraw a card that is still pending: a save in progress
 // finishes, and its card shows how it went.
 function withdraw(key: string, reason: "conversation_ended" | "expired"): void {
-  if (entryFor(key)?.state !== "pending") return;
+  const state = entryFor(key)?.state;
+  // Remembered, so a save that comes back without writing doesn't reopen the card.
+  if (state === "saving") {
+    const pending = resolutions.get(key);
+    if (pending) pending.ended = reason;
+    return;
+  }
+  if (state !== "pending") return;
   settle(key, { state: "not_saved", reason }, { state: "not_saved" });
+}
+
+// A save that wrote nothing hands the card back to the user, unless its turn ended meanwhile.
+function reopen(key: string, patch: Partial<SkillApprovalBase & SkillCreatePatch>): void {
+  const ended = resolutions.get(key)?.ended;
+  if (ended) settle(key, { state: "not_saved", reason: ended }, { state: "not_saved" });
+  else patchEntry(key, { ...patch, state: "pending" });
 }
 
 export function requestSkillApproval(
@@ -175,7 +193,7 @@ export function updateSkillDraft(
 export async function saveSkillApproval(key: string): Promise<void> {
   const entry = entryFor(key);
   if (!entry || entry.state !== "pending") return;
-  patchEntry(key, { state: "saving" });
+  patchEntry(key, { state: "saving", problems: undefined });
   if (entry.kind === "create") {
     // An edited title can name a skill the user already has, and saving would replace it.
     // The card says so first, and the next Save confirms.
@@ -187,7 +205,7 @@ export async function saveSkillApproval(key: string): Promise<void> {
       return;
     }
     if (check.existing && !(entry.replacesExisting && check.name === entry.name)) {
-      patchEntry(key, { state: "pending", name: check.name, replacesExisting: true });
+      reopen(key, { name: check.name, replacesExisting: true });
       return;
     }
   }
@@ -196,6 +214,10 @@ export async function saveSkillApproval(key: string): Promise<void> {
       ? window.electronAPI?.skillsApplyUpdate?.(entry.draft)
       : window.electronAPI?.skillsSaveProposal?.(entry.draft);
   const result = await saving?.catch(() => null);
+  if (result && !result.ok && "problems" in result) {
+    reopen(key, { problems: result.problems });
+    return;
+  }
   if (!result?.ok) {
     settle(key, { state: "failed" }, { state: "failed" });
     return;

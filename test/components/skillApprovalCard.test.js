@@ -223,6 +223,18 @@ test("an Undo the skill's later changes refuse says so and goes away", async (t)
   assert.equal(buttonLabelled("skills.approval.undo"), undefined);
 });
 
+test("a refused save says why and leaves Save to try again", async (t) => {
+  const { container, buttonLabelled } = await mountCard(t, {
+    saveResult: { ok: false, problems: [{ code: "descriptionAngleBrackets" }] },
+  });
+
+  await click(buttonLabelled("skills.approval.save"));
+  await settle();
+
+  assert.match(container.textContent, /skills\.problems\.descriptionAngleBrackets/);
+  assert.equal(Boolean(buttonLabelled("skills.approval.save")), true);
+});
+
 test("Skip leaves the card saying nothing was saved", async (t) => {
   const { container, calls, buttonLabelled, outcome } = await mountCard(t);
 

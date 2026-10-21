@@ -14,6 +14,7 @@ import { LineNumberedTextarea } from "../ui/LineNumberedTextarea";
 import { SkillIcon } from "../skills/SkillIcon";
 import { APPROVAL_CARD_CLASS } from "./ApprovalCard";
 import { useSkillChatActions } from "./skillChatActions";
+import { problemKey } from "../skills/skillCopy";
 import { useSkillsStore } from "../../stores/skillsStore";
 import {
   saveSkillApproval,
@@ -347,6 +348,11 @@ export function SkillApprovalCard({ entry }: { entry: SkillApprovalEntry }): Rea
       {/* One live region for every outcome, rendered from the start so a screen reader
           announces each change. */}
       <div role="status" aria-live="polite" className="text-xs">
+        {entry.state === "pending" && entry.problems?.[0] && (
+          <p className="mt-2 text-warning">
+            {t(problemKey(entry.problems[0]), entry.problems[0].values)}
+          </p>
+        )}
         {entry.state === "saving" && (
           <p className="mt-2 text-muted-foreground">{t("skills.approval.saving")}</p>
         )}

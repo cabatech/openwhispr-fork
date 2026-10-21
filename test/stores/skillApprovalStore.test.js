@@ -246,3 +246,38 @@ test("a refused Undo says the skill has changed since", async (t) => {
 
   assert.equal(entryOf("call-1").state, "changed_since");
 });
+
+test("a save main refuses for the card's text keeps the card open with why", async (t) => {
+  const problems = [{ code: "descriptionAngleBrackets" }];
+  const { store, entryOf, calls } = await freshStore(t, fakeElectron({ ok: false, problems }));
+
+  const outcome = store.requestSkillApproval(context("call-1").value, CREATE);
+  const { key } = entryOf("call-1");
+  store.updateSkillDraft(key, { description: "Use for <weekly> reports" });
+  await store.saveSkillApproval(key);
+
+  assert.equal(entryOf("call-1").state, "pending", "the user can fix it and save again");
+  assert.deepEqual(entryOf("call-1").problems, problems);
+  assert.equal(calls.save.length, 1);
+  store.skipSkillApproval(key);
+  assert.deepEqual(await outcome, { state: "skipped" });
+});
+
+test("a turn that ends while Save checks the name doesn't reopen the card", async (t) => {
+  let answer;
+  const pendingCheck = new Promise((resolve) => (answer = resolve));
+  const electron = fakeElectron(undefined, () => pendingCheck);
+  const { store, entryOf, calls } = await freshStore(t, electron);
+  const ctx = context("call-1");
+
+  const outcome = store.requestSkillApproval(ctx.value, CREATE);
+  const saving = store.saveSkillApproval(entryOf("call-1").key);
+  ctx.controller.abort();
+  answer({ name: "meeting-prep", existing: true, problems: [] });
+  await saving;
+
+  assert.deepEqual(await outcome, { state: "not_saved", reason: "conversation_ended" });
+  assert.equal(entryOf("call-1").state, "not_saved");
+  assert.deepEqual(calls.save, []);
+});
+
