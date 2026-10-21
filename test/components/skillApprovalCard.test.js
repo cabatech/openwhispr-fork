@@ -24,7 +24,10 @@ const CREATE = { kind: "create", name: "follow-up-email-from-notes", draft: PROP
 const SAVED = { ok: true, name: "follow-up-email-from-notes" };
 
 // The card on its store entry, as ToolCallItem shows it, with the skills IPC faked.
-async function mountCard(t, { request = CREATE, saveResult = SAVED, openSkill } = {}) {
+async function mountCard(
+  t,
+  { request = CREATE, saveResult = SAVED, undoResult = { ok: true }, openSkill } = {}
+) {
   let root = null;
   let approvals = null;
   const key = "m1::call-1";
@@ -51,8 +54,14 @@ async function mountCard(t, { request = CREATE, saveResult = SAVED, openSkill } 
         },
         skillsUndo: async (name, versionId) => {
           calls.undo.push([name, versionId]);
-          return { ok: true };
+          return undoResult;
         },
+        // Where Save writes, as the card was told when it opened.
+        skillsCheckProposal: async () => ({
+          name: request.name,
+          existing: Boolean(request.replacesExisting),
+          problems: [],
+        }),
       },
     },
   });
@@ -127,6 +136,19 @@ test("See full skill shows the instructions", async (t) => {
   assert.equal(toggle.getAttribute("aria-expanded"), "true");
 });
 
+test("See full skill also shows each file the skill would add", async (t) => {
+  const style = { path: "references/style.md", content: "# Style\nShort sentences." };
+  const request = { ...CREATE, draft: { ...PROPOSAL, files: [style] } };
+  const { container, buttonLabelled } = await mountCard(t, { request });
+
+  await click(buttonLabelled("skills.approval.seeFull"));
+
+  const shown = findAll(container, (node) => node.tagName === "PRE").map((pre) => pre.textContent);
+  assert.deepEqual(shown, [PROPOSAL.instructions, style.content]);
+  const path = findAll(container, (node) => label(node) === style.path)[0];
+  assert.equal(path?.getAttribute("dir"), "ltr", "the file's path is shown left to right");
+});
+
 test("Edit changes what Save writes", async (t) => {
   const { calls, buttonLabelled, fieldLabelled, outcome } = await mountCard(t);
 
@@ -182,6 +204,22 @@ test("a replacing save shows Updated with Undo", async (t) => {
 
   assert.deepEqual(calls.undo, [["follow-up-email-from-notes", "1760950800000"]]);
   assert.match(container.textContent, /skills\.approval\.undone/);
+  assert.equal(buttonLabelled("skills.approval.undo"), undefined);
+});
+
+test("an Undo the skill's later changes refuse says so and goes away", async (t) => {
+  const { container, buttonLabelled } = await mountCard(t, {
+    request: { ...CREATE, replacesExisting: true },
+    saveResult: { ...SAVED, versionId: "1760950800000" },
+    undoResult: { ok: false, error: "invalid" },
+  });
+
+  await click(buttonLabelled("skills.approval.save"));
+  await settle();
+  await click(buttonLabelled("skills.approval.undo"));
+  await settle();
+
+  assert.match(container.textContent, /skills\.approval\.undoStale/);
   assert.equal(buttonLabelled("skills.approval.undo"), undefined);
 });
 

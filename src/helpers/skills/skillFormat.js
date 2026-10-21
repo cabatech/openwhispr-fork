@@ -241,7 +241,10 @@ const lineEnding = (markdown) => (markdown.includes("\r\n") ? "\r\n" : "\n");
 /** Sets one top-level header key; every other line, line endings included, stays as it was. */
 function replaceFrontmatterValue(markdown, key, value) {
   const { lines, close } = headerLines(markdown);
-  const start = lines.findIndex((line, i) => i > 0 && i < close && line.startsWith(`${key}:`));
+  // As YAML reads a key: bare or quoted, with or without spaces before the colon.
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const keyLine = new RegExp(`^(["']?)${escaped}\\1\\s*:(\\s|$)`);
+  const start = lines.findIndex((line, i) => i > 0 && i < close && keyLine.test(line));
   const entry = `${key}: ${JSON.stringify(value)}`;
   if (start < 0) {
     lines.splice(close, 0, entry);

@@ -190,24 +190,35 @@ export function createProposeSkillTool(): ToolDefinition {
   };
 }
 
-// The text the card diffs against: the instructions, and each file the change touches.
-async function currentText(skill: SkillSummary, update: SkillUpdate) {
+// As main matches a changed file to the one it replaces: a leading "./" dropped, case ignored.
+const withoutDotSlash = (path: string): string => path.replace(/^\.\//, "");
+const pathKey = (path: string): string => withoutDotSlash(path).normalize("NFC").toLowerCase();
+
+// The text the card diffs against: the instructions, and each file the change touches. A file
+// the change replaces takes that file's path, so the card shows the change main will write.
+async function currentText(skill: SkillSummary, changed: SkillUpdate["files"]) {
   const read = (ref: SkillRef & { file?: string; withFiles?: boolean }) =>
     window.electronAPI?.skillsReadForModel?.(ref).catch(() => null) ?? Promise.resolve(null);
   const loaded = await read({ name: skill.name, withFiles: true });
   if (!loaded) return null;
-  const files: Record<string, string> = {};
-  for (const { path } of update.files) {
-    const listed = loaded.files.find((file) => file.path === path);
+  const files: SkillUpdate["files"] = [];
+  const currentFiles: Record<string, string> = {};
+  for (const file of changed) {
+    const listed = loaded.files.find((entry) => pathKey(entry.path) === pathKey(file.path));
+    const path = listed?.path ?? withoutDotSlash(file.path);
+    files.push({ path, content: file.content });
     // A file the change adds has no current text, and its diff is all additions.
     if (!listed?.text) continue;
     const content =
       listed.content ??
-      (await read({ name: skill.name, file: path }))?.files.find((file) => file.path === path)
+      (await read({ name: skill.name, file: path }))?.files.find((entry) => entry.path === path)
         ?.content;
-    if (content !== undefined) files[path] = content;
+    if (content !== undefined) currentFiles[path] = content;
   }
-  return { description: skill.description, instructions: loaded.body, files };
+  return {
+    files,
+    current: { description: skill.description, instructions: loaded.body, files: currentFiles },
+  };
 }
 
 async function learnedFromNote(id: unknown) {
@@ -256,17 +267,19 @@ export function createUpdateSkillTool(usable: SkillSummary[]): ToolDefinition {
       if (!context.claimTurnSlot(SKILL_CARD_SLOT, MAX_SKILL_CARDS_PER_ANSWER)) {
         return failure("Only three skill cards per answer.");
       }
+      const skillText = await currentText(skill, proposedFiles(args.files));
       const update: SkillUpdate = {
         name: skill.name,
         ...(typeof args.description === "string" ? { description: args.description } : {}),
         ...(typeof args.instructions === "string" ? { instructions: args.instructions } : {}),
-        files: proposedFiles(args.files),
+        files: skillText?.files ?? [],
       };
-      const [current, check] = await Promise.all([
-        currentText(skill, update),
-        window.electronAPI?.skillsCheckProposal?.({ kind: "update", update }).catch(() => null),
-      ]);
-      if (!current || !check || !("problems" in check)) {
+      const check = skillText
+        ? await window.electronAPI
+            ?.skillsCheckProposal?.({ kind: "update", update })
+            .catch(() => null)
+        : null;
+      if (!skillText || !check || !("problems" in check)) {
         context.releaseTurnSlot(SKILL_CARD_SLOT);
         return failure(`The ${skill.name} skill couldn't be read`);
       }
@@ -283,7 +296,7 @@ export function createUpdateSkillTool(usable: SkillSummary[]): ToolDefinition {
         name: skill.name,
         displayName: skill.displayName,
         draft: update,
-        current,
+        current: skillText.current,
         intent: asText(args.intent),
         removals: removals.slice(0, 5),
         learnedFrom: await learnedFromNote(args.learned_from_note_id),

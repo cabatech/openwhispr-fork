@@ -8,7 +8,15 @@ import { playSkillIcon } from "./skillsStore";
 // the connector approval path, which refuses signed out, on the free plan or under policy.
 
 export type SkillApprovalState =
-  "pending" | "saving" | "saved" | "failed" | "skipped" | "not_saved" | "undone";
+  | "pending"
+  | "saving"
+  | "saved"
+  | "failed"
+  | "skipped"
+  | "not_saved"
+  | "undone"
+  /** Undo refused: the skill changed again after this card saved it. */
+  | "changed_since";
 
 interface SkillApprovalBase {
   /** approvalKey(messageId, toolCallId). */
@@ -87,7 +95,9 @@ function entryFor(key: string): SkillApprovalEntry | undefined {
 
 function patchEntry(
   key: string,
-  patch: Partial<SkillApprovalBase> | { draft: SkillProposal | SkillUpdate }
+  patch:
+    | Partial<SkillApprovalBase & Pick<SkillCreateApproval, "replacesExisting">>
+    | { draft: SkillProposal | SkillUpdate }
 ): void {
   useSkillApprovalStore.setState((state) => {
     const entry = state.entries[key];
@@ -166,6 +176,21 @@ export async function saveSkillApproval(key: string): Promise<void> {
   const entry = entryFor(key);
   if (!entry || entry.state !== "pending") return;
   patchEntry(key, { state: "saving" });
+  if (entry.kind === "create") {
+    // An edited title can name a skill the user already has, and saving would replace it.
+    // The card says so first, and the next Save confirms.
+    const check = await window.electronAPI
+      ?.skillsCheckProposal?.({ kind: "create", proposal: entry.draft })
+      .catch(() => null);
+    if (!check || !("existing" in check)) {
+      settle(key, { state: "failed" }, { state: "failed" });
+      return;
+    }
+    if (check.existing && !(entry.replacesExisting && check.name === entry.name)) {
+      patchEntry(key, { state: "pending", name: check.name, replacesExisting: true });
+      return;
+    }
+  }
   const saving =
     entry.kind === "update"
       ? window.electronAPI?.skillsApplyUpdate?.(entry.draft)
@@ -196,5 +221,6 @@ export async function undoSkillApproval(key: string): Promise<void> {
   const result = await window.electronAPI
     ?.skillsUndo?.(entry.name, entry.versionId)
     .catch(() => null);
-  if (result?.ok) patchEntry(key, { state: "undone" });
+  // Main refuses once a later save changed the skill: undoing this one would lose that.
+  if (result) patchEntry(key, { state: result.ok ? "undone" : "changed_since" });
 }

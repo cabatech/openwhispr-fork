@@ -12,6 +12,9 @@ export type SkillTier = keyof typeof SKILL_CONTEXT_MAX_TOKENS;
 const SCRIPTS_NOTE = "scripts are shown to the user to run, never run by you";
 const SKILL_CUT = "[The rest of this skill was cut to fit.]";
 const FILE_CUT = "[The rest of this file was cut to fit.]";
+// Each list of file names gets at most this share of a skill's budget, so a skill with
+// hundreds of files can't push its own instructions out.
+const FILE_NAMES_SHARE = 8;
 
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 // A skill's text is data: a closing tag inside it must not end its block early.
@@ -28,12 +31,31 @@ function cutToFit(text: string, maxTokens: number, marker: string): string {
   return kept ? `${kept}\n${marker}` : marker;
 }
 
-function filesLine(files: SkillForModel["files"], inlineFiles: boolean): string {
+// The paths that fit in `maxTokens`, then how many more there are.
+function namesToFit(paths: string[], maxTokens: number): string {
+  let used = 0;
+  let shown = 0;
+  for (const path of paths) {
+    used += estimateNoteTokens(`${path}, `);
+    if (used > maxTokens) break;
+    shown += 1;
+  }
+  const names = paths.slice(0, shown).join(", ");
+  const rest = paths.length - shown;
+  if (rest === 0) return names;
+  return shown > 0 ? `${names} and ${rest} more` : `${rest} files`;
+}
+
+function filesLine(files: SkillForModel["files"], inlineFiles: boolean, maxTokens: number): string {
   if (files.length === 0) return "";
   const note = inlineFiles
     ? SCRIPTS_NOTE
     : `read one with load_skill and its file; ${SCRIPTS_NOTE}`;
-  return `Files: ${files.map((file) => file.path).join(", ")} (${note})`;
+  const names = namesToFit(
+    files.map((file) => file.path),
+    maxTokens
+  );
+  return `Files: ${names} (${note})`;
 }
 
 const fileBlock = (file: SkillForModel["files"][number]): string =>
@@ -68,7 +90,8 @@ export function buildSkillBlock(
   { inlineFiles }: { inlineFiles: boolean }
 ): string {
   const open = `<skill_content name="${asAttribute(skill.name)}" title="${asAttribute(skill.displayName)}">`;
-  const close = ["</skill_content>", filesLine(skill.files, inlineFiles)]
+  const namesBudget = Math.floor(maxTokens / FILE_NAMES_SHARE);
+  const close = ["</skill_content>", filesLine(skill.files, inlineFiles, namesBudget)]
     .filter(Boolean)
     .join("\n");
   const inline = inlineFiles ? skill.files.filter((file) => file.content !== undefined) : [];
@@ -78,7 +101,7 @@ export function buildSkillBlock(
       open,
       body,
       ...inline.slice(0, included).map(fileBlock),
-      ...(leftOut.length > 0 ? [`[Left out to fit: ${leftOut.join(", ")}]`] : []),
+      ...(leftOut.length > 0 ? [`[Left out to fit: ${namesToFit(leftOut, namesBudget)}]`] : []),
       close,
     ].join("\n");
   };

@@ -300,6 +300,19 @@ test("the card carries intent, removals, learned-from and the current text", asy
   );
 });
 
+test("a change naming ./References/Objections.md diffs against the file it replaces", async (t) => {
+  const { update, entry, settled } = await setupUpdate(t);
+  const content = "# Objections\n- SSO: Enterprise plan.\n";
+
+  const files = [{ path: "./References/Objections.md", content }];
+  const { key } = update({ ...UPDATE_ARGS, files });
+  await settled();
+
+  const card = entry(key);
+  assert.deepEqual(card.draft.files, [{ path: OBJECTIONS, content }], "the file keeps its path");
+  assert.deepEqual(card.current.files, { [OBJECTIONS]: "# Objections\n- No SSO.\n" });
+});
+
 test("a missing note just leaves out Learned from", async (t) => {
   const electron = updateElectron({ note: null });
   const { update, entry, settled, approvals } = await setupUpdate(t, electron);

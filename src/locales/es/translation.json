@@ -4753,6 +4753,7 @@
       "updated": "Actualizada",
       "undo": "Deshacer",
       "undone": "Deshecho. La habilidad volvió a como estaba.",
+      "undoStale": "No se pudo deshacer. La habilidad ha cambiado desde entonces.",
       "failed": "No se pudo guardar la habilidad.",
       "notSaved": "No se guardó nada.",
       "updateHeader": "Actualizar habilidad",

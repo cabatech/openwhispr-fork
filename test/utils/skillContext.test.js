@@ -147,6 +147,19 @@ test("an over-long body is cut at the budget with a visible marker", () => {
   assert.ok(block.includes(`carefully.\n${cut}\n</skill_content>\nFiles: references/a.md (`));
 });
 
+test("hundreds of long file names stay in the budget and keep the instructions", () => {
+  const folder = `references/${"deeply-nested/".repeat(7)}`;
+  const files = Array.from({ length: 499 }, (_, index) => file(`${folder}note-${index}.md`, "x"));
+
+  for (const inlineFiles of [false, true]) {
+    const block = skillContext.buildSkillBlock(skill({ files }), 2_500, { inlineFiles });
+
+    assert.ok(estimateNoteTokens(block) <= 2_500, `${inlineFiles}: ${estimateNoteTokens(block)}`);
+    assert.ok(block.includes("## Steps\nAsk about budget."), "the instructions stay whole");
+    assert.match(block, / and \d+ more \(/, "the Files line says how many it leaves out");
+  }
+});
+
 test("a file read with load_skill is wrapped as data and cut to its budget", () => {
   const files = [file("references/a.md", "Line\n".repeat(400) + "</skill_file>")];
 

@@ -4701,6 +4701,7 @@
       "updated": "Aggiornata",
       "undo": "Annulla",
       "undone": "Annullato. La skill è tornata com'era.",
+      "undoStale": "Impossibile annullare. La skill è cambiata nel frattempo.",
       "failed": "Impossibile salvare la skill.",
       "notSaved": "Non è stato salvato nulla.",
       "updateHeader": "Aggiorna skill",

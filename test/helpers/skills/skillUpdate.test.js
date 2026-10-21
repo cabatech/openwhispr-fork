@@ -103,6 +103,21 @@ test("a missing description key is added before the closing line", () => {
   assert.throws(() => replaceFrontmatterValue("# No header\n", "description", "x"));
 });
 
+test("a quoted description key, or one spaced before its colon, is replaced in place", () => {
+  for (const key of ['"description"', "'description'", "description "]) {
+    assert.equal(
+      replaceFrontmatterValue(`---\nname: recap\n${key}: Before\n---\n`, "description", "After"),
+      '---\nname: recap\ndescription: "After"\n---\n',
+      key
+    );
+  }
+  // A longer key that starts the same way is another key.
+  assert.equal(
+    replaceFrontmatterValue("---\ndescription_note: keep\n---\n", "description", "After"),
+    '---\ndescription_note: keep\ndescription: "After"\n---\n'
+  );
+});
+
 test("an update keeps a version and Undo restores it exactly", (t) => {
   const { library, skillsDir, versionsDir } = playbook(t);
   const before = snapshot(path.join(skillsDir, NAME));
@@ -116,6 +131,19 @@ test("an update keeps a version and Undo restores it exactly", (t) => {
   assert.deepEqual(snapshot(path.join(skillsDir, NAME)), before);
   assert.deepEqual(listDir(versionsDir), [], "the restored copy is gone");
   assert.equal(library.scan()[0].enabled, true);
+});
+
+test("Undo refuses once a later change has replaced the one it would undo", (t) => {
+  const { library, skillsDir } = playbook(t);
+  const first = library.applyUpdate({ ...SSO, files: [] }).versionId;
+  const second = library.applyUpdate({ ...SSO, instructions: "## Steps\nAsk twice.", files: [] });
+  const latest = snapshot(path.join(skillsDir, NAME));
+
+  assert.equal(library.undo(NAME, first), false);
+  assert.deepEqual(snapshot(path.join(skillsDir, NAME)), latest, "the later change stays");
+
+  assert.equal(library.undo(NAME, second.versionId), true);
+  assert.equal(library.undo(NAME, first), true, "newest first, each Undo still works");
 });
 
 test("only the five newest versions are kept", (t) => {

@@ -4701,6 +4701,7 @@
       "updated": "已更新",
       "undo": "復原",
       "undone": "已復原，技能已恢復原狀。",
+      "undoStale": "無法復原，此後技能已被變更。",
       "failed": "無法儲存技能。",
       "notSaved": "未儲存任何內容。",
       "updateHeader": "更新技能",

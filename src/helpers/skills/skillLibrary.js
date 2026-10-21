@@ -451,10 +451,12 @@ class SkillLibrary {
     return { name: update.name, versionId };
   }
 
-  // Puts a kept copy back in one swap, then forgets it. False when there is no such copy.
+  // Puts a kept copy back in one swap, then forgets it. False when there is no such copy, or
+  // when a later save made a newer one: putting this one back would lose that change.
   undo(name, versionId) {
     const versionDir = path.join(this.versionsDir, name, versionId);
     if (!fs.existsSync(versionDir)) return false;
+    if (versionIds(path.join(this.versionsDir, name)).at(-1) !== Number(versionId)) return false;
     const walked = walkSkillFolder(versionDir);
     if (walked.unreadable) return false;
     const files = walked.files.map((file) => ({

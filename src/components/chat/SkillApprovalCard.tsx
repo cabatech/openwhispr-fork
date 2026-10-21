@@ -29,6 +29,8 @@ import { formatShortDate, normalizeDbDate } from "../../utils/dateFormatting";
 
 const FIELD_CLASS = "w-full rounded-md border border-border/70 bg-background px-2 py-1";
 const INLINE_LINK_CLASS = "h-auto px-1.5 py-0";
+const PREVIEW_CLASS =
+  "mt-1.5 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-border/70 bg-background px-2.5 py-2 font-mono text-[11px] leading-relaxed text-foreground/85";
 
 function ExpandToggle({
   open,
@@ -109,13 +111,23 @@ function CreateSkillBody({
         <ExpandToggle open={showFull} onToggle={() => setShowFull((open) => !open)}>
           {t("skills.approval.seeFull")}
         </ExpandToggle>
+        {/* Everything Save writes: the instructions, then each file. */}
         {showFull && (
-          <pre
-            dir="auto"
-            className="mt-1.5 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-border/70 bg-background px-2.5 py-2 font-mono text-[11px] leading-relaxed text-foreground/85"
-          >
-            {draft.instructions}
-          </pre>
+          <>
+            <pre dir="auto" className={PREVIEW_CLASS}>
+              {draft.instructions}
+            </pre>
+            {draft.files.map((file) => (
+              <div key={file.path} className="mt-2">
+                <p dir="ltr" className="font-mono text-[11px] text-muted-foreground">
+                  {file.path}
+                </p>
+                <pre dir="auto" className={PREVIEW_CLASS}>
+                  {file.content}
+                </pre>
+              </div>
+            ))}
+          </>
         )}
       </div>
     </>
@@ -374,6 +386,9 @@ export function SkillApprovalCard({ entry }: { entry: SkillApprovalEntry }): Rea
         )}
         {entry.state === "undone" && (
           <p className="mt-2 text-muted-foreground">{t("skills.approval.undone")}</p>
+        )}
+        {entry.state === "changed_since" && (
+          <p className="mt-2 text-muted-foreground">{t("skills.approval.undoStale")}</p>
         )}
         {entry.state === "skipped" && (
           <p className="mt-2 text-muted-foreground">

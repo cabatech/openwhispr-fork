@@ -11,9 +11,15 @@ const PROPOSAL = {
   files: [],
 };
 
+const NEW_SKILL = { name: "follow-up-email-from-notes", existing: false, problems: [] };
+
 // The skills IPC as main serves it, with the connector calls a skill card must never make.
-function fakeElectron(saveResult = { ok: true, name: "follow-up-email-from-notes" }) {
-  const calls = { save: [], undo: [], connector: [] };
+function fakeElectron(
+  saveResult = { ok: true, name: "follow-up-email-from-notes" },
+  check = () => NEW_SKILL,
+  undoResult = { ok: true }
+) {
+  const calls = { save: [], undo: [], check: [], connector: [] };
   const connector = (name) => async () => {
     calls.connector.push(name);
     return {};
@@ -25,9 +31,13 @@ function fakeElectron(saveResult = { ok: true, name: "follow-up-email-from-notes
         calls.save.push(proposal);
         return saveResult;
       },
+      skillsCheckProposal: async (request) => {
+        calls.check.push(request);
+        return check(request.proposal);
+      },
       skillsUndo: async (name, versionId) => {
         calls.undo.push([name, versionId]);
-        return { ok: true };
+        return undoResult;
       },
       connectorPrepare: connector("connectorPrepare"),
       connectorCommit: connector("connectorCommit"),
@@ -202,4 +212,37 @@ test("a save that replaced a skill keeps its version, and Undo puts it back", as
 
   assert.deepEqual(calls.undo, [["follow-up-email-from-notes", "1760950800000"]]);
   assert.equal(entryOf("call-1").state, "undone");
+});
+
+test("an edited title naming an existing skill asks again before replacing it", async (t) => {
+  const meetingPrep = { name: "meeting-prep", existing: true, problems: [] };
+  const electron = fakeElectron(undefined, (proposal) =>
+    proposal.title === "Meeting prep" ? meetingPrep : NEW_SKILL
+  );
+  const { store, entryOf, calls } = await freshStore(t, electron);
+
+  void store.requestSkillApproval(context("call-1").value, CREATE);
+  const { key } = entryOf("call-1");
+  store.updateSkillDraft(key, { title: "Meeting prep" });
+  await store.saveSkillApproval(key);
+
+  assert.deepEqual(calls.save, [], "nothing is written yet");
+  assert.equal(entryOf("call-1").state, "pending");
+  assert.equal(entryOf("call-1").name, "meeting-prep");
+  assert.equal(entryOf("call-1").replacesExisting, true, "the card now says it replaces it");
+
+  await store.saveSkillApproval(key);
+  assert.equal(calls.save.length, 1, "Save with the notice showing writes");
+});
+
+test("a refused Undo says the skill has changed since", async (t) => {
+  const replaced = { ok: true, name: "follow-up-email-from-notes", versionId: "1760950800000" };
+  const electron = fakeElectron(replaced, undefined, { ok: false, error: "invalid" });
+  const { store, entryOf } = await freshStore(t, electron);
+
+  void store.requestSkillApproval(context("call-1").value, { ...CREATE, replacesExisting: true });
+  await store.saveSkillApproval(entryOf("call-1").key);
+  await store.undoSkillApproval(entryOf("call-1").key);
+
+  assert.equal(entryOf("call-1").state, "changed_since");
 });
