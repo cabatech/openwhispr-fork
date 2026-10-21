@@ -19,6 +19,8 @@ import { TranscriptionsService } from "./TranscriptionsService.js";
 import { syncPendingAnalytics } from "./AnalyticsService.js";
 import { DictionaryService } from "./DictionaryService.js";
 import { SnippetService, type CloudSnippetEntry } from "./SnippetService.js";
+import { SkillsService } from "./SkillsService.js";
+import type { CloudSkillEntry } from "../types/skills";
 import { CloudApiError, isAuthContextError } from "./cloudApi.js";
 import { LeaderboardService } from "./LeaderboardService";
 import {
@@ -70,6 +72,30 @@ import {
   type PurgedSpaceReason,
   type SyncConsent,
 } from "./syncPassPolicy";
+
+// Batches within the API's caps on count and size; a skill over the size cap on its own can't
+// reach here (the library holds it back as too large to back up).
+function skillBatches<T>(entries: T[]): T[][] {
+  const encoder = new TextEncoder();
+  const batches: T[][] = [];
+  let batch: T[] = [];
+  let bytes = 2;
+  for (const entry of entries) {
+    const size = encoder.encode(JSON.stringify(entry)).length + 1;
+    if (
+      batch.length === SKILL_BATCH_SIZE ||
+      (batch.length > 0 && bytes + size > SKILL_BATCH_BYTES)
+    ) {
+      batches.push(batch);
+      batch = [];
+      bytes = 2;
+    }
+    batch.push(entry);
+    bytes += size;
+  }
+  if (batch.length > 0) batches.push(batch);
+  return batches;
+}
 
 function isHttpStatus(err: unknown, status: number): boolean {
   return err instanceof CloudApiError && err.status === status;
@@ -126,6 +152,10 @@ const BATCH_SIZE = 50;
 const TRANSCRIPTION_BATCH_SIZE = 100;
 const DICTIONARY_BATCH_SIZE = 200;
 const SNIPPET_BATCH_SIZE = 200;
+// The API's caps on one skills batch-create, which it measures as the JSON of the entries.
+const SKILL_BATCH_SIZE = 10;
+const SKILL_BATCH_BYTES = 3 * 1024 * 1024;
+const SKILL_PAGE_SIZE = 50;
 // Minimum gap between auto syncs, measured from the last completed pass in
 // any window (the stamp lives in shared localStorage).
 const AUTO_SYNC_THROTTLE_MS = 20000;
@@ -255,6 +285,7 @@ export class SyncService {
   private autoSyncStarted = false;
   private dictionaryDirty = false;
   private snippetsDirty = false;
+  private skillsDirty = false;
   // One owner_user_id backfill probe per session (see backfillNoteOwners).
   private ownerBackfillChecked = false;
   // Whether the API keeps note revisions; null until a pulled row or the
@@ -533,6 +564,10 @@ export class SyncService {
             this.snippetsDirty = false;
             await this.syncSnippets();
           } while (this.snippetsDirty);
+          do {
+            this.skillsDirty = false;
+            await this.syncSkills();
+          } while (this.skillsDirty);
         } else {
           // Backup is off: team-space content still syncs (membership is
           // consent, D7) and note deletes still propagate so revoked/deleted
@@ -658,6 +693,25 @@ export class SyncService {
       } while (this.snippetsDirty);
     } catch (err) {
       console.error("Snippets sync failed:", err);
+    } finally {
+      this.syncing = false;
+    }
+  }
+
+  async syncSkillsNow(): Promise<void> {
+    if (!this.canSync()) return;
+    if (this.syncing) {
+      this.skillsDirty = true;
+      return;
+    }
+    this.syncing = true;
+    try {
+      do {
+        this.skillsDirty = false;
+        await this.syncSkills();
+      } while (this.skillsDirty);
+    } catch (err) {
+      console.error("Skills sync failed:", err);
     } finally {
       this.syncing = false;
     }
@@ -2904,6 +2958,179 @@ export class SyncService {
       if (changed) await window.electronAPI.broadcastSnippetsUpdated?.();
     } catch (err) {
       console.error("Snippet pull failed:", err);
+    }
+  }
+
+  private async syncSkills(): Promise<void> {
+    const api = window.electronAPI;
+    const required = [
+      "getPendingSkills",
+      "getPendingSkillDeletes",
+      "exportSkillForCloud",
+      "getSkillForCloudMerge",
+      "applySkillFromCloud",
+      "markSkillSynced",
+      "hardDeleteSkill",
+      "clearSkillCloudId",
+      "broadcastSkillsUpdated",
+    ] as const;
+    const missing = required.filter((name) => typeof api[name] !== "function");
+    if (missing.length > 0) {
+      throw new Error(`Skill IPC bindings missing — preload out of date: ${missing.join(", ")}`);
+    }
+
+    // An API from before skills answers 404 on every skills route: nothing to do there.
+    if (!(await this.pushPendingSkills())) return;
+    await this.pushSkillDeletes();
+    await this.pullSkills();
+  }
+
+  // False when the API has no skills routes.
+  private async pushPendingSkills(): Promise<boolean> {
+    const pending = (await window.electronAPI.getPendingSkills?.()) ?? [];
+    const updates = [];
+    const creates = [];
+    for (const row of pending) {
+      const exported = await window.electronAPI.exportSkillForCloud?.(row.name);
+      // A skill that needs fixing, or is over the backup caps, stays on this computer.
+      if (!exported || "tooLargeToSync" in exported) continue;
+      const entry = {
+        name: row.name,
+        enabled: row.enabled === 1,
+        content_hash: exported.contentHash,
+        files: exported.files,
+      };
+      if (row.cloud_id) updates.push({ cloudId: row.cloud_id, entry });
+      else
+        creates.push({
+          ...entry,
+          client_skill_id: row.client_skill_id,
+          created_at: row.created_at,
+        });
+    }
+
+    for (const { cloudId, entry } of updates) {
+      const markSynced = (id: string, updatedAt?: string) =>
+        window.electronAPI.markSkillSynced?.(
+          entry.name,
+          id,
+          updatedAt,
+          entry.content_hash,
+          entry.enabled
+        );
+      try {
+        const { name: _name, ...fields } = entry;
+        const server = await SkillsService.update(cloudId, fields);
+        await markSynced(server.id, server.updated_at);
+      } catch (err) {
+        if (isHttpStatus(err, 404)) {
+          // Purged in the cloud: the next push creates it again.
+          await window.electronAPI.clearSkillCloudId?.(entry.name);
+        } else if (isHttpStatus(err, 409)) {
+          // The server keeps refusing this change; stop re-sending it.
+          await markSynced(cloudId);
+        } else {
+          console.error("Skill update sync failed:", err);
+        }
+      }
+    }
+
+    for (const batch of skillBatches(creates)) {
+      try {
+        const { created } = await SkillsService.batchCreate(batch);
+        const byName = new Map(created.map((server) => [server.name, server]));
+        for (const local of batch) {
+          const server = byName.get(local.name);
+          if (!server) continue;
+          await window.electronAPI.markSkillSynced?.(
+            local.name,
+            server.id,
+            server.updated_at,
+            local.content_hash,
+            local.enabled
+          );
+        }
+      } catch (err) {
+        if (isHttpStatus(err, 404)) return false;
+        console.error("Skill batch create failed:", err);
+      }
+    }
+    return true;
+  }
+
+  private async pushSkillDeletes(): Promise<void> {
+    const deletes = (await window.electronAPI.getPendingSkillDeletes?.()) ?? [];
+    for (const row of deletes) {
+      if (!row.cloud_id) continue;
+      try {
+        await SkillsService.delete(row.cloud_id);
+        await window.electronAPI.hardDeleteSkill?.(row.name);
+      } catch (err) {
+        if (isHttpStatus(err, 404)) {
+          await window.electronAPI.hardDeleteSkill?.(row.name);
+        } else {
+          console.error("Skill delete sync failed:", err);
+        }
+      }
+    }
+  }
+
+  private async pullSkills(): Promise<void> {
+    try {
+      const since = localStorage.getItem("lastSyncedAt.skills") ?? undefined;
+      const sinceId = localStorage.getItem("lastSyncedAt.skills.id") ?? undefined;
+      let changed = false;
+
+      let cursor: string | undefined = since;
+      let cursorId: string | undefined = sinceId;
+      let maxUpdatedAt = normalizeTimestamp(since);
+      let maxId = sinceId ?? "";
+      const cursorField: keyof Pick<CloudSkillEntry, "created_at" | "updated_at"> = since
+        ? "updated_at"
+        : "created_at";
+
+      while (true) {
+        const { entries, hasMore } = since
+          ? await SkillsService.listDelta(cursor, SKILL_PAGE_SIZE, cursorId)
+          : await SkillsService.listSnapshot(cursor, SKILL_PAGE_SIZE, cursorId);
+        if (entries.length === 0) break;
+
+        for (const cloudEntry of entries) {
+          const cloudTs = normalizeTimestamp(cloudEntry.updated_at);
+          const local = await window.electronAPI.getSkillForCloudMerge?.(cloudEntry);
+
+          if (cloudTs > maxUpdatedAt) {
+            maxUpdatedAt = cloudTs;
+            maxId = cloudEntry.id;
+          } else if (cloudTs === maxUpdatedAt && cloudEntry.id > maxId) {
+            maxId = cloudEntry.id;
+          }
+
+          // As for snippets: a delete wins, except over a skill this computer has never sent.
+          const shouldApply = cloudEntry.deleted_at
+            ? !!local && !local.deleted_at && !(local.sync_status === "pending" && !local.cloud_id)
+            : !local ||
+              cloudTs > normalizeTimestamp(local.updated_at) ||
+              (local.sync_status !== "pending" &&
+                (!local.cloud_id || local.cloud_id !== cloudEntry.id));
+          if (shouldApply && (await window.electronAPI.applySkillFromCloud?.(cloudEntry))) {
+            changed = true;
+          }
+        }
+
+        if (!hasMore) break;
+        const last = entries[entries.length - 1];
+        const nextCursor = last[cursorField];
+        if (nextCursor === cursor && last.id === cursorId) break;
+        cursor = nextCursor;
+        cursorId = last.id;
+      }
+
+      if (maxUpdatedAt) localStorage.setItem("lastSyncedAt.skills", maxUpdatedAt);
+      if (maxId) localStorage.setItem("lastSyncedAt.skills.id", maxId);
+      if (changed) await window.electronAPI.broadcastSkillsUpdated?.();
+    } catch (err) {
+      if (!isHttpStatus(err, 404)) console.error("Skill pull failed:", err);
     }
   }
 

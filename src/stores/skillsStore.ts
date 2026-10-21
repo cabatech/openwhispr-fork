@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SkillCreateInput, SkillSummary } from "../types/skills";
+import { syncAfterLocalWrite } from "../services/syncAfterLocalWrite";
 
 /** What Create skill holds, kept here so it survives leaving the page. */
 export type SkillCreateDraft = SkillCreateInput;
@@ -71,6 +72,7 @@ export function playSkillIcon(name: string): void {
 export async function setSkillEnabled(name: string, enabled: boolean): Promise<boolean> {
   const result = await window.electronAPI?.skillsSetEnabled?.(name, enabled);
   if (!result?.ok) return false;
+  syncAfterLocalWrite("syncSkillsNow");
   useSkillsStore.setState((state) => ({
     skills: state.skills.map((skill) => (skill.name === name ? { ...skill, enabled } : skill)),
   }));

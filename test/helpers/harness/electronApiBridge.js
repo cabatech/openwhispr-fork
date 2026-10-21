@@ -36,6 +36,40 @@ function inertSnippetApi() {
   };
 }
 
+// The skill sync surface, as skillsIpc.js serves it: over a real SkillLibrary when the test
+// gives one, otherwise empty so a notes pass doesn't trip the binding check.
+function skillApi(library, onBroadcast) {
+  if (!library) {
+    return {
+      getPendingSkills: async () => [],
+      getPendingSkillDeletes: async () => [],
+      exportSkillForCloud: async () => null,
+      getSkillForCloudMerge: async () => null,
+      applySkillFromCloud: async () => false,
+      markSkillSynced: async () => ({ success: true, changes: 1 }),
+      hardDeleteSkill: async () => ({ success: true }),
+      clearSkillCloudId: async () => ({ success: true }),
+      broadcastSkillsUpdated: async () => undefined,
+    };
+  }
+  const db = library.database;
+  return {
+    getPendingSkills: async () => {
+      library.scan();
+      return db.getPendingSkills();
+    },
+    getPendingSkillDeletes: async () => db.getPendingSkillDeletes(),
+    exportSkillForCloud: async (name) => library.exportForCloud(name),
+    getSkillForCloudMerge: async (entry) => db.getSkillForCloudMerge(entry),
+    applySkillFromCloud: async (entry) => library.applyFromCloud(entry),
+    markSkillSynced: async (name, cloudId, serverUpdatedAt, expectedHash, expectedEnabled) =>
+      db.markSkillSynced(name, cloudId, serverUpdatedAt, expectedHash, expectedEnabled),
+    hardDeleteSkill: async (name) => db.hardDeleteSkillState(name),
+    clearSkillCloudId: async (name) => db.clearSkillCloudId(name),
+    broadcastSkillsUpdated: async () => onBroadcast("skills-changed"),
+  };
+}
+
 // Every analytics binding syncPendingAnalytics reaches for. A missing one does
 // not fail loudly here -- SyncService catches the TypeError and logs it -- so
 // the pass silently does nothing and the test that asserts it drained still
@@ -187,6 +221,7 @@ function createElectronApi(db, options = {}) {
 
     ...inertDictionaryApi(),
     ...inertSnippetApi(),
+    ...skillApi(options.skillLibrary, (name) => syncEvents.push({ name })),
     ...inertAnalyticsApi(),
   };
 }
