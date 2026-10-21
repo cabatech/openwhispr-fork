@@ -62,6 +62,12 @@ test("load_skill's name is one of the skills it was given", () => {
   assert.equal(tool.readOnly, true);
 });
 
+test("load_skill asks to be called before a follow-up question", () => {
+  const { tool } = loadTool();
+
+  assert.match(tool.description, /before asking the user a follow-up question/);
+});
+
 test("a call naming a disabled skill returns no text", async () => {
   const { tool, reads, used } = loadTool();
 

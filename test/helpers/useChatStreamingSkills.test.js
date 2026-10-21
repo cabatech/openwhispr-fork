@@ -375,8 +375,10 @@ test("the attached creator learns the user's skills, connected apps and tool use
 const LOCAL_LARGE = { ...LOCAL_SMALL, chatAgentModel: "qwen3-8b-q4_k_m" };
 const systemPromptOf = (sent) => sent.find((message) => message.role === "system").content;
 const CATALOG_INTRO =
-  "The user's skills (name: when to use it). When a request matches one, call load_skill " +
-  "with its name before answering, then follow it. Load only the skills the request needs.";
+  "The user's skills (name: when to use it). Check this list before you answer and before " +
+  "you ask the user a follow-up question: when a request fits a skill, call load_skill with " +
+  "its name first, then follow it, since the skill may say how to settle what the request " +
+  "leaves open. Load only the skills the request needs.";
 const catalogOf = (sent) => {
   const prompt = systemPromptOf(sent);
   const start = prompt.indexOf(`${CATALOG_INTRO}\n`);

@@ -36,7 +36,7 @@ export function createLoadSkillTool({
   return {
     name: "load_skill",
     description:
-      "Load one of the user's saved skills to follow it for the current request. Pass file to read one of the files a loaded skill lists.",
+      "Load one of the user's saved skills to follow it for the current request. When a request fits a skill, call this before asking the user a follow-up question. Pass file to read one of the files a loaded skill lists.",
     parameters: {
       type: "object",
       properties: {

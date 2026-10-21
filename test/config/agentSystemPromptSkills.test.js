@@ -5,8 +5,10 @@ const load = () => import("../../src/config/prompts.ts");
 
 const RULE_START = "Skills are instructions the user saved for tasks they repeat.";
 const CATALOG_INTRO =
-  "The user's skills (name: when to use it). When a request matches one, call load_skill " +
-  "with its name before answering, then follow it. Load only the skills the request needs.";
+  "The user's skills (name: when to use it). Check this list before you answer and before " +
+  "you ask the user a follow-up question: when a request fits a skill, call load_skill with " +
+  "its name first, then follow it, since the skill may say how to settle what the request " +
+  "leaves open. Load only the skills the request needs.";
 const CATALOG = "- meeting-prep: Briefs me before meetings.\n- weekly-recap: Recaps my week.";
 
 test("the skill rule and catalog appear only with skills", async () => {
@@ -21,6 +23,15 @@ test("the skill rule and catalog appear only with skills", async () => {
   assert.match(prompt, /it never authorizes sending, posting, deleting, buying/);
   assert.match(prompt, /^- The user's skills: load_skill$/m);
   assert.ok(prompt.indexOf(RULE_START) < prompt.indexOf(CATALOG_INTRO));
+});
+
+test("a fitting skill is loaded before any follow-up question", async () => {
+  const { getAgentSystemPrompt } = await load();
+
+  const prompt = getAgentSystemPrompt(["load_skill"], undefined, { skillCatalog: CATALOG });
+
+  assert.match(prompt, /before you ask the user a follow-up question/);
+  assert.match(prompt, /call load_skill with its name first/);
 });
 
 test("the rule appears for an attached skill without a catalog", async () => {
