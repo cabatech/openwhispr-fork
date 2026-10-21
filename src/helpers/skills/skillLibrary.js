@@ -452,11 +452,19 @@ class SkillLibrary {
   }
 
   // Puts a kept copy back in one swap, then forgets it. False when there is no such copy, or
-  // when a later save made a newer one: putting this one back would lose that change.
+  // when the skill changed after the save that kept it (a later save, an upload or an edit by
+  // hand): putting this one back would lose that change.
   undo(name, versionId) {
     const versionDir = path.join(this.versionsDir, name, versionId);
     if (!fs.existsSync(versionDir)) return false;
     if (versionIds(path.join(this.versionsDir, name)).at(-1) !== Number(versionId)) return false;
+    let written;
+    try {
+      written = JSON.parse(fs.readFileSync(`${versionDir}.json`, "utf8"));
+    } catch {
+      return false;
+    }
+    if (this._folderHash(name) !== written.hash) return false;
     const walked = walkSkillFolder(versionDir);
     if (walked.unreadable) return false;
     const files = walked.files.map((file) => ({
@@ -464,8 +472,9 @@ class SkillLibrary {
       data: fs.readFileSync(file.fullPath),
     }));
     this._writeSkillFolder(name, files);
-    this._stamp(name, files, {});
+    this._stamp(name, files, { enabled: written.enabled });
     this._removeQuietly(versionDir);
+    this._removeQuietly(`${versionDir}.json`);
     return true;
   }
 
@@ -478,6 +487,7 @@ class SkillLibrary {
     fs.cpSync(path.join(this.skillsDir, name), path.join(folder, versionId), { recursive: true });
     for (const old of kept.slice(0, Math.max(0, kept.length + 1 - VERSIONS_KEPT))) {
       this._removeQuietly(path.join(folder, String(old)));
+      this._removeQuietly(path.join(folder, `${old}.json`));
     }
     return versionId;
   }
@@ -610,15 +620,28 @@ class SkillLibrary {
   }
 
   // Keeps a version, then writes; a failed write leaves the skill and its versions as they were.
+  // Beside the version goes what the write left and whether the skill was on, so Undo can tell
+  // whether the skill changed since and put its switch back too.
   _withVersion(name, write) {
+    const enabled = this.database.getSkillStates().find((state) => state.name === name)?.enabled;
     const versionId = this.saveVersion(name);
+    const versionDir = path.join(this.versionsDir, name, versionId);
     try {
       write();
     } catch (error) {
-      this._removeQuietly(path.join(this.versionsDir, name, versionId));
+      this._removeQuietly(versionDir);
       throw error;
     }
+    const written = { hash: this._folderHash(name), enabled: enabled === true };
+    fs.writeFileSync(`${versionDir}.json`, JSON.stringify(written));
     return versionId;
+  }
+
+  _folderHash(name) {
+    const walked = walkSkillFolder(this.skillDir(name));
+    return contentHash(
+      walked.files.map((file) => ({ path: file.path, data: fs.readFileSync(file.fullPath) }))
+    );
   }
 
   _install(name, files) {

@@ -146,6 +146,33 @@ test("Undo refuses once a later change has replaced the one it would undo", (t) 
   assert.equal(library.undo(NAME, first), true, "newest first, each Undo still works");
 });
 
+test("Undo refuses once the skill was changed outside the app", (t) => {
+  const { library, skillsDir } = playbook(t);
+  const { versionId } = library.applyUpdate({ ...SSO, files: [] });
+  // An edit by hand, or an upload that replaced the folder, keeps no version.
+  fs.writeFileSync(path.join(skillsDir, NAME, "references", "objections.md"), "# Mine\n");
+  const edited = snapshot(path.join(skillsDir, NAME));
+
+  assert.equal(library.undo(NAME, versionId), false);
+  assert.deepEqual(snapshot(path.join(skillsDir, NAME)), edited);
+});
+
+test("Undo puts back whether the replaced skill was switched on", (t) => {
+  const { library, skillsDir, database } = setup(t);
+  writeFolder(skillsDir, "weekly-recap", {
+    "SKILL.md": "---\nname: weekly-recap\ndescription: Recaps.\n---\n\nOld\n",
+  });
+  library.scan(); // found on disk, so it starts off
+  const proposal = { title: "Weekly recap", description: "Recaps.", instructions: "New" };
+
+  const { versionId } = library.saveProposal({ ...proposal, files: [] });
+  assert.equal(library.scan()[0].enabled, true, "the approved save switches it on");
+  assert.equal(library.undo("weekly-recap", versionId), true);
+
+  assert.equal(library.scan()[0].enabled, false);
+  assert.equal(database.getSkillStates()[0].enabled, false);
+});
+
 test("only the five newest versions are kept", (t) => {
   const { library, versionsDir } = playbook(t);
 
@@ -154,14 +181,16 @@ test("only the five newest versions are kept", (t) => {
     ids.push(library.applyUpdate({ ...SSO, instructions: `Round ${round}`, files: [] }).versionId);
   }
 
-  assert.deepEqual(listDir(versionsDir), [...ids].sort().slice(2));
+  // Each kept copy has a folder and, beside it, a note of what its save wrote.
+  const kept = [...ids].sort().slice(2);
+  assert.deepEqual(listDir(versionsDir), [...kept, ...kept.map((id) => `${id}.json`)].sort());
   assert.equal(new Set(ids).size, 7);
 });
 
 test("uninstall removes the skill's versions", (t) => {
   const { library, versionsDir } = playbook(t);
-  library.applyUpdate(SSO);
-  assert.equal(listDir(versionsDir).length, 1);
+  const { versionId } = library.applyUpdate(SSO);
+  assert.deepEqual(listDir(versionsDir), [versionId, `${versionId}.json`]);
 
   library.uninstall(NAME);
 
@@ -180,7 +209,7 @@ test("a failed update leaves the skill and its versions as they were", (t) => {
   t.mock.restoreAll();
 
   assert.deepEqual(snapshot(path.join(skillsDir, NAME)), skill);
-  assert.deepEqual(listDir(versionsDir), [versionId]);
+  assert.deepEqual(listDir(versionsDir), [versionId, `${versionId}.json`]);
   assert.deepEqual(
     listDir(skillsDir).filter((name) => name.startsWith(".")),
     [],
