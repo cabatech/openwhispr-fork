@@ -3,6 +3,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { randomUUID } = require("node:crypto");
 
 const { createDb } = require("./harness/db.js");
 const {
@@ -44,6 +45,21 @@ function updateNote(db, id, fields) {
 
 function silenceConsoleErrors(t) {
   t.mock.method(console, "error", () => {});
+}
+
+function attempted(db, table, id) {
+  return db.db.prepare(`SELECT cloud_create_attempted AS flag FROM ${table} WHERE id = ?`).get(id)
+    .flag;
+}
+
+// The database as a release without create attempts left it; reopening runs
+// the upgrade.
+function reopenWithoutCreateAttempts(db) {
+  for (const table of ["notes", "agent_conversations"]) {
+    db.db.exec(`ALTER TABLE ${table} DROP COLUMN cloud_create_attempted`);
+  }
+  db.db.close();
+  db.initDatabase();
 }
 
 test("a local tombstone survives a pull serving a newer cloud copy", async (t) => {
@@ -135,4 +151,114 @@ test("a never-synced pending conversation delete makes no cloud call", async (t)
     0,
     "a conversation delete without a cloud id must never reach the cloud"
   );
+});
+
+test("a note create attempt is recorded only while the note keeps the identity being sent", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const kept = db.saveNote("Kept", "body").note;
+  const forked = db.saveNote("Forked", "body").note;
+  const gone = db.saveNote("Gone", "body").note;
+  db.updateNote(forked.id, { client_note_id: randomUUID(), cloud_id: null });
+  db.hardDeleteNote(gone.id);
+
+  assert.deepEqual(
+    db.markNoteCreatesAttempted([kept.client_note_id, forked.client_note_id, gone.client_note_id]),
+    [kept.client_note_id]
+  );
+  assert.equal(attempted(db, "notes", kept.id), 1);
+  assert.equal(attempted(db, "notes", forked.id), 0);
+});
+
+test("a chat create attempt is recorded only while the chat exists", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const chat = db.createAgentConversation("Chat");
+  const gone = db.createAgentConversation("Gone");
+  db.hardDeleteConversation(gone.id);
+
+  assert.deepEqual(db.markConversationCreateAttempted(chat.id), { success: true });
+  assert.deepEqual(db.markConversationCreateAttempted(gone.id), { success: false });
+  assert.equal(attempted(db, "agent_conversations", chat.id), 1);
+});
+
+test("an upgrade counts a note whose last create failed as a create attempt", (t) => {
+  const db = createDb(t);
+  if (!db) return;
+  const failed = db.saveNote("Failed", "body").note;
+  db.markNoteSyncError(failed.id);
+  const fresh = db.saveNote("Fresh", "body").note;
+
+  reopenWithoutCreateAttempts(db);
+
+  assert.equal(attempted(db, "notes", failed.id), 1);
+  assert.equal(attempted(db, "notes", fresh.id), 0);
+});
+
+test("every note and chat create is recorded as attempted before its request is sent", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const { db, api, service } = ctx;
+  silenceConsoleErrors(t);
+  const flagAtSend = new Map();
+  const send = api.cloudApiRequest;
+  api.cloudApiRequest = async (opts) => {
+    if (opts.path === "/api/notes/create" || opts.path === "/api/notes/batch-create") {
+      for (const { client_note_id: clientId } of opts.body.notes ?? [opts.body]) {
+        flagAtSend.set(clientId, db.getNoteByClientId(clientId).cloud_create_attempted);
+      }
+    }
+    if (opts.path === "/api/conversations/create") {
+      const clientId = opts.body.client_conversation_id;
+      flagAtSend.set(clientId, db.getConversationByClientId(clientId).cloud_create_attempted);
+    }
+    return send(opts);
+  };
+
+  const batched = db.saveNote("Batched", "body").note;
+  const chat = db.createAgentConversation("Chat");
+  db.addAgentMessage(chat.id, "user", "hello");
+  await service.syncAll(true);
+  const single = db.saveNote("Single", "body").note;
+  await service.pushNote(single.id);
+  const migrated = db.saveNote("Migrated", "body").note;
+  api.getNotes = async () => [db.getNote(migrated.id)];
+  await require("../../src/stores/noteStore.ts").startMigration();
+
+  assert.deepEqual(Object.fromEntries(flagAtSend), {
+    [batched.client_note_id]: 1,
+    [chat.client_conversation_id]: 1,
+    [single.client_note_id]: 1,
+    [migrated.client_note_id]: 1,
+  });
+});
+
+test("a note given a new identity after a sync pass read it is not sent under the old one", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const { db, cloud, api, service } = ctx;
+  silenceConsoleErrors(t);
+  const note = db.saveNote("Forked mid-pass", "body").note;
+  const oldClientId = note.client_note_id;
+  const readPending = api.getPendingNotes;
+  api.getPendingNotes = async (spaceKind) => {
+    const pending = await readPending(spaceKind);
+    if (pending.some((row) => row.id === note.id)) {
+      api.getPendingNotes = readPending;
+      db.updateNote(note.id, { client_note_id: randomUUID(), cloud_id: null });
+    }
+    return pending;
+  };
+
+  await service.syncAll(true);
+  await service.syncAll(true);
+
+  const sent = cloud
+    .logFor("/api/notes/batch-create")
+    .flatMap((call) => call.body.notes.map((row) => row.client_note_id));
+  assert.equal(sent.includes(oldClientId), false);
+  assert.equal(cloud.note(oldClientId), null);
+  const synced = db.getNote(note.id);
+  assert.equal(synced.sync_status, "synced");
+  assert.equal(cloud.note(synced.client_note_id).id, synced.cloud_id);
 });
