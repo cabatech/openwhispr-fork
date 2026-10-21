@@ -323,3 +323,32 @@ test("a missing note just leaves out Learned from", async (t) => {
   assert.equal(entry(key).learnedFrom, null);
   approvals.skipSkillApproval(key);
 });
+
+// A small model can send a field's own hint as its value.
+test("an update field that repeats its hint counts as unchanged", async (t) => {
+  const { update, entry, settled } = await setupUpdate(t);
+  const instructions = "## Steps\nAsk about budget.\nAsk about pricing.";
+
+  const echoed = { ...UPDATE_ARGS, files: [], description: "The new description, if it changes" };
+  const { key } = update({ ...echoed, instructions });
+  await settled();
+
+  assert.deepEqual(entry(key).draft, { name: PLAYBOOK.name, instructions, files: [] });
+});
+
+test("an update whose every field repeats its hint shows no card", async (t) => {
+  const { update, entry, settled } = await setupUpdate(t);
+  const args = {
+    ...UPDATE_ARGS,
+    files: [],
+    description: "The new description, if it changes",
+    instructions: "The full new instructions, if they change",
+  };
+
+  const { result, key } = update(args, "update-echo");
+  await settled();
+
+  assert.equal(entry(key), undefined);
+  assert.match((await result).data, /the skill's new text/);
+});
+

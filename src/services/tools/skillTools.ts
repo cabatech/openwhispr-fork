@@ -87,6 +87,18 @@ export function createLoadSkillTool({
 
 const asText = (value: unknown): string => (typeof value === "string" ? value : "");
 
+const HINTS = {
+  proposeDescription: "What the skill does and when to use it, in one or two sentences",
+  proposeInstructions: "The skill's instructions, as short headed sections",
+  updateDescription: "The new description, if it changes",
+  updateInstructions: "The full new instructions, if they change",
+};
+// A small model can send a field's own hint back as its value, which says nothing.
+const givenText = (value: unknown, hint: string): string | undefined =>
+  typeof value === "string" && value.trim().toLowerCase() !== hint.toLowerCase()
+    ? value
+    : undefined;
+
 const FILES_PARAMETER = {
   type: "array",
   maxItems: MAX_PROPOSAL_FILES,
@@ -138,11 +150,11 @@ export function createProposeSkillTool(): ToolDefinition {
         },
         description: {
           type: "string",
-          description: "What the skill does and when to use it, in one or two sentences",
+          description: HINTS.proposeDescription,
         },
         instructions: {
           type: "string",
-          description: "The skill's instructions, as short headed sections",
+          description: HINTS.proposeInstructions,
         },
         files: {
           ...FILES_PARAMETER,
@@ -161,8 +173,8 @@ export function createProposeSkillTool(): ToolDefinition {
       }
       const proposal: SkillProposal = {
         title: asText(args.title),
-        description: asText(args.description),
-        instructions: asText(args.instructions),
+        description: givenText(args.description, HINTS.proposeDescription) ?? "",
+        instructions: givenText(args.instructions, HINTS.proposeInstructions) ?? "",
         files: proposedFiles(args.files),
       };
       const check = await window.electronAPI
@@ -251,8 +263,8 @@ export function createUpdateSkillTool(usable: SkillSummary[]): ToolDefinition {
           type: "integer",
           description: "The note this change was learned from, if any",
         },
-        description: { type: "string", description: "The new description, if it changes" },
-        instructions: { type: "string", description: "The full new instructions, if they change" },
+        description: { type: "string", description: HINTS.updateDescription },
+        instructions: { type: "string", description: HINTS.updateInstructions },
         files: { ...FILES_PARAMETER, description: "The full new text of each file it changes" },
       },
       required: ["name", "intent"],
@@ -264,14 +276,24 @@ export function createUpdateSkillTool(usable: SkillSummary[]): ToolDefinition {
       if (!context) return failure("A skill can only be changed in a chat");
       const skill = usable.find((entry) => entry.name === args.name);
       if (!skill) return failure(`No skill named "${asText(args.name)}"`);
+      const description = givenText(args.description, HINTS.updateDescription);
+      const instructions = givenText(args.instructions, HINTS.updateInstructions);
+      const changedFiles = proposedFiles(args.files);
+      if (description === undefined && instructions === undefined && changedFiles.length === 0) {
+        return {
+          success: true,
+          data: "Nothing would change. Send the skill's new text itself, not the field hints.",
+          displayText: "",
+        };
+      }
       if (!context.claimTurnSlot(SKILL_CARD_SLOT, MAX_SKILL_CARDS_PER_ANSWER)) {
         return failure("Only three skill cards per answer.");
       }
-      const skillText = await currentText(skill, proposedFiles(args.files));
+      const skillText = await currentText(skill, changedFiles);
       const update: SkillUpdate = {
         name: skill.name,
-        ...(typeof args.description === "string" ? { description: args.description } : {}),
-        ...(typeof args.instructions === "string" ? { instructions: args.instructions } : {}),
+        ...(description !== undefined ? { description } : {}),
+        ...(instructions !== undefined ? { instructions } : {}),
         files: skillText?.files ?? [],
       };
       const check = skillText
