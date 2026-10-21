@@ -87,6 +87,18 @@ test("a skill that needs fixing, or isn't there, is not exported", (t) => {
   assert.equal(ctx.library.exportForCloud("missing"), null);
 });
 
+test("a skill folder that is a link is never exported", (t) => {
+  const ctx = setup(t);
+  if (!ctx) return;
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "openwhispr-outside-"));
+  t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(outside, "SKILL.md"), skillText("linked"));
+  fs.mkdirSync(ctx.skillsDir, { recursive: true });
+  fs.symlinkSync(outside, path.join(ctx.skillsDir, "linked"), "dir");
+
+  assert.equal(ctx.library.exportForCloud("linked"), null);
+});
+
 test("a skill over the sync caps reports tooLargeToSync and is never pushed", (t) => {
   const ctx = setup(t);
   if (!ctx) return;

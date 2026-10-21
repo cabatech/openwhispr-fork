@@ -527,7 +527,8 @@ class SkillLibrary {
   // A skill's files for Cloud backup, with the hash they make. Null when there's no such skill or
   // it needs fixing; tooLargeToSync when it is over the backup caps.
   exportForCloud(name) {
-    if (!this._exists(name) || !isSkillFolderName(name)) return null;
+    // skillDir refuses a link, so nothing outside the skills folder is ever sent.
+    if (!this.skillDir(name)) return null;
     const inspected = this._inspect(name);
     if (inspected.problems.length > 0) return null;
     if (inspected.tooLargeToSync) return { tooLargeToSync: true };
