@@ -222,6 +222,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   skillsDiscardUploads: (tokens) => ipcRenderer.invoke("skills-discard-uploads", tokens),
   skillsCreate: (input) => ipcRenderer.invoke("skills-create", input),
   skillsAddRecommended: (id, copy) => ipcRenderer.invoke("skills-add-recommended", id, copy),
+  skillsReadForModel: (ref) => ipcRenderer.invoke("skills-read-for-model", ref),
+  skillsCheckProposal: (request) => ipcRenderer.invoke("skills-check-proposal", request),
+  skillsSaveProposal: (proposal) => ipcRenderer.invoke("skills-save-proposal", proposal),
+  skillsMarkUsed: (name) => ipcRenderer.invoke("skills-mark-used", name),
   onSkillsChanged: (callback) => {
     const listener = () => callback?.();
     ipcRenderer.on("skills-changed", listener);

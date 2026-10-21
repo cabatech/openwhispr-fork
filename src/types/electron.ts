@@ -38,7 +38,11 @@ import type {
   SkillCommitResult,
   SkillCreateInput,
   SkillDetail,
+  SkillForModel,
   SkillInvalidRequest,
+  SkillProposal,
+  SkillProposalCheck,
+  SkillRef,
   SkillSaveResult,
   SkillSummary,
   SkillUploadItem,
@@ -1719,6 +1723,16 @@ declare global {
         id: string,
         copy: { title: string; description: string }
       ) => Promise<SkillSaveResult>;
+      /** The built-in creator, or a skill that is on and valid; null for anything else. */
+      skillsReadForModel?: (
+        ref: SkillRef & { file?: string; withFiles?: boolean }
+      ) => Promise<SkillForModel | null>;
+      skillsCheckProposal?: (request: {
+        kind: "create";
+        proposal: SkillProposal;
+      }) => Promise<SkillProposalCheck | SkillInvalidRequest>;
+      skillsSaveProposal?: (proposal: SkillProposal) => Promise<SkillSaveResult>;
+      skillsMarkUsed?: (name: string) => Promise<void>;
       onSkillsChanged?: (callback: () => void) => () => void;
       setAutoLearnEnabled?: (enabled: boolean) => void;
       onCorrectionsLearned?: (callback: (words: string[]) => void) => () => void;

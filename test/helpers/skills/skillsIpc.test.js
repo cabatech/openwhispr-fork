@@ -32,6 +32,10 @@ function fakeLibrary(overrides = {}) {
     discardUploads: record("discardUploads"),
     create: record("create", { name: "weekly-recap" }),
     addRecommended: record("addRecommended", { name: "decision-log" }),
+    readForModel: record("readForModel", { name: "meeting-prep", body: "Steps", files: [] }),
+    checkProposal: record("checkProposal", { name: "weekly-recap", existing: false, problems: [] }),
+    saveProposal: record("saveProposal", { name: "weekly-recap", versionId: "1760950800000" }),
+    markUsed: record("markUsed"),
     ...overrides,
   };
 }
@@ -152,4 +156,84 @@ test("reveal shows the skill's folder", async () => {
   assert.deepEqual(await call("skills-reveal", "meeting-prep"), { ok: true });
   assert.deepEqual(await call("skills-reveal", "missing"), { ok: false });
   assert.deepEqual(revealed, ["/data/skills/meeting-prep"]);
+});
+
+const proposal = { title: "Recap", description: "Recaps.", instructions: "Go", files: [] };
+
+test("malformed model reads, proposals and marks never reach the library", async () => {
+  const { call, library } = setup();
+
+  for (const ref of [
+    null,
+    "meeting-prep",
+    { name: 7 },
+    { name: "../escape" },
+    { name: "meeting-prep", builtin: "yes" },
+    { name: "meeting-prep", file: 7 },
+    { name: "meeting-prep", withFiles: 1 },
+  ]) {
+    assert.equal(await call("skills-read-for-model", ref), null, JSON.stringify(ref));
+  }
+  for (const bad of [
+    null,
+    { ...proposal, title: 7 },
+    { ...proposal, files: "notes.md" },
+    { ...proposal, files: [{ path: "a.md" }] },
+    { ...proposal, files: [{ path: 7, content: "x" }] },
+  ]) {
+    const request = { kind: "create", proposal: bad };
+    assert.deepEqual(await call("skills-check-proposal", request), INVALID);
+    assert.deepEqual(await call("skills-save-proposal", bad), INVALID);
+  }
+  assert.deepEqual(await call("skills-check-proposal", { kind: "other", proposal }), INVALID);
+  assert.equal(await call("skills-mark-used", "../escape"), undefined);
+  assert.deepEqual(library.calls, []);
+});
+
+test("a saved proposal broadcasts skills-changed; reads, checks and marks don't", async () => {
+  const { call, library, broadcasts } = setup();
+  const ref = { name: "meeting-prep", file: "references/a.md" };
+
+  assert.deepEqual(await call("skills-read-for-model", ref), {
+    name: "meeting-prep",
+    body: "Steps",
+    files: [],
+  });
+  assert.deepEqual(await call("skills-check-proposal", { kind: "create", proposal }), {
+    name: "weekly-recap",
+    existing: false,
+    problems: [],
+  });
+  await call("skills-mark-used", "meeting-prep");
+  assert.deepEqual(broadcasts, []);
+
+  assert.deepEqual(await call("skills-save-proposal", proposal), {
+    ok: true,
+    name: "weekly-recap",
+    versionId: "1760950800000",
+  });
+  assert.deepEqual(broadcasts, ["skills-changed"]);
+  assert.deepEqual(library.calls, [
+    ["readForModel", ref],
+    ["checkProposal", { kind: "create", proposal }],
+    ["markUsed", "meeting-prep"],
+    ["saveProposal", proposal],
+  ]);
+});
+
+test("a proposal that can't be saved reports why and broadcasts nothing", async () => {
+  const problems = [{ code: "placeholder" }];
+  const refused = setup({ saveProposal: () => ({ problems }) });
+  assert.deepEqual(await refused.call("skills-save-proposal", proposal), { ok: false, problems });
+
+  const full = setup({
+    saveProposal: () => {
+      throw Object.assign(new Error("disk"), { code: "noSpace" });
+    },
+  });
+  assert.deepEqual(await full.call("skills-save-proposal", proposal), {
+    ok: false,
+    error: "noSpace",
+  });
+  assert.deepEqual([...refused.broadcasts, ...full.broadcasts], []);
 });

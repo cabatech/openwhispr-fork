@@ -95,7 +95,44 @@ export interface SkillCreateInput {
 }
 
 export type SkillSaveResult =
-  | { ok: true; name: string }
+  | {
+      ok: true;
+      name: string;
+      /** The copy Undo restores, when the save replaced a skill. */
+      versionId?: string;
+    }
   | { ok: false; problems: SkillIssue<SkillProblemCode>[] }
   | { ok: false; error: SkillWriteError }
   | SkillInvalidRequest;
+
+/** A skill a chat uses: one of the user's, or the app's built-in skill creator. */
+export interface SkillRef {
+  name: string;
+  builtin?: boolean;
+}
+
+/** A skill as the assistant reads it. */
+export interface SkillForModel {
+  name: string;
+  displayName: string;
+  /** SKILL.md without its header block. */
+  body: string;
+  /** Every file but SKILL.md; content only on the text files that were asked for. */
+  files: Array<SkillFileInfo & { content?: string }>;
+}
+
+/** A new skill the assistant proposes; nothing is written until the user approves it. */
+export interface SkillProposal {
+  title: string;
+  description: string;
+  instructions: string;
+  files: { path: string; content: string }[];
+}
+
+export interface SkillProposalCheck {
+  /** The folder saving writes. */
+  name: string;
+  /** A skill already has that name, so saving updates it. */
+  existing: boolean;
+  problems: SkillIssue<SkillProblemCode>[];
+}

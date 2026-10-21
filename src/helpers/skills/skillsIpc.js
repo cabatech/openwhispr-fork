@@ -19,6 +19,29 @@ function isCreateInput(input) {
   );
 }
 
+const isOptional = (value, type) => value === undefined || typeof value === type;
+
+function isModelRef(ref) {
+  return (
+    Boolean(ref) &&
+    isSkillFolderName(ref.name) &&
+    isOptional(ref.builtin, "boolean") &&
+    isOptional(ref.file, "string") &&
+    isOptional(ref.withFiles, "boolean")
+  );
+}
+
+function isProposal(proposal) {
+  return (
+    Boolean(proposal) &&
+    ["title", "description", "instructions"].every((key) => typeof proposal[key] === "string") &&
+    Array.isArray(proposal.files) &&
+    proposal.files.every(
+      (file) => typeof file?.path === "string" && typeof file?.content === "string"
+    )
+  );
+}
+
 function writeErrorCode(error) {
   return ["noSpace", "permission"].includes(error?.code) ? error.code : "unknown";
 }
@@ -32,7 +55,7 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     if (!result) return INVALID;
     if (result.problems) return { ok: false, problems: result.problems };
     changed();
-    return { ok: true, name: result.name };
+    return { ok: true, ...result };
   };
 
   ipcMain.handle("skills-list", () => ({ skills: library.scan() }));
@@ -116,6 +139,29 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     } catch (error) {
       return { ok: false, error: writeErrorCode(error) };
     }
+  });
+
+  ipcMain.handle("skills-read-for-model", (_event, ref) =>
+    isModelRef(ref) ? library.readForModel(ref) : null
+  );
+
+  ipcMain.handle("skills-check-proposal", (_event, request) => {
+    if (request?.kind !== "create" || !isProposal(request.proposal)) return INVALID;
+    return library.checkProposal(request);
+  });
+
+  ipcMain.handle("skills-save-proposal", (_event, proposal) => {
+    if (!isProposal(proposal)) return INVALID;
+    try {
+      return saved(library.saveProposal(proposal));
+    } catch (error) {
+      return { ok: false, error: writeErrorCode(error) };
+    }
+  });
+
+  // Bookkeeping, not a change to any skill, so the windows aren't told.
+  ipcMain.handle("skills-mark-used", (_event, name) => {
+    if (isSkillFolderName(name)) library.markUsed(name);
   });
 }
 

@@ -17,6 +17,12 @@ const { readSkillArchive, isSafeArchivePath, hasClashingPaths } = require("./ski
 
 const ARCHIVE_EXTENSIONS = new Set([".zip", ".skill"]);
 const FINDER_JUNK = ".DS_Store";
+// Ships with the app, read-only, and never listed in the library.
+const BUILTIN_DIR = path.join(__dirname, "builtin");
+const SKILL_CREATOR = "skill-creator";
+// File text a model read may carry, and what an assistant proposal may write.
+const MODEL_FILES_MAX_BYTES = 200 * 1024;
+const PROPOSAL_LIMITS = { maxFiles: 20, maxFileBytes: 200 * 1024, maxBytes: 1024 * 1024 };
 
 // A name the library can address on disk: one path segment that isn't hidden. Wider than
 // SKILL_NAME_PATTERN, so a folder dropped in under any name can still be shown and removed.
@@ -115,6 +121,36 @@ function sizeProblem(files) {
   return bytes > SKILL_LIMITS.maxBytes ? { code: "tooLarge" } : null;
 }
 
+function readBuiltin(name) {
+  const markdown = fs.readFileSync(path.join(BUILTIN_DIR, name, "SKILL.md"), "utf8");
+  const { data, body } = parseSkillMarkdown(markdown);
+  return { name, displayName: displayNameFor(name, data?.metadata), body, files: [] };
+}
+
+// The files an assistant proposal adds, as written: SKILL.md comes from its instructions.
+function proposalFiles(files) {
+  if (files.length > PROPOSAL_LIMITS.maxFiles) return { problem: { code: "tooManyFiles" } };
+  const entries = files.map((file) => ({
+    path: file.path.replace(/^\.\//, ""),
+    data: Buffer.from(file.content),
+  }));
+  const unsafe = entries.find((entry) => !isSafeArchivePath(entry.path));
+  if (unsafe) return { problem: { code: "unsafePath", values: { path: unsafe.path } } };
+  if (hasClashingPaths(["SKILL.md", ...entries.map((entry) => entry.path)])) {
+    return { problem: { code: "unsafePath" } };
+  }
+  return { files: entries };
+}
+
+function proposalSizeProblem(files) {
+  let bytes = 0;
+  for (const file of files) {
+    if (file.data.length > PROPOSAL_LIMITS.maxFileBytes) return { code: "tooLarge" };
+    bytes += file.data.length;
+  }
+  return bytes > PROPOSAL_LIMITS.maxBytes ? { code: "tooLarge" } : null;
+}
+
 /**
  * The user's skills: one folder each under userData/skills, which is the only copy of a
  * skill's content. The database keeps only each skill's on/off state.
@@ -122,6 +158,7 @@ function sizeProblem(files) {
 class SkillLibrary {
   constructor({ userDataDir, database, recommendedDir }) {
     this.skillsDir = path.join(userDataDir, "skills");
+    this.versionsDir = path.join(userDataDir, "skill-versions");
     this.database = database;
     this.recommendedDir = recommendedDir;
     this.inspected = new Map();
@@ -336,6 +373,62 @@ class SkillLibrary {
     return { name: id };
   }
 
+  // What the assistant reads: the built-in creator, or a skill that is on and valid.
+  readForModel({ name, builtin, file, withFiles }) {
+    if (builtin) return name === SKILL_CREATOR ? readBuiltin(name) : null;
+    const skill = this.get(name);
+    if (!skill?.enabled || !skill.valid) return null;
+    const files = skill.files.map((entry) => ({ ...entry }));
+    if (file !== undefined) {
+      const entry = files.find((candidate) => candidate.path === file && candidate.text);
+      const content = entry ? this.readFile(name, file) : null;
+      if (content === null) return null;
+      entry.content = content;
+    } else if (withFiles) {
+      let room = MODEL_FILES_MAX_BYTES;
+      for (const entry of files) {
+        if (!entry.text) continue;
+        if (entry.size > room) break;
+        const content = this.readFile(name, entry.path);
+        if (content === null) continue;
+        entry.content = content;
+        room -= entry.size;
+      }
+    }
+    const { body } = parseSkillMarkdown(skill.markdown);
+    return { name, displayName: skill.displayName, body, files };
+  }
+
+  // Checked before the user sees a card, so the assistant can fix what it proposed.
+  checkProposal({ proposal }) {
+    const { name, existing, problems } = this._proposedSkill(proposal);
+    return { name, existing, problems };
+  }
+
+  // An approved proposal. One named like a skill the user has updates it, keeping a version.
+  saveProposal(proposal) {
+    const { name, existing, problems, files } = this._proposedSkill(proposal);
+    if (problems.length > 0) return { problems };
+    const versionId = existing ? this.saveVersion(name) : null;
+    this._install(name, files);
+    return versionId ? { name, versionId } : { name };
+  }
+
+  // A copy of the skill as it is now, for Undo to put back.
+  saveVersion(name) {
+    const folder = path.join(this.versionsDir, name);
+    let versionId = Date.now();
+    while (fs.existsSync(path.join(folder, String(versionId)))) versionId += 1;
+    fs.cpSync(path.join(this.skillsDir, name), path.join(folder, String(versionId)), {
+      recursive: true,
+    });
+    return String(versionId);
+  }
+
+  markUsed(name) {
+    this.database.markSkillUsed(name);
+  }
+
   _inspect(name) {
     let walked;
     try {
@@ -407,6 +500,23 @@ class SkillLibrary {
       problems: [],
       warnings: result.warnings,
     };
+  }
+
+  _proposedSkill({ title, description, instructions, files }) {
+    const cleanTitle = title.trim();
+    // The title's own name, even when a skill has it: saving then updates that skill.
+    const name = slugifySkillName(cleanTitle, new Set());
+    const existing = this._exists(name);
+    const refuse = (problem) => ({ name, existing, problems: [problem], files: [] });
+    if (!cleanTitle) return refuse({ code: "missingName" });
+    const attachments = proposalFiles(files);
+    if (attachments.problem) return refuse(attachments.problem);
+    const skillFile = buildSkillMarkdown({ name, title: cleanTitle, description, instructions });
+    const skillFiles = [{ path: "SKILL.md", data: Buffer.from(skillFile) }, ...attachments.files];
+    const limit = proposalSizeProblem(skillFiles);
+    if (limit) return refuse(limit);
+    const { problems } = validateSkillFiles(skillFiles, { source: "app" });
+    return { name, existing, problems, files: skillFiles };
   }
 
   _install(name, files) {
