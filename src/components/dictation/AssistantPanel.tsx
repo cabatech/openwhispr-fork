@@ -91,6 +91,15 @@ interface AssistantPanelProps {
   onResponseContent: () => void;
   onConversationReset: () => void;
   onSelectionContextChange: (context: AgentSelectionContext | null) => void;
+  /** The conversation's picked skill, kept by the owner because the panel unmounts on close. */
+  skillChoice: AssistantSkillChoice;
+  onSkillChoiceChange: (choice: AssistantSkillChoice) => void;
+}
+
+/** A skill the app picked for a model without tools, and whether the user turned picking off. */
+export interface AssistantSkillChoice {
+  picked: { name: string; displayName: string } | null;
+  pickOff: boolean;
 }
 
 // Avoid reparsing Markdown when only the selection indicator changes.
@@ -116,6 +125,8 @@ export function AssistantPanel({
   onResponseContent,
   onConversationReset,
   onSelectionContextChange,
+  skillChoice,
+  onSkillChoiceChange,
 }: AssistantPanelProps) {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
@@ -150,17 +161,15 @@ export function AssistantPanel({
   const [submissionInFlight, setSubmissionInFlight] = useState(false);
   // A skill the app picked for a model without tools; later sends keep it until it's removed,
   // and then nothing else is picked in this conversation.
-  const [pickedSkill, setPickedSkill] = useState<{ name: string; displayName: string } | null>(
-    null
-  );
-  const [skillPickOff, setSkillPickOff] = useState(false);
+  const { picked: pickedSkill, pickOff: skillPickOff } = skillChoice;
   const skillSendOptions = useCallback(
     () => ({
       attachedSkill: pickedSkill ? { name: pickedSkill.name } : undefined,
       allowSkillPick: !skillPickOff,
-      onSkillPicked: setPickedSkill,
+      onSkillPicked: (picked: { name: string; displayName: string }) =>
+        onSkillChoiceChange({ picked, pickOff: skillPickOff }),
     }),
-    [pickedSkill, skillPickOff]
+    [pickedSkill, skillPickOff, onSkillChoiceChange]
   );
   const sendMessage = useChatMessageSender({
     conversationId: persistence.conversationId,
@@ -365,8 +374,6 @@ export function AssistantPanel({
     persistence.handleNewChat();
     onConversationIdChange(null);
     clearSelectedContext();
-    setPickedSkill(null);
-    setSkillPickOff(false);
     displayedMessageRef.current = undefined;
     onConversationReset();
   }, [
@@ -393,11 +400,10 @@ export function AssistantPanel({
 
   const composerAreaRef = useRef<HTMLDivElement | null>(null);
   const removePickedSkill = useCallback(() => {
-    setPickedSkill(null);
-    setSkillPickOff(true);
+    onSkillChoiceChange({ picked: null, pickOff: true });
     // The × is gone with the chip, so the cursor goes back to the composer.
     composerAreaRef.current?.querySelector("textarea")?.focus();
-  }, []);
+  }, [onSkillChoiceChange]);
 
   const showEmptyState =
     historyReady &&

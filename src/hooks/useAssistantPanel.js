@@ -12,6 +12,8 @@ import {
 const ASSISTANT_TRANSITION_MS = 320;
 const ASSISTANT_CONTENT_FADE_FALLBACK_MS = 260;
 
+const NO_SKILL_CHOICE = { picked: null, pickOff: false };
+
 /**
  * Owns the assistant panel lifecycle: open/close choreography, the thinking
  * flourish, footer phase timeline, pending voice commands, and conversation
@@ -35,6 +37,9 @@ export function useAssistantPanel({
   const [footerPhase, setFooterPhase] = useState("pill");
   const [pendingCommand, setPendingCommand] = useState(null);
   const [conversationId, setConversationId] = useState(null);
+  // The conversation's picked skill and whether the user turned picking off: they outlive the
+  // panel, which unmounts on close while the conversation carries on.
+  const [skillChoice, setSkillChoice] = useState(NO_SKILL_CHOICE);
 
   const openRef = useRef(open);
   const closingRef = useRef(false);
@@ -160,6 +165,7 @@ export function useAssistantPanel({
 
   const handleConversationReset = useCallback(() => {
     hasContentRef.current = false;
+    setSkillChoice(NO_SKILL_CHOICE);
     errorDownplayRequestedRef.current = false;
     setResponseReady(false);
   }, []);
@@ -226,6 +232,7 @@ export function useAssistantPanel({
     setBusy(closeState.busy);
     setPendingCommand(closeState.pendingCommand);
     setConversationId(closeState.conversationId);
+    if (closeState.conversationId == null) setSkillChoice(NO_SKILL_CHOICE);
     selectionContextRef.current = null;
     hasContentRef.current = false;
     clearTimeout(closeTimerRef.current);
@@ -320,6 +327,8 @@ export function useAssistantPanel({
     footerPhase,
     pendingCommand,
     conversationId,
+    skillChoice,
+    setSkillChoice,
     openRef,
     setBusy,
     setResponseReady,

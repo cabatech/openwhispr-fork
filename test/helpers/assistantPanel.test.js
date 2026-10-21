@@ -158,6 +158,8 @@ async function setupAssistantPanel(
     onResponseContent: noop,
     onConversationReset: noop,
     onSelectionContextChange: noop,
+    skillChoice: { picked: null, pickOff: false },
+    onSkillChoiceChange: noop,
   };
   return { AssistantPanel, props };
 }
@@ -342,6 +344,8 @@ test("starting a new conversation clears the displayed response and parent conte
         assistant.handleConversationReset();
       },
       onSelectionContextChange: (context) => lifecycleEvents.push(`selection:${context}`),
+      skillChoice: assistant.skillChoice,
+      onSkillChoiceChange: assistant.setSkillChoice,
     });
   }
 
@@ -1001,6 +1005,8 @@ test("only a plain-text caret delivery asks the model for plain prose", async (t
       onResponseContent: noop,
       onConversationReset: noop,
       onSelectionContextChange: noop,
+      skillChoice: { picked: null, pickOff: false },
+      onSkillChoiceChange: noop,
     });
 
   root = createRoot(container);

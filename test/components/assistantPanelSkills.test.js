@@ -109,6 +109,8 @@ const PANEL_PROPS = {
   onResponseContent: noop,
   onConversationReset: noop,
   onSelectionContextChange: noop,
+  skillChoice: { picked: null, pickOff: false },
+  onSkillChoiceChange: noop,
 };
 
 // Browser globals (and, for a mount, the DOM) come first: react-dom reads them as it loads.
@@ -146,10 +148,23 @@ async function mountPanel(t, props, options) {
   const container = installInteractiveDom(t);
   const { createRoot } = require("react-dom/client");
   const loaded = await loadPanel(t, options);
+  // The panel's owner keeps the conversation's skill choice, as useAssistantPanel does.
+  function Owner() {
+    const [skillChoice, setSkillChoice] = React.useState(
+      props.skillChoice ?? { picked: null, pickOff: false }
+    );
+    return React.createElement(loaded.AssistantPanel, {
+      ...PANEL_PROPS,
+      ...props,
+      skillChoice,
+      onSkillChoiceChange: (choice) => {
+        props.onSkillChoiceChange?.(choice);
+        setSkillChoice(choice);
+      },
+    });
+  }
   root = createRoot(container);
-  await React.act(async () =>
-    root.render(React.createElement(loaded.AssistantPanel, { ...PANEL_PROPS, ...props }))
-  );
+  await React.act(async () => root.render(React.createElement(Owner)));
   await settle();
   return { ...loaded, container };
 }
@@ -193,6 +208,27 @@ test("the voice panel shows a picked skill's chip", async (t) => {
   const afterRemove = await typed("And the 5pm");
   assert.equal(afterRemove.attachedSkill, undefined);
   assert.equal(afterRemove.allowSkillPick, false);
+});
+
+// The panel unmounts when it closes; the conversation, and the skill it uses, outlive it.
+test("a reopened voice panel keeps the conversation's picked skill and its removal", async (t) => {
+  const changes = [];
+  const { container } = await mountPanel(t, {
+    pendingCommand: null,
+    skillChoice: { picked: { name: "meeting-prep", displayName: "Meeting prep" }, pickOff: false },
+    onSkillChoiceChange: (choice) => changes.push(choice),
+  });
+  const chip = () =>
+    findAll(container, (node) => ariaLabel(node).startsWith("skills.chat.chipRemove"))[0];
+
+  assert.equal(Boolean(chip()), true);
+  await React.act(async () => globalThis.__panelInput.onTextSubmit("And the 4pm"));
+  await settle();
+  assert.deepEqual(globalThis.__panelSends.at(-1).options.attachedSkill, { name: "meeting-prep" });
+
+  await click(chip());
+
+  assert.deepEqual(changes.at(-1), { picked: null, pickOff: true });
 });
 
 test("the voice panel renders skill cards", async (t) => {
@@ -260,3 +296,39 @@ test("voice panel code blocks offer Paste into app", async (t) => {
   assert.match(markup, /skills\.code\.paste/);
   assert.match(markup, /common\.copy/);
 });
+
+test("the panel's owner keeps the skill choice through a close, and resets it", async (t) => {
+  let root = null;
+  t.after(async () => {
+    if (root) await React.act(async () => root.unmount());
+  });
+  installBrowserGlobals(t, { window: { setInterval: () => 1, clearInterval() {} } });
+  const container = installInteractiveDom(t);
+  const { createRoot } = require("react-dom/client");
+  const vite = await createRendererServer(t, {
+    cachePrefix: "openwhispr-assistant-panel-skill-choice-test-",
+  });
+  const { useAssistantPanel } = await vite.ssrLoadModule("/hooks/useAssistantPanel.js");
+  let assistant;
+  function Harness() {
+    assistant = useAssistantPanel({
+      requestMainWindowSize: async () => ({ success: true }),
+      dictationErrorActionCount: 0,
+      recordingControlsRef: { current: null },
+    });
+    return null;
+  }
+  root = createRoot(container);
+  await React.act(async () => root.render(React.createElement(Harness)));
+  const picked = { picked: { name: "meeting-prep", displayName: "Meeting prep" }, pickOff: false };
+
+  await React.act(async () => assistant.setSkillChoice(picked));
+  await React.act(async () => assistant.setConversationId(42));
+  await React.act(async () => assistant.handleClose());
+  await React.act(async () => assistant.completeContentFade());
+  assert.deepEqual(assistant.skillChoice, picked, "kept while the conversation is");
+
+  await React.act(async () => assistant.handleConversationReset());
+  assert.deepEqual(assistant.skillChoice, { picked: null, pickOff: false });
+});
+
