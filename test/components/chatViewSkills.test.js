@@ -186,6 +186,18 @@ test("removing the chip drops the skill from the next send", async (t) => {
   assert.equal(options.allowSkillPick, true, "the user removed a chip they attached");
 });
 
+test("a removed skill stays off the chat until a new one starts", async (t) => {
+  const { chip, send } = await renderChatView(t, TRY_MEETING_PREP);
+
+  await click(chip());
+  const afterRemove = await send("What's the capital of France?");
+  assert.deepEqual(afterRemove.removedSkills, ["meeting-prep"]);
+
+  await React.act(async () => globalThis.__conversationList.onNewChat());
+  const afterNewChat = await send("Hello");
+  assert.deepEqual(afterNewChat.removedSkills, []);
+});
+
 test("removing a picked chip stops picking in that chat", async (t) => {
   const { chip, send } = await renderChatView(t);
 

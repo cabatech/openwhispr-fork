@@ -472,6 +472,37 @@ test(
   }
 );
 
+test("a skill the user took off the chat isn't re-sent, though the model loaded it", async (t) => {
+  const { api, calls } = skillsApi();
+  const { captured, sentMessages } = await renderChat(t, SKILLS_ON, { electronAPI: api });
+  const history = [
+    userMessage("u1", "prep me"),
+    loadedEarlier("meeting-prep"),
+    userMessage("u2", "what's the capital of France?"),
+  ];
+
+  await captured.sendToAI("what's the capital of France?", history, {
+    removedSkills: ["meeting-prep"],
+  });
+
+  assert.equal(latestUserText(sentMessages[0]), "what's the capital of France?");
+  assert.deepEqual(calls.reads, []);
+});
+
+test("a skill read that fails sends the turn without that skill", async (t) => {
+  const { api } = skillsApi();
+  api.skillsReadForModel = async () => {
+    throw new Error("EACCES: permission denied");
+  };
+  const { captured, sentMessages } = await renderChat(t, SKILLS_ON, { electronAPI: api });
+
+  await captured.sendToAI("prep me", [userMessage("u1", "prep me")], {
+    attachedSkill: { name: "meeting-prep" },
+  });
+
+  assert.equal(latestUserText(sentMessages[0]), "prep me");
+});
+
 test("switching a skill off mid-conversation stops re-sending it", async (t) => {
   const { api, calls } = skillsApi({ skills: [{ ...SKILLS[0], enabled: false }, SKILLS[1]] });
   const { captured, sentMessages, toolDefinitions } = await renderChat(t, SKILLS_ON, {
@@ -513,6 +544,42 @@ test("the cached load_skill knows which skills each send already carries", async
     { name: "meeting-prep" },
     { name: "meeting-prep", withFiles: false },
   ]);
+});
+
+test("a skill cut to fit is left to load_skill, not marked loaded", async (t) => {
+  // About 5 tokens a line: Meeting prep takes most of the 16,000, and Weekly recap can't fit.
+  const lines = (count, word) =>
+    Array.from({ length: count }, (_, index) => `${word} step ${index + 1} done.`).join("\n");
+  const readable = {
+    ...READABLE,
+    "meeting-prep": forModel("meeting-prep", "Meeting prep", lines(2_900, "Prep")),
+    "weekly-recap": forModel("weekly-recap", "Weekly recap", lines(400, "Recap")),
+  };
+  const { api } = skillsApi({ readable });
+  const { captured, sentMessages, reasoningService } = await renderChat(t, SKILLS_ON, {
+    electronAPI: api,
+  });
+  const results = [];
+  reasoningService.processTextStreamingCloud.mock.mockImplementation(async function* (m, c) {
+    sentMessages.push(m);
+    results.push(await c.executeToolCall("load_skill", '{"name":"weekly-recap"}', "call-9"));
+    yield { type: "done", finishReason: "stop" };
+  });
+  const recapEarlier = { ...loadedEarlier("weekly-recap"), id: "a0" };
+  const history = [
+    userMessage("u1", "recap"),
+    recapEarlier,
+    userMessage("u2", "prep me"),
+    loadedEarlier("meeting-prep"),
+    userMessage("u3", "both please"),
+  ];
+
+  await captured.sendToAI("both please", history);
+
+  const sent = latestUserText(sentMessages[0]);
+  assert.match(sent, /<skill_content name="meeting-prep"/);
+  assert.doesNotMatch(sent, /<skill_content name="weekly-recap"/, "no partial block");
+  assert.match(results[0].data, /^<skill_content name="weekly-recap"/);
 });
 
 test("a local model above the 4B gate gets a 330-token catalog", async (t) => {

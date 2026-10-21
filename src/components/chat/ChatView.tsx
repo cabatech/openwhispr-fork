@@ -50,6 +50,8 @@ export default function ChatView({
   const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
   // The user removed a skill the app picked; no other is picked in this chat.
   const [skillPickOff, setSkillPickOff] = useState(false);
+  // Skills the user took off this chat stay off it, even where the model loaded them.
+  const [removedSkills, setRemovedSkills] = useState<string[]>([]);
   const { confirmDialog, showConfirmDialog, hideConfirmDialog } = useDialogs();
 
   const persistence = useChatPersistence({
@@ -81,6 +83,7 @@ export default function ChatView({
       setIsNewChat(false);
       setAttachedSkill(null);
       setSkillPickOff(false);
+      setRemovedSkills([]);
       if ((await persistence.loadConversation(id)) === null) {
         setActiveConversationId(null);
         setIsNewChat(true);
@@ -95,6 +98,7 @@ export default function ChatView({
     setIsNewChat(true);
     setAttachedSkill(null);
     setSkillPickOff(false);
+    setRemovedSkills([]);
     persistence.handleNewChat();
   }, [cancelStream, persistence]);
 
@@ -137,14 +141,18 @@ export default function ChatView({
       handleTextSubmit(text, {
         attachedSkill: skill?.ref,
         allowSkillPick: !skillPickOff,
+        removedSkills,
         onSkillPicked: ({ name, displayName }) =>
           setAttachedSkill({ ref: { name }, displayName, picked: true }),
       }),
-    [handleTextSubmit, skillPickOff]
+    [handleTextSubmit, skillPickOff, removedSkills]
   );
 
   const removeSkill = useCallback(() => {
     if (attachedSkill?.picked) setSkillPickOff(true);
+    if (attachedSkill && !attachedSkill.ref.builtin) {
+      setRemovedSkills((names) => [...names, attachedSkill.ref.name]);
+    }
     setAttachedSkill(null);
     // The × is gone with the chip, so the cursor goes back to the composer.
     focusComposer();

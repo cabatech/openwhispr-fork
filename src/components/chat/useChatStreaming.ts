@@ -197,6 +197,8 @@ export interface SendToAIOptions {
   attachedSkill?: SkillRef;
   /** False once the user removed an app-picked skill from this chat. */
   allowSkillPick?: boolean;
+  /** Skills the user took off this chat; they stay off even where the history loaded them. */
+  removedSkills?: string[];
   /** The app picked a skill for a model without tools; the surface shows its chip. */
   onSkillPicked?: (skill: { name: string; displayName: string }) => void;
   /** Per-request completion hook used to deliver a finished voice response. */
@@ -443,8 +445,11 @@ export function useChatStreaming({
           !isCloudAgent && (isLocalProvider || isLanAgent) ? "selfHosted" : "hosted";
 
         let usableSkills: SkillSummary[] = [];
+        const removedSkills = new Set(options?.removedSkills);
         let activeRefs: SkillRef[] = skillsEnabled
-          ? activeSkillNames(allMessages, options?.attachedSkill)
+          ? activeSkillNames(allMessages, options?.attachedSkill).filter(
+              (ref) => ref.builtin || !removedSkills.has(ref.name)
+            )
           : [];
         if (skillsEnabled) {
           // Read fresh: a skill switched off or edited since the last send is never offered.
@@ -571,10 +576,10 @@ export function useChatStreaming({
         for (const ref of activeRefs) {
           // Switched off or broken since it was attached or loaded.
           if (!ref.builtin && !usableSkills.some((skill) => skill.name === ref.name)) continue;
-          const skill = await window.electronAPI?.skillsReadForModel?.({
-            ...ref,
-            withFiles: registry === null,
-          });
+          // A skill that can't be read is left out; the turn still goes.
+          const skill = await window.electronAPI
+            ?.skillsReadForModel?.({ ...ref, withFiles: registry === null })
+            .catch(() => null);
           if (!skill) continue;
           const connectedApps = connectorsAvailable
             ? readyConnectorIds().map((id) => CONNECTOR_NAMES[id] ?? id)
@@ -586,13 +591,22 @@ export function useChatStreaming({
                 opening: t("skills.chat.creatorOpening"),
               })}`
             : "";
-          const block =
-            buildSkillBlock(skill, skillRoom - estimateNoteTokens(creatorContext), {
-              inlineFiles: registry === null,
-            }) + creatorContext;
+          const blockOptions = { inlineFiles: registry === null };
+          const fitted = buildSkillBlock(
+            skill,
+            skillRoom - estimateNoteTokens(creatorContext),
+            blockOptions
+          );
+          const whole = fitted === buildSkillBlock(skill, Infinity, blockOptions);
+          // A model with tools reads a cut skill whole with load_skill, unless nothing came before
+          // it to take its room.
+          if (!whole && registry !== null && skillBlocks.length > 0) continue;
+          const block = fitted + creatorContext;
           skillRoom -= estimateNoteTokens(block);
           skillBlocks.push(block);
-          if (!ref.builtin) carried.add(ref.name);
+          // Only a skill carried whole is "already loaded" for load_skill; without tools there is
+          // no load_skill, and what's carried is what the picked chip names.
+          if (!ref.builtin && (whole || registry === null)) carried.add(ref.name);
           if (skillRoom <= 0) break;
         }
         if (cancelled() || !mountedRef.current) return;
