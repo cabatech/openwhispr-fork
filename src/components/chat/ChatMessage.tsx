@@ -42,6 +42,11 @@ function ToolCallStep({ toolCall }: { toolCall: ToolCallInfo }) {
   const isError = toolCall.status === "error";
   const isCompleted = toolCall.status === "completed";
   const isClipboard = toolCall.name === "copy_to_clipboard" && isCompleted;
+  // A loaded skill's result is its name, labelled in the current language.
+  const label =
+    toolCall.name === "load_skill" && isCompleted && toolCall.result
+      ? t("skills.chat.usingSkill", { name: toolCall.result })
+      : toolCall.result || toolCall.name;
 
   const resultLines = toolCall.result?.split("\n") ?? [];
   const hasDetail = resultLines.length > 1 && !isClipboard;
@@ -106,9 +111,7 @@ function ToolCallStep({ toolCall }: { toolCall: ToolCallInfo }) {
             />
           </div>
         ) : (
-          <span className="text-[11px] text-muted-foreground/70">
-            {toolCall.result || toolCall.name}
-          </span>
+          <span className="text-[11px] text-muted-foreground/70">{label}</span>
         )}
 
         {hasDetail && !isExecuting && (

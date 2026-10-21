@@ -40,8 +40,10 @@ import { estimateNoteTokens } from "../../helpers/noteChunking";
 import {
   SKILL_CATALOG_MAX_TOKENS,
   SKILL_CONTEXT_MAX_TOKENS,
+  activeSkillNames,
   buildCreatorContext,
   buildSkillBlock,
+  buildSkillCatalog,
   withSkillContext,
 } from "../../utils/skillContext";
 import type { SkillRef, SkillSummary } from "../../types/skills";
@@ -261,6 +263,8 @@ export function useChatStreaming({
   const userNameRef = useRef<string | null>(null);
   userNameRef.current = user?.name ?? null;
   const toolRegistryRef = useRef<{ key: string; registry: ToolRegistry } | null>(null);
+  // The skills whose text the current send carries; load_skill reads it at call time.
+  const carriedSkillNamesRef = useRef<ReadonlySet<string>>(new Set());
   const toolActivityStartedAtRef = useRef<number | null>(null);
   const toolActivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -434,8 +438,9 @@ export function useChatStreaming({
           !isCloudAgent && (isLocalProvider || isLanAgent) ? "selfHosted" : "hosted";
 
         let usableSkills: SkillSummary[] = [];
-        const activeRefs: SkillRef[] =
-          skillsEnabled && options?.attachedSkill ? [options.attachedSkill] : [];
+        const activeRefs: SkillRef[] = skillsEnabled
+          ? activeSkillNames(allMessages, options?.attachedSkill)
+          : [];
         if (skillsEnabled) {
           // Read fresh: a skill switched off or edited since the last send is never offered.
           await refreshSkills();
@@ -472,8 +477,12 @@ export function useChatStreaming({
           connectorsOffered = connectors !== undefined;
           // Triggers ride in the tool description, so a snippet edit rebuilds the registry.
           const snippetKey = settings.snippets.map((s) => s.trigger).join("|");
+          // load_skill names the usable skills and a budget for this model.
+          const skillKey = skillsEnabled
+            ? `${contextTier}:${usableSkills.map((s) => `${s.name}@${s.updatedAt}`).join("|")}`
+            : "";
           const keepNotesUnchanged = !!options?.keepNotesUnchanged;
-          const cacheKey = `${settings.isSignedIn}-${calendarConnected}-${settings.cloudBackupEnabled}-${scopeKey}-${webSearchEnabled}-${productHelpEnabled}-${snippetKey}-${connectors?.emailDraftTarget ?? "no-connectors"}-${connectors?.readyConnectorIds.join(",") ?? ""}-${keepNotesUnchanged}`;
+          const cacheKey = `${settings.isSignedIn}-${calendarConnected}-${settings.cloudBackupEnabled}-${scopeKey}-${webSearchEnabled}-${productHelpEnabled}-${snippetKey}-${connectors?.emailDraftTarget ?? "no-connectors"}-${connectors?.readyConnectorIds.join(",") ?? ""}-${keepNotesUnchanged}-${skillKey}`;
           if (toolRegistryRef.current?.key === cacheKey) {
             registry = toolRegistryRef.current.registry;
           } else {
@@ -493,6 +502,18 @@ export function useChatStreaming({
               },
               connectors,
               keepNotesUnchanged,
+              skills: skillsEnabled
+                ? {
+                    usable: usableSkills,
+                    activeNames: () => carriedSkillNamesRef.current,
+                    read: (ref) =>
+                      window.electronAPI?.skillsReadForModel?.(ref) ?? Promise.resolve(null),
+                    // Last use only orders the catalog; a failed stamp isn't worth surfacing.
+                    markUsed: (name) =>
+                      void window.electronAPI?.skillsMarkUsed?.(name).catch(() => {}),
+                    maxTokens: SKILL_CONTEXT_MAX_TOKENS[contextTier],
+                  }
+                : undefined,
             });
             toolRegistryRef.current = { key: cacheKey, registry };
           }
@@ -522,12 +543,14 @@ export function useChatStreaming({
           },
         });
 
-        // The attached skill's text rides only in the model's copy of this turn, rebuilt on
-        // every send, so the chat and its saved history keep just what the user typed.
+        // The text of the skills this conversation uses (the attached one, and those loaded
+        // in the history the model sees) rides only in the model's copy of this turn, rebuilt
+        // on every send, so the chat and its saved history keep just what the user typed.
         const skillBlocks: string[] = [];
+        const carried = new Set<string>();
         let skillRoom: number = SKILL_CONTEXT_MAX_TOKENS[contextTier];
         for (const ref of activeRefs) {
-          // Switched off or broken since it was attached.
+          // Switched off or broken since it was attached or loaded.
           if (!ref.builtin && !usableSkills.some((skill) => skill.name === ref.name)) continue;
           const skill = await window.electronAPI?.skillsReadForModel?.({
             ...ref,
@@ -549,9 +572,11 @@ export function useChatStreaming({
             }) + creatorContext;
           skillRoom -= estimateNoteTokens(block);
           skillBlocks.push(block);
+          if (!ref.builtin) carried.add(ref.name);
           if (skillRoom <= 0) break;
         }
         if (cancelled() || !mountedRef.current) return;
+        carriedSkillNamesRef.current = carried;
 
         // A note's chat is about its note: other notes up front would compete with
         // it, and search_notes still reaches them when it doesn't answer.
@@ -593,6 +618,10 @@ export function useChatStreaming({
             writingStyle: settings.toneStyleEnabled
               ? { tones: settings.toneStyles, destination: options?.destinationAppCategory }
               : undefined,
+            skillCatalog: registry?.get("load_skill")
+              ? buildSkillCatalog(usableSkills, SKILL_CATALOG_MAX_TOKENS[contextTier])
+              : undefined,
+            skillContent: skillBlocks.length > 0,
           }),
           getDictionaryHintWords(settings),
           settings.uiLanguage

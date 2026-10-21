@@ -15,6 +15,7 @@ import {
   registerConnectorTools,
   type ConnectorToolSettings,
 } from "./connectors/connectorToolModules";
+import { createLoadSkillTool, type SkillToolDeps } from "./skillTools";
 import type { ContainerScope } from "../../types/chat";
 
 export { ToolRegistry } from "./ToolRegistry";
@@ -35,6 +36,8 @@ interface ToolRegistrySettings {
   connectors?: ConnectorToolSettings;
   /** Leaves out update_note, for a turn that must not change any note. */
   keepNotesUnchanged?: boolean;
+  /** The user's skills; load_skill is offered once one is usable. */
+  skills?: SkillToolDeps;
 }
 
 export function createToolRegistry(settings: ToolRegistrySettings): ToolRegistry {
@@ -67,6 +70,10 @@ export function createToolRegistry(settings: ToolRegistrySettings): ToolRegistry
   }
 
   if (settings.connectors) registerConnectorTools(registry, settings.connectors);
+
+  if (settings.skills && settings.skills.usable.length > 0) {
+    registry.register(createLoadSkillTool(settings.skills));
+  }
 
   return registry;
 }

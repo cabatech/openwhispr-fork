@@ -4078,6 +4078,7 @@
       "get_noteStatus": "Reading note...",
       "create_noteStatus": "Creating note...",
       "update_noteStatus": "Updating note...",
+      "load_skillStatus": "Loading skill…",
       "copiedToClipboard": "Copied to your clipboard",
       "openNote": "Open note",
       "unknownTool": "Unknown tool: {{name}}",
@@ -4840,6 +4841,9 @@
         "title": "Decision log",
         "description": "Keeps a running list of decisions from my meetings. Use when I ask what we decided."
       }
+    },
+    "chat": {
+      "usingSkill": "Using skill · {{name}}"
     }
   },
   "notesView": {

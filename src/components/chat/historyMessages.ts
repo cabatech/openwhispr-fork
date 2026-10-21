@@ -20,6 +20,7 @@ const TRACE_ARGUMENT: Record<string, string> = {
   github_search_issues: "query",
   find_contact: "name",
   create_note: "title",
+  load_skill: "name",
 };
 
 // A connector action's status (its saved result), as the model reads it. Without

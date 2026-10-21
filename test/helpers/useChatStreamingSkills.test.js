@@ -99,6 +99,7 @@ async function renderChat(t, hookOptions = {}, { settings = {}, electronAPI = {}
   addTeardown(t, () => reasoningService.destroy());
 
   const offeredTools = [];
+  const toolDefinitions = [];
   const sentMessages = [];
   const endStream = async function* () {
     yield { type: "done", finishReason: "stop" };
@@ -106,6 +107,7 @@ async function renderChat(t, hookOptions = {}, { settings = {}, electronAPI = {}
   t.mock.method(reasoningService, "processTextStreamingCloud", (messages, config) => {
     sentMessages.push(messages);
     offeredTools.push((config.tools ?? []).map((tool) => tool.name));
+    toolDefinitions.push(config.tools ?? []);
     return endStream();
   });
   t.mock.method(
@@ -149,6 +151,7 @@ async function renderChat(t, hookOptions = {}, { settings = {}, electronAPI = {}
     send,
     saved,
     offeredTools,
+    toolDefinitions,
     sentMessages,
     reasoningService,
     getMessages: () => messages,
@@ -203,7 +206,7 @@ test("the skill block rides only in the latest user turn sent to the model", asy
   await captured.sendToAI("prep me", history, MEETING_PREP);
 
   const [system, ...turns] = sentMessages[0];
-  assert.doesNotMatch(system.content, /skill_content|Steps for meeting prep/);
+  assert.doesNotMatch(system.content, /<skill_content name=|Steps for meeting prep/);
   assert.deepEqual(
     turns.map((turn) => turn.content),
     ["Hi", "Hello! What can I do?", withRequest(MEETING_PREP_BLOCK, "prep me")]
@@ -360,4 +363,169 @@ test("the attached creator learns the user's skills, connected apps and tool use
         "This model can't call tools.\n\nUser request:\nMake a skill"
     )
   );
+});
+
+// ---- Picking a skill from its description (load_skill) ----
+
+const LOCAL_LARGE = { ...LOCAL_SMALL, chatAgentModel: "qwen3-8b-q4_k_m" };
+const systemPromptOf = (sent) => sent.find((message) => message.role === "system").content;
+const CATALOG_INTRO =
+  "The user's skills (name: when to use it). When a request matches one, call load_skill " +
+  "with its name before answering, then follow it. Load only the skills the request needs.";
+const catalogOf = (sent) => {
+  const prompt = systemPromptOf(sent);
+  const start = prompt.indexOf(`${CATALOG_INTRO}\n`);
+  if (start < 0) return null;
+  const rest = prompt.slice(start + CATALOG_INTRO.length + 1);
+  return rest.slice(0, rest.indexOf("\n\n"));
+};
+const loadSkillEnum = (definitions) =>
+  definitions.find((tool) => tool.name === "load_skill")?.parameters.properties.name.enum;
+const loadedEarlier = (name) => ({
+  id: "a1",
+  role: "assistant",
+  content: "Here is your prep.",
+  isStreaming: false,
+  toolCalls: [
+    {
+      id: "c1",
+      name: "load_skill",
+      arguments: JSON.stringify({ name }),
+      status: "completed",
+      result: "Meeting prep",
+    },
+  ],
+});
+
+test("a matching request on a tool-capable model offers load_skill and the catalog", async (t) => {
+  const { api, calls } = skillsApi();
+  const { captured, sentMessages, offeredTools } = await renderChat(t, SKILLS_ON, {
+    electronAPI: api,
+  });
+
+  await captured.sendToAI("prep me for my 2pm", [userMessage("u1", "prep me for my 2pm")]);
+
+  assert.ok(offeredTools[0].includes("load_skill"));
+  assert.equal(
+    catalogOf(sentMessages[0]),
+    "- meeting-prep: Briefs me before meetings.\n- weekly-recap: Recaps my week on Fridays."
+  );
+  assert.match(systemPromptOf(sentMessages[0]), /Skills are instructions the user saved/);
+  assert.equal(latestUserText(sentMessages[0]), "prep me for my 2pm");
+  assert.deepEqual(calls.reads, []);
+});
+
+test("load_skill's enum lists only enabled, valid skills", async (t) => {
+  const skills = [
+    SKILLS[0],
+    { ...SKILLS[1], enabled: false },
+    summary("broken", "Broken", "", { valid: false, problem: { code: "missingDescription" } }),
+  ];
+  const { api } = skillsApi({ skills });
+  const { captured, toolDefinitions } = await renderChat(t, SKILLS_ON, { electronAPI: api });
+
+  await captured.sendToAI("prep me", [userMessage("u1", "prep me")]);
+
+  assert.deepEqual(loadSkillEnum(toolDefinitions[0]), ["meeting-prep"]);
+});
+
+test("an invalid skill is left out of the catalog and the load_skill enum", async (t) => {
+  const broken = summary("broken-prep", "Broken prep", "Preps meetings, badly.", {
+    valid: false,
+    problem: { code: "nameMismatch" },
+  });
+  const { api } = skillsApi({ skills: [broken, SKILLS[0]] });
+  const { captured, sentMessages, toolDefinitions } = await renderChat(t, SKILLS_ON, {
+    electronAPI: api,
+  });
+
+  await captured.sendToAI("prep me", [userMessage("u1", "prep me")]);
+
+  assert.equal(catalogOf(sentMessages[0]), "- meeting-prep: Briefs me before meetings.");
+  assert.deepEqual(loadSkillEnum(toolDefinitions[0]), ["meeting-prep"]);
+});
+
+test(
+  "a skill loaded in an earlier turn is re-sent in the next turn's model-only text",
+  async (t) => {
+    const { api, calls } = skillsApi();
+    const { captured, sentMessages } = await renderChat(t, SKILLS_ON, { electronAPI: api });
+    const history = [
+      userMessage("u1", "prep me"),
+      loadedEarlier("meeting-prep"),
+      userMessage("u2", "and the agenda?"),
+    ];
+
+    await captured.sendToAI("and the agenda?", history);
+
+    assert.equal(
+      latestUserText(sentMessages[0]),
+      withRequest(MEETING_PREP_BLOCK, "and the agenda?")
+    );
+    assert.equal(userTurns(sentMessages[0])[0].content, "prep me");
+    assert.deepEqual(calls.reads, [{ name: "meeting-prep", withFiles: false }]);
+  }
+);
+
+test("switching a skill off mid-conversation stops re-sending it", async (t) => {
+  const { api, calls } = skillsApi({ skills: [{ ...SKILLS[0], enabled: false }, SKILLS[1]] });
+  const { captured, sentMessages, toolDefinitions } = await renderChat(t, SKILLS_ON, {
+    electronAPI: api,
+  });
+  const history = [
+    userMessage("u1", "prep me"),
+    loadedEarlier("meeting-prep"),
+    userMessage("u2", "and the agenda?"),
+  ];
+
+  await captured.sendToAI("and the agenda?", history);
+
+  assert.equal(latestUserText(sentMessages[0]), "and the agenda?");
+  assert.deepEqual(calls.reads, []);
+  assert.deepEqual(loadSkillEnum(toolDefinitions[0]), ["weekly-recap"]);
+});
+
+test("the cached load_skill knows which skills each send already carries", async (t) => {
+  const { api, calls } = skillsApi();
+  const { captured, reasoningService } = await renderChat(t, SKILLS_ON, { electronAPI: api });
+  const results = [];
+  reasoningService.processTextStreamingCloud.mock.mockImplementation(async function* (_m, c) {
+    results.push(await c.executeToolCall("load_skill", '{"name":"meeting-prep"}', "call-1"));
+    yield { type: "done", finishReason: "stop" };
+  });
+
+  await captured.sendToAI("prep me", [userMessage("u1", "prep me")]);
+  const history = [userMessage("u1", "prep me"), loadedEarlier("meeting-prep")];
+  await captured.sendToAI("more", [...history, userMessage("u2", "more")]);
+
+  assert.equal(results[0].displayText, "Meeting prep");
+  assert.match(results[0].data, /^<skill_content name="meeting-prep"/);
+  assert.equal(
+    results[1].data,
+    "The meeting-prep skill is already loaded in this conversation. Follow it as given."
+  );
+  assert.deepEqual(calls.reads, [
+    { name: "meeting-prep" },
+    { name: "meeting-prep", withFiles: false },
+  ]);
+});
+
+test("a local model above the 4B gate gets a 330-token catalog", async (t) => {
+  const { estimateNoteTokens } = await import("../../src/helpers/noteChunking.js");
+  const skills = Array.from({ length: 30 }, (_, index) =>
+    summary(`skill-${index + 1}`, `Skill ${index + 1}`, `Handles task number ${index + 1} well.`)
+  );
+  const { api } = skillsApi({ skills });
+  const { sentMessages, offeredTools, captured } = await renderChat(t, SKILLS_ON, {
+    settings: LOCAL_LARGE,
+    electronAPI: api,
+  });
+
+  await captured.sendToAI("help", [userMessage("u1", "help")]);
+
+  const catalog = catalogOf(sentMessages[0]);
+  assert.ok(offeredTools[0].includes("load_skill"));
+  assert.ok(estimateNoteTokens(catalog) <= 330, String(estimateNoteTokens(catalog)));
+  for (const skill of skills) assert.match(catalog, new RegExp(`^- ${skill.name}(:|$)`, "m"));
+  assert.match(catalog, /^- skill-1: Handles task number 1 well\.$/m);
 });
