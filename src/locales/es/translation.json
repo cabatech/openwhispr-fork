@@ -3960,6 +3960,9 @@
       "get_noteStatus": "Leyendo nota...",
       "create_noteStatus": "Creando nota...",
       "update_noteStatus": "Actualizando nota...",
+      "load_skillStatus": "Cargando habilidad…",
+      "propose_skillStatus": "Preparando la habilidad…",
+      "update_skillStatus": "Preparando el cambio…",
       "copiedToClipboard": "Copiado al portapapeles",
       "openNote": "Abrir nota",
       "unknownTool": "Herramienta desconocida: {{name}}",
@@ -4569,6 +4572,7 @@
       "manage": "Gestionar habilidades",
       "add": "Añadir",
       "addMenu": {
+        "createWithAssistant": "Crear con el asistente",
         "create": "Crear habilidad",
         "upload": "Subir habilidad"
       },
@@ -4604,7 +4608,8 @@
       "neverRun": "Se muestra, nunca se ejecuta",
       "uninstall": "Desinstalar",
       "uninstallConfirm": "¿Desinstalar {{name}}? Se eliminará de este equipo.",
-      "problem": "Esta habilidad no se puede usar hasta que se corrija: {{reason}}"
+      "problem": "Esta habilidad no se puede usar hasta que se corrija: {{reason}}",
+      "tryNow": "Probar ahora"
     },
     "menu": {
       "copyMarkdown": "Copiar Markdown",
@@ -4673,7 +4678,8 @@
       "submit": "Crear",
       "unsaved": "Tienes cambios sin guardar",
       "keepEditing": "Seguir editando",
-      "discard": "Descartar"
+      "discard": "Descartar",
+      "draftWithAssistant": "Redactar con el asistente"
     },
     "problems": {
       "missingName": "Necesita un nombre al principio",
@@ -4722,6 +4728,48 @@
         "title": "Registro de decisiones",
         "description": "Mantiene una lista actualizada de las decisiones de mis reuniones. Úsala cuando pregunte qué decidimos."
       }
+    },
+    "chat": {
+      "chipRemove": "Quitar {{name}} de este chat",
+      "placeholderWith": "Pregunta lo que quieras — este chat usa {{name}}",
+      "usingSkill": "Usando habilidad · {{name}}",
+      "creatorName": "Creador de habilidades",
+      "creatorOpening": "¿Qué haces una y otra vez? Cuéntame cómo fue la última vez o elige una nota para empezar.",
+      "draftPrompt": "Ayúdame a terminar esta habilidad.\nNombre: {{name}}\nDescripción: {{description}}",
+      "noneYet": "(aún nada)"
+    },
+    "approval": {
+      "createHeader": "Crear habilidad",
+      "newSkill": "Nueva habilidad",
+      "replacesExisting": "Ya tienes esta habilidad. Al guardar, se actualiza.",
+      "nameLabel": "Nombre de la habilidad",
+      "descriptionLabel": "Cuándo se usa",
+      "seeFull": "Ver la habilidad completa",
+      "save": "Guardar habilidad",
+      "saving": "Guardando…",
+      "saved": "Guardada",
+      "openSkill": "Abrir habilidad",
+      "skippedCreate": "Omitida. No se guardó nada.",
+      "updated": "Actualizada",
+      "undo": "Deshacer",
+      "undone": "Deshecho. La habilidad volvió a como estaba.",
+      "failed": "No se pudo guardar la habilidad.",
+      "notSaved": "No se guardó nada.",
+      "updateHeader": "Actualizar habilidad",
+      "removes": "Se elimina:",
+      "learnedFrom": "Aprendida de: {{title}} · {{date}}",
+      "today": "Hoy",
+      "seeChanges": "Ver los cambios exactos",
+      "added": "Añadido:",
+      "removed": "Eliminado:",
+      "update": "Actualizar habilidad",
+      "skippedUpdate": "Omitida. La habilidad no se cambió."
+    },
+    "code": {
+      "paste": "Pegar en la app",
+      "pasteNote": "Pega sin pulsar Enter, así tú decides cuándo ejecutarlo.",
+      "pasted": "Pegado",
+      "pasteFailed": "No se pudo pegar. El texto está en tu portapapeles."
     }
   },
   "calendar": {

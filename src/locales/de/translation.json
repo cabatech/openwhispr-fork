@@ -4078,6 +4078,9 @@
       "get_noteStatus": "Notiz wird gelesen...",
       "create_noteStatus": "Notiz wird erstellt...",
       "update_noteStatus": "Notiz wird aktualisiert...",
+      "load_skillStatus": "Skill wird geladen…",
+      "propose_skillStatus": "Skill wird vorbereitet…",
+      "update_skillStatus": "Änderung wird vorbereitet…",
       "copiedToClipboard": "In die Zwischenablage kopiert",
       "openNote": "Notiz öffnen",
       "unknownTool": "Unbekanntes Werkzeug: {{name}}",
@@ -4687,6 +4690,7 @@
       "manage": "Skills verwalten",
       "add": "Hinzufügen",
       "addMenu": {
+        "createWithAssistant": "Mit dem Assistenten erstellen",
         "create": "Skill erstellen",
         "upload": "Skill hochladen"
       },
@@ -4722,7 +4726,8 @@
       "neverRun": "Wird angezeigt, nie ausgeführt",
       "uninstall": "Deinstallieren",
       "uninstallConfirm": "{{name}} deinstallieren? Der Skill wird von diesem Computer entfernt.",
-      "problem": "Dieser Skill kann erst verwendet werden, wenn er korrigiert ist: {{reason}}"
+      "problem": "Dieser Skill kann erst verwendet werden, wenn er korrigiert ist: {{reason}}",
+      "tryNow": "Jetzt ausprobieren"
     },
     "menu": {
       "copyMarkdown": "Markdown kopieren",
@@ -4791,7 +4796,8 @@
       "submit": "Erstellen",
       "unsaved": "Du hast ungespeicherte Änderungen",
       "keepEditing": "Weiter bearbeiten",
-      "discard": "Verwerfen"
+      "discard": "Verwerfen",
+      "draftWithAssistant": "Mit dem Assistenten entwerfen"
     },
     "problems": {
       "missingName": "Braucht oben einen Namen",
@@ -4840,6 +4846,48 @@
         "title": "Entscheidungsprotokoll",
         "description": "Führt eine fortlaufende Liste der Entscheidungen aus meinen Meetings. Nutzen, wenn ich frage, was wir entschieden haben."
       }
+    },
+    "chat": {
+      "chipRemove": "{{name}} aus diesem Chat entfernen",
+      "placeholderWith": "Frag etwas – dieser Chat nutzt {{name}}",
+      "usingSkill": "Nutzt Skill · {{name}}",
+      "creatorName": "Skill-Ersteller",
+      "creatorOpening": "Was machst du immer wieder? Erzähl mir, wie es beim letzten Mal lief, oder wähle eine Notiz als Ausgangspunkt.",
+      "draftPrompt": "Hilf mir, diesen Skill fertigzustellen.\nName: {{name}}\nBeschreibung: {{description}}",
+      "noneYet": "(noch nichts)"
+    },
+    "approval": {
+      "createHeader": "Skill erstellen",
+      "newSkill": "Neuer Skill",
+      "replacesExisting": "Diesen Skill hast du schon. Beim Speichern wird er aktualisiert.",
+      "nameLabel": "Name des Skills",
+      "descriptionLabel": "Wann er genutzt wird",
+      "seeFull": "Ganzen Skill ansehen",
+      "save": "Skill speichern",
+      "saving": "Wird gespeichert…",
+      "saved": "Gespeichert",
+      "openSkill": "Skill öffnen",
+      "skippedCreate": "Übersprungen. Es wurde nichts gespeichert.",
+      "updated": "Aktualisiert",
+      "undo": "Rückgängig",
+      "undone": "Rückgängig gemacht. Der Skill ist wieder wie vorher.",
+      "failed": "Der Skill konnte nicht gespeichert werden.",
+      "notSaved": "Es wurde nichts gespeichert.",
+      "updateHeader": "Skill aktualisieren",
+      "removes": "Wird entfernt:",
+      "learnedFrom": "Gelernt aus: {{title}} · {{date}}",
+      "today": "Heute",
+      "seeChanges": "Genaue Änderungen ansehen",
+      "added": "Hinzugefügt:",
+      "removed": "Entfernt:",
+      "update": "Skill aktualisieren",
+      "skippedUpdate": "Übersprungen. Der Skill wurde nicht geändert."
+    },
+    "code": {
+      "paste": "In App einfügen",
+      "pasteNote": "Fügt ohne Enter ein, damit du selbst entscheidest, wann es ausgeführt wird.",
+      "pasted": "Eingefügt",
+      "pasteFailed": "Einfügen fehlgeschlagen. Der Text ist in deiner Zwischenablage."
     }
   },
   "notesView": {
