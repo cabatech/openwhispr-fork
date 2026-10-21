@@ -65,3 +65,14 @@ test("Japanese requests match without spaces", () => {
   assert.equal(pickName("決定事項ログに追加して", skillsFor("ja")), "decision-log");
   assert.equal(pickName("週次まとめを書いて", skillsFor("ja")), "weekly-recap");
 });
+
+test("a stopword ending in s isn't shortened into a keyword", () => {
+  const thisWeek = summary({
+    name: "this-week",
+    displayName: "This week",
+    description: "Lists what is due this week. Use on Mondays.",
+  });
+
+  assert.equal(pickName("translate this to French", [thisWeek]), null);
+  assert.equal(pickName("what does this mean", [thisWeek]), null);
+});

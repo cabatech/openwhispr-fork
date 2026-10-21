@@ -47,7 +47,8 @@ function terms(text: string): Set<string> {
   const out = new Set<string>();
   const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
   for (const { segment, isWordLike } of segmenter.segment(text.normalize("NFKC").toLowerCase())) {
-    if (!isWordLike) continue;
+    // Checked before the plural trim, which would turn "this" into a keyword ("thi").
+    if (!isWordLike || STOPWORDS.has(segment)) continue;
     const word = segment.length > 3 && segment.endsWith("s") ? segment.slice(0, -1) : segment;
     if ((word.length < 2 && !CJK.test(word)) || STOPWORDS.has(word)) continue;
     out.add(word);
