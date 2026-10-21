@@ -343,7 +343,7 @@
           }
         },
         "byok": {
-          "title": "API-Anbieter",
+          "title": "Eigenen Schlüssel nutzen",
           "description": "Verwenden Sie Ihren eigenen API-Schlüssel."
         },
         "local": {
@@ -412,15 +412,14 @@
         "optional": "Optional",
         "modelId": "Modell-ID",
         "modelIdPlaceholder": "Modell-ID eingeben",
-        "testConnection": "Verbindung testen",
         "proceed": "Fortfahren",
         "clinical": "FÜR KLINISCHE TRANSKRIPTION",
         "clientId": "Client ID",
         "clientSecret": "Client Secret",
-        "runTest": "Test starten",
         "testing": "Test läuft…",
         "connected": "Verbunden",
         "connectionFailed": "Die Verbindung konnte nicht überprüft werden.",
+        "unverified": "Konnte nicht überprüft werden: {{reason}}",
         "errors": {
           "endpointRequired": "Gib vor dem Test eine Endpoint-URL ein.",
           "invalidUrl": "Der Endpoint muss eine gültige HTTP- oder HTTPS-URL sein.",
@@ -429,6 +428,7 @@
           "apiKeyRequired": "Füge vor dem Test einen API-Schlüssel hinzu.",
           "credentialsRejected": "Der Anbieter hat diese Zugangsdaten abgelehnt.",
           "endpointNotFound": "Der Endpoint stellt keine OpenAI-kompatible Modellliste bereit.",
+          "transcriptionEndpointNotFound": "Unter dieser Adresse werden keine Transkriptionen angenommen.",
           "modelNotFound": "Das ausgewählte Modell ist bei diesem Anbieter nicht verfügbar.",
           "providerStatus": "Der Anbieter hat den Status {{status}} zurückgegeben.",
           "timeout": "Der Verbindungstest hat das Zeitlimit überschritten.",
@@ -2156,12 +2156,12 @@
       "enableTextCleanupDescription": "KI entfernt Füllwörter, korrigiert Grammatik und Zeichensetzung",
       "modes": {
         "openwhispr": "OpenWhispr Cloud",
-        "providers": "Cloud-Anbieter",
+        "providers": "Eigenen Schlüssel nutzen",
         "local": "Lokal",
         "selfHosted": "Selbst gehostet",
         "enterprise": "Enterprise",
         "openwhisprDesc": "Zuverlässige Ergebnisse. Keine Einrichtung nötig.",
-        "providersDesc": "Eigenen API-Schlüssel nutzen.",
+        "providersDesc": "Verwenden Sie Ihren eigenen API-Schlüssel, um Ihren bevorzugten LLM-Anbieter zu verbinden.",
         "localDesc": "Modelle auf dem Gerät. Voll privat.",
         "selfHostedDesc": "Eigener Server in Ihrem Netzwerk.",
         "enterpriseDesc": "Nutzen Sie das Cloud-Konto Ihrer Organisation (AWS, Azure, GCP)."
@@ -2179,7 +2179,7 @@
           "title": "Zu benutzerdefinierter Einrichtung gewechselt"
         },
         "switchedProviders": {
-          "title": "Cloud-Anbieter",
+          "title": "Eigenen Schlüssel nutzen",
           "description": "Verwendung Ihrer eigenen API-Schlüssel."
         },
         "switchedLocal": {
@@ -2404,15 +2404,11 @@
             "step1Desc": "Starten Sie ydotoold und aktivieren Sie es für jeden Anmeldevorgang.",
             "step2Title": "Prüfen, ob er läuft"
           },
-          "xclip": {
-            "step1Title": "xclip installieren"
-          },
           "wlCopy": {
             "step1Title": "wl-clipboard installieren",
             "step2Title": "Installation überprüfen"
           }
         },
-        "xclipDesc": "Zwischenablage-Tool für KDE-Wayland-Einfügen (xclip oder xsel)",
         "nixos": {
           "intro": "Sie verwenden NixOS. Für das automatische Einfügen werden ydotool und Zugriff auf /dev/uinput benötigt, was NixOS deklarativ gewährt.",
           "detected": "Erkannt",
@@ -2778,6 +2774,9 @@
         "openai_gpt_4_1_nano": "GPT-4.1 mit der niedrigsten Latenz",
         "anthropic_claude_fable_5_1": "Leistungsstärkstes Modell von Anthropic, Mythos-Klasse",
         "anthropic_claude_fable_5": "Vorheriges Flaggschiff der Mythos-Klasse",
+        "anthropic_claude_opus_5_5": "Neuestes Opus-Modell für komplexes Reasoning, 1M Kontext",
+        "anthropic_claude_sonnet_5_5": "Neuestes Sonnet: schnell und leistungsfähig für die tägliche Arbeit, 1M Kontext",
+        "anthropic_claude_haiku_5_5": "Schnellstes und günstigstes Claude-Modell, 1M Kontext",
         "anthropic_claude_sonnet_5": "Schnelles, leistungsfähiges Assistentenmodell zu geringeren Kosten",
         "anthropic_claude_sonnet_4_6": "Ausgewogene Leistung",
         "anthropic_claude_sonnet_4_5": "Vorherige Sonnet-Generation",
@@ -2798,7 +2797,7 @@
         "openai_gpt_5_6_terra": "Ausgewogenes GPT-5.6 für die tägliche Arbeit",
         "openai_gpt_5_6_luna": "Schnellstes und günstigstes GPT-5.6",
         "openai_gpt_5_5": "Frontier-Modell für komplexes Reasoning",
-        "anthropic_claude_opus_5": "Leistungsstärkstes Opus-Modell, 1M Kontext",
+        "anthropic_claude_opus_5": "Vorheriges Opus-Flaggschiff, 1M Kontext",
         "anthropic_claude_opus_4_8": "Leistungsstarkes Opus-Modell für Ehrlichkeit und Zuverlässigkeit",
         "anthropic_claude_opus_4_7": "Leistungsstarkes Opus-Modell",
         "anthropic_claude_opus_4_6": "Vorherige Opus-Generation, 1M Kontext",
@@ -3453,6 +3452,25 @@
       "typeEmail": "E-Mail eingeben zum Hinzufügen...",
       "me": "(ich)"
     },
+    "eventLink": {
+      "selectEvent": "Kalenderereignis auswählen",
+      "searchPlaceholder": "Ereignis suchen…",
+      "back": "Zurück",
+      "removeEvent": "Kalenderereignis entfernen",
+      "allDay": "Ganztägig",
+      "noEventsOnDay": "Keine Ereignisse an diesem Tag",
+      "searchOtherDays": "Suchen, um Ereignisse an anderen Tagen zu finden",
+      "outsideWindow": "Nur Ereignisse der letzten {{days}} Tage können verknüpft werden",
+      "noResults": "Keine passenden Ereignisse",
+      "noCalendar": "Verbinde unter Integrationen einen Kalender, um Ereignisse zu verknüpfen",
+      "loadFailed": "Kalenderereignisse konnten nicht geladen werden",
+      "join": "Beitreten",
+      "calendar": "Kalender",
+      "openInGoogle": "In Google Calendar öffnen",
+      "openInOutlook": "In Outlook öffnen",
+      "linkedEvent": "Kalenderereignis",
+      "unavailable": "Dieses Ereignis ist auf diesem Gerät in keinem deiner Kalender"
+    },
     "upload": {
       "title": "Audio hochladen",
       "using": "Verwendet {{model}}",
@@ -3677,6 +3695,9 @@
         "actionFailed": "Aktion fehlgeschlagen",
         "noEndpoint": "Keine URL für den selbst gehosteten Server festgelegt. Konfigurieren Sie eine in den Einstellungen.",
         "outputTruncated": "Dem KI-Modell ging der Platz aus, bevor es fertig war. Die Notiz bleibt daher unverändert.",
+        "outputSpentThinking": "Das KI-Modell hat sein gesamtes Ausgabelimit mit Nachdenken verbraucht und keine Notizen geschrieben. Die Notiz bleibt daher unverändert. Aktivieren Sie unter Einstellungen → Sprachmodelle → Notizformatierung „Denkausgabe deaktivieren“ oder wählen Sie ein Modell, das weniger nachdenkt, und versuchen Sie es erneut.",
+        "outputSpentThinkingDisabled": "Das KI-Modell hat sein gesamtes Ausgabelimit mit Nachdenken verbraucht und keine Notizen geschrieben, obwohl „Denkausgabe deaktivieren“ aktiv ist. Die Notiz bleibt daher unverändert. Wählen Sie unter Einstellungen → Sprachmodelle → Notizformatierung ein anderes Modell.",
+        "outputSpentThinkingOtherModel": "Das KI-Modell hat sein gesamtes Ausgabelimit mit Nachdenken verbraucht und keine Notizen geschrieben. Die Notiz bleibt daher unverändert. Wählen Sie unter Einstellungen → Sprachmodelle → Notizformatierung ein Modell, das weniger nachdenkt.",
         "nothingToSummarize": "Diese Notiz enthält noch nichts zum Zusammenfassen, daher bleibt die KI-Zusammenfassung unverändert.",
         "saveFailed": "Speichern nicht möglich. Prüfen Sie, dass nichts zu lang ist, und versuchen Sie es erneut."
       },
@@ -3826,6 +3847,16 @@
       "applied": "Der Assistent hat „{{title}}“ aktualisiert",
       "changed": "Diese Notiz wurde nach der Änderung des Assistenten erneut geändert. Rückgängig ist nicht mehr verfügbar.",
       "failed": "Die Änderung konnte nicht rückgängig gemacht werden. Bitte versuche es erneut."
+    },
+    "folderMore": {
+      "more": "{{count}} weitere",
+      "search": "{{count}} Notizen in {{folder}} durchsuchen",
+      "newest": "Neueste zuerst",
+      "openFolder": "Ordner öffnen",
+      "empty": "Keine passenden Notizen",
+      "loading": "Notizen werden geladen…",
+      "retry": "Notizen konnten nicht geladen werden. Erneut versuchen",
+      "results": "{{count}} von {{total}} Notizen"
     }
   },
   "dictionary": {
@@ -3985,18 +4016,6 @@
       "permissionDescription": "macOS benötigt die Berechtigung zur Bildschirmaufnahme, um Ihren Bildschirm zu erfassen.",
       "relaunchHint": "Die Bildschirmaufnahme wurde erteilt, während OpenWhispr lief. Beenden und öffnen Sie OpenWhispr erneut, um Screenshots aufzunehmen."
     },
-    "modes": {
-      "openwhispr": "OpenWhispr Cloud",
-      "openwhisprDesc": "Den von OpenWhispr verwalteten Assistenten nutzen, kein API-Schlüssel nötig.",
-      "providers": "Eigenen Schlüssel nutzen",
-      "providersDesc": "Mit Ihrem eigenen API-Schlüssel an OpenAI, Anthropic, Gemini oder Groq anbinden.",
-      "local": "Lokal",
-      "localDesc": "Ein lokales LLM auf Ihrem Gerät ausführen, voll privat.",
-      "selfHosted": "Selbst gehostet",
-      "selfHostedDesc": "Auf einen selbst gehosteten, OpenAI-kompatiblen Endpunkt verweisen.",
-      "enterprise": "Enterprise",
-      "enterpriseDesc": "AWS Bedrock, Azure OpenAI oder Google Vertex nutzen."
-    },
     "prompt": {
       "title": "Assistent-Prompt",
       "description": "Der System-Prompt, der bei Erkennung des Aktivierungsworts verwendet wird. Fällt auf die integrierte Standardvorgabe zurück."
@@ -4006,19 +4025,7 @@
     "settings": {
       "systemPrompt": "System-Prompt",
       "systemPromptDescription": "Benutzerdefinierte Anweisungen für den Assistenten",
-      "systemPromptPlaceholder": "Benutzerdefinierten System-Prompt eingeben...",
-      "modes": {
-        "openwhispr": "OpenWhispr Cloud",
-        "providers": "Cloud-Anbieter",
-        "local": "Lokal",
-        "selfHosted": "Selbst gehostet",
-        "enterprise": "Enterprise",
-        "openwhisprDesc": "Zuverlässige Ergebnisse. Keine Einrichtung nötig.",
-        "providersDesc": "Eigenen API-Schlüssel verwenden.",
-        "localDesc": "Modelle auf dem Gerät. Vollständig privat.",
-        "selfHostedDesc": "Eigener Server in Ihrem Netzwerk.",
-        "enterpriseDesc": "Nutzen Sie das Cloud-Konto Ihrer Organisation (AWS, Azure, GCP)."
-      }
+      "systemPromptPlaceholder": "Benutzerdefinierten System-Prompt eingeben..."
     },
     "chat": {
       "errorPrefix": "Fehler",

@@ -343,7 +343,7 @@
           }
         },
         "byok": {
-          "title": "API 服务商",
+          "title": "自带密钥",
           "description": "使用你自己的 API Key。"
         },
         "local": {
@@ -412,15 +412,14 @@
         "optional": "可选",
         "modelId": "模型 ID",
         "modelIdPlaceholder": "填写你的模型 ID",
-        "testConnection": "测试连接",
         "proceed": "继续",
         "clinical": "用于临床转录",
         "clientId": "Client ID",
         "clientSecret": "Client secret",
-        "runTest": "运行测试",
         "testing": "测试中…",
         "connected": "已连接",
         "connectionFailed": "无法验证此连接。",
+        "unverified": "无法验证：{{reason}}",
         "errors": {
           "endpointRequired": "测试前请先输入端点 URL。",
           "invalidUrl": "端点必须是有效的 HTTP 或 HTTPS URL。",
@@ -429,6 +428,7 @@
           "apiKeyRequired": "测试前请先添加 API Key。",
           "credentialsRejected": "服务商拒绝了这些凭据。",
           "endpointNotFound": "该端点未提供兼容 OpenAI 的模型列表。",
+          "transcriptionEndpointNotFound": "此地址不接受转录请求。",
           "modelNotFound": "所选模型无法从此服务商获得。",
           "providerStatus": "服务商返回了状态码 {{status}}。",
           "timeout": "连接测试超时。",
@@ -1862,11 +1862,11 @@
       "enableTextCleanupDescription": "AI 去除语气词，修正语法和标点",
       "modes": {
         "openwhispr": "OpenWhispr Cloud",
-        "providers": "云服务商",
+        "providers": "自带密钥",
         "local": "本地",
         "selfHosted": "自托管",
         "openwhisprDesc": "准确可靠，无需设置。",
-        "providersDesc": "使用你自己的 API Key。",
+        "providersDesc": "使用你自己的 API Key 连接你首选的 LLM 服务商。",
         "localDesc": "设备端模型，完全私密。",
         "selfHostedDesc": "你的服务器，在你的网络上。",
         "enterprise": "企业级",
@@ -1885,7 +1885,7 @@
           "title": "已切换到自定义设置"
         },
         "switchedProviders": {
-          "title": "云服务商",
+          "title": "自带密钥",
           "description": "使用你自己的 API Key。"
         },
         "switchedLocal": {
@@ -2110,15 +2110,11 @@
             "step1Desc": "启动 ydotoold 并设置为每次登录时自动运行。",
             "step2Title": "验证是否正在运行"
           },
-          "xclip": {
-            "step1Title": "安装 xclip"
-          },
           "wlCopy": {
             "step1Title": "安装 wl-clipboard",
             "step2Title": "验证安装"
           }
         },
-        "xclipDesc": "KDE Wayland 粘贴用的剪贴板工具（xclip 或 xsel）",
         "nixos": {
           "intro": "您正在使用 NixOS。自动粘贴需要 ydotool 和 /dev/uinput 访问权限，NixOS 通过声明式配置来授予这些权限。",
           "detected": "已检测到",
@@ -2680,6 +2676,9 @@
         "openai_gpt_4_1_nano": "最低延迟 GPT-4.1",
         "anthropic_claude_fable_5_1": "Anthropic 最强大的模型，Mythos 级",
         "anthropic_claude_fable_5": "上一代 Mythos 级旗舰模型",
+        "anthropic_claude_opus_5_5": "最新 Opus 模型，适合复杂推理，1M 上下文",
+        "anthropic_claude_sonnet_5_5": "最新 Sonnet：快速强大，适合日常工作，1M 上下文",
+        "anthropic_claude_haiku_5_5": "速度最快、成本最低的 Claude 模型，1M 上下文",
         "anthropic_claude_sonnet_5": "快速且强大的助手模型，成本更低",
         "anthropic_claude_sonnet_4_6": "均衡性能",
         "anthropic_claude_sonnet_4_5": "上一代 Sonnet",
@@ -2700,7 +2699,7 @@
         "openai_gpt_5_6_terra": "均衡的 GPT-5.6，适合日常工作",
         "openai_gpt_5_6_luna": "速度最快、成本最低的 GPT-5.6",
         "openai_gpt_5_5": "复杂推理前沿模型",
-        "anthropic_claude_opus_5": "最强大的 Opus 模型，1M 上下文",
+        "anthropic_claude_opus_5": "上一代 Opus 旗舰模型，1M 上下文",
         "anthropic_claude_opus_4_8": "强大的 Opus 模型，注重诚实与可靠",
         "anthropic_claude_opus_4_7": "强大的 Opus 模型",
         "anthropic_claude_opus_4_6": "上一代 Opus，1M 上下文",
@@ -3102,6 +3101,25 @@
       "typeEmail": "输入邮箱以添加...",
       "me": "（我）"
     },
+    "eventLink": {
+      "selectEvent": "选择日历事件",
+      "searchPlaceholder": "搜索事件…",
+      "back": "返回",
+      "removeEvent": "移除日历事件",
+      "allDay": "全天",
+      "noEventsOnDay": "这一天没有事件",
+      "searchOtherDays": "搜索以查找其他日期的事件",
+      "outsideWindow": "只能关联最近 {{days}} 天内的事件",
+      "noResults": "没有匹配的事件",
+      "noCalendar": "请在“集成”中连接日历以关联事件",
+      "loadFailed": "无法加载日历事件",
+      "join": "加入",
+      "calendar": "日历",
+      "openInGoogle": "在 Google Calendar 中打开",
+      "openInOutlook": "在 Outlook 中打开",
+      "linkedEvent": "日历事件",
+      "unavailable": "此设备上的日历中没有这个事件"
+    },
     "upload": {
       "title": "上传音频",
       "using": "使用 {{model}}",
@@ -3310,6 +3328,9 @@
         "actionFailed": "操作失败",
         "noEndpoint": "未设置自托管服务器 URL。请在设置中配置。",
         "outputTruncated": "AI 模型在完成之前就用完了输出空间，因此笔记保持不变。",
+        "outputSpentThinking": "AI 模型把全部输出额度都用在了思考上，没有写出笔记，因此笔记保持不变。请在“设置 → 语言模型 → 笔记格式化”中开启“禁用思考输出”，或选择思考较少的模型，然后重试。",
+        "outputSpentThinkingDisabled": "即使已开启“禁用思考输出”，AI 模型仍把全部输出额度用在了思考上，没有写出笔记，因此笔记保持不变。请在“设置 → 语言模型 → 笔记格式化”中选择其他模型。",
+        "outputSpentThinkingOtherModel": "AI 模型把全部输出额度都用在了思考上，没有写出笔记，因此笔记保持不变。请在“设置 → 语言模型 → 笔记格式化”中选择思考较少的模型。",
         "nothingToSummarize": "这条笔记还没有可以总结的内容，因此 AI 摘要保持不变。",
         "saveFailed": "无法保存。请检查是否有内容过长，然后重试。"
       },
@@ -3475,6 +3496,16 @@
       "applied": "助手已更新“{{title}}”",
       "changed": "助手编辑后，这篇笔记又发生了更改，无法撤销。",
       "failed": "无法撤销编辑，请重试。"
+    },
+    "folderMore": {
+      "more": "还有 {{count}} 篇",
+      "search": "在 {{folder}} 中搜索 {{count}} 篇笔记",
+      "newest": "最新优先",
+      "openFolder": "打开文件夹",
+      "empty": "没有匹配的笔记",
+      "loading": "正在加载笔记…",
+      "retry": "无法加载笔记。重试",
+      "results": "{{count}} / {{total}} 篇笔记"
     }
   },
   "dictionary": {
@@ -3815,18 +3846,6 @@
       "permissionDescription": "macOS 需要屏幕录制权限才能截取屏幕。",
       "relaunchHint": "屏幕录制权限是在 OpenWhispr 运行期间授予的。请退出并重新打开 OpenWhispr 以开始捕获屏幕截图。"
     },
-    "modes": {
-      "openwhispr": "OpenWhispr Cloud",
-      "openwhisprDesc": "使用 OpenWhispr 托管的助手，无需 API Key。",
-      "providers": "使用自己的 API Key",
-      "providersDesc": "用你自己的 API Key 连接 OpenAI、Anthropic、Gemini 或 Groq。",
-      "local": "本地",
-      "localDesc": "在你的设备上运行本地 LLM，完全私密。",
-      "selfHosted": "自托管",
-      "selfHostedDesc": "指向兼容 OpenAI 的自托管端点。",
-      "enterprise": "企业级",
-      "enterpriseDesc": "使用 AWS Bedrock、Azure OpenAI 或 Google Vertex。"
-    },
     "prompt": {
       "title": "助手提示词",
       "description": "检测到唤醒词时使用的系统提示词。未设置时回退到内置默认值。"
@@ -3836,19 +3855,7 @@
     "settings": {
       "systemPrompt": "系统提示词",
       "systemPromptDescription": "助手的自定义指令",
-      "systemPromptPlaceholder": "输入自定义系统提示词...",
-      "modes": {
-        "openwhispr": "OpenWhispr Cloud",
-        "providers": "云服务商",
-        "local": "本地",
-        "selfHosted": "自托管",
-        "openwhisprDesc": "准确可靠，无需设置。",
-        "providersDesc": "使用自己的 API 密钥。",
-        "localDesc": "设备端模型，完全私密。",
-        "selfHostedDesc": "你自己网络上的服务器。",
-        "enterprise": "企业级",
-        "enterpriseDesc": "使用你组织的云账号（AWS、Azure、GCP）。"
-      }
+      "systemPromptPlaceholder": "输入自定义系统提示词..."
     },
     "chat": {
       "errorPrefix": "错误",

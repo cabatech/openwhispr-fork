@@ -200,6 +200,37 @@ test("joining a calendar meeting resumes the user's own note for the event", asy
   assert.equal(meetingNavigations[0].folderId, 3);
 });
 
+test("a joined meeting's new note tags the event's guests, keeps the user and skips rooms and declines", async () => {
+  const { engine } = createEngine();
+  const db = createJoinDatabase(null);
+  const updates = [];
+  const me = { email: "me@x.com", displayName: "Me", self: true };
+  db.databaseManager.getCalendarEventById = (id) => ({
+    id,
+    summary: "Weekly sync",
+    attendees: JSON.stringify([
+      { email: "dana@x.com", displayName: "Dana", self: false },
+      me,
+      { email: "room@x.com", displayName: "Room 4", self: false, resource: true },
+      { email: "kim@x.com", displayName: "Kim", responseStatus: "declined", self: false },
+    ]),
+  });
+  db.databaseManager.updateNote = (id, update) => {
+    updates.push(update);
+    return { note: { id, ...update } };
+  };
+  engine.databaseManager = db.databaseManager;
+
+  await engine.joinCalendarMeeting("event-1");
+
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].calendar_event_id, "event-1");
+  assert.deepEqual(JSON.parse(updates[0].participants), [
+    { email: "dana@x.com", displayName: "Dana", self: false, addedByEvent: "event-1" },
+    me,
+  ]);
+});
+
 test("joining a calendar meeting with no note of the user's own creates one", async () => {
   const { engine, meetingNavigations } = createEngine();
   const db = createJoinDatabase(null);
@@ -375,6 +406,37 @@ test("notification Start saves directly in selected folder and duplicate clicks 
   assert.equal((await one).success, true);
   assert.equal((await two).success, true);
   assert.equal(c.db.getNotes().length, 1);
+});
+
+test("notification Start's new note tags the event's attendees", async (t) => {
+  const c = ownedNotification(t);
+  if (!c) return;
+  const dana = { email: "dana@x.com", displayName: "Dana", self: false };
+  const me = { email: "me@x.com", displayName: "Me", self: true };
+  const room = { email: "room@x.com", displayName: "Room 4", self: false, resource: true };
+  c.db.upsertCalendarEvents([
+    {
+      id: "event",
+      calendar_id: "test-calendar",
+      provider: "google",
+      summary: "Weekly",
+      start_time: "2026-07-22T10:00:00Z",
+      end_time: "2026-07-22T11:00:00Z",
+      is_all_day: false,
+      status: "confirmed",
+      attendees: JSON.stringify([dana, me, room]),
+    },
+  ]);
+
+  assert.equal((await c.respond()).success, true);
+
+  const note = c.db.getNote(c.meetingNavigations[0].noteId);
+  assert.equal(note.calendar_event_id, "event");
+  assert.deepEqual(
+    JSON.parse(note.participants),
+    [{ ...dana, addedByEvent: "event" }, me],
+    "the user's own row survives removing the event, and the room never joins"
+  );
 });
 
 test("a linked root note requires current acknowledgment and is never moved or copied", async (t) => {

@@ -26,7 +26,10 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 // Runs the real local-meeting stop, rollback and start paths over stubbed
 // capture, transcription and diarization so the closure state is observable.
-function harness() {
+function harness({
+  plannedSystemAudio = { mode: "unsupported", strategy: "unsupported" },
+  startedStrategy = plannedSystemAudio.strategy,
+} = {}) {
   const events = [];
   const sent = [];
   const diarizations = [];
@@ -46,6 +49,8 @@ function harness() {
     chunkGates,
     lateStreamingFinals,
     win,
+    plannedSystemAudio,
+    startedStrategy,
     debugLogger: { debug() {}, error() {} },
     meetingDetectionEngine: engine,
     windowManager: { controlPanelWindow: null },
@@ -93,6 +98,7 @@ function harness() {
     const armMeetingSystemAudioSilenceTimer = noop;
     const startMeetingSystemAudioWatchdog = noop;
     const flushPendingMeetingMicChunks = noop;
+    const setMeetingSystemAudioStrategy = (strategy) => events.push("strategy:" + strategy);
     const flushPendingMicFinals = () => events.push("flush");
     const stopMeetingAec = asyncNoop;
     const startMeetingAec = asyncNoop;
@@ -102,13 +108,10 @@ function harness() {
     const resolveOneOnOneAttendeeForNote = () => null;
     const isMeetingStreamingConnected = () => false;
     const getMeetingConnectionKey = () => "local";
-    const getMeetingSystemAudioPlan = async () => ({
-      mode: "unsupported",
-      strategy: "unsupported",
-    });
-    const startMeetingSystemAudio = async (_event, systemAudioMode, systemAudioStrategy) => ({
+    const getMeetingSystemAudioPlan = async () => plannedSystemAudio;
+    const startMeetingSystemAudio = async (_event, systemAudioMode) => ({
       systemAudioMode,
-      systemAudioStrategy,
+      systemAudioStrategy: startedStrategy,
     });
     const toPolicyFailure = (error) => ({ success: false, error: error.message });
     const buildOrderedTranscriptText = (segments) =>
@@ -263,4 +266,19 @@ test("a new session starts with no segments from an earlier one", async () => {
 
   assert.equal(result.success, true);
   assert.deepEqual(plain(api.segments), []);
+});
+
+test("start sets the mic alignment strategy from the plan, then from the start result", async () => {
+  const { api, events } = harness({
+    plannedSystemAudio: { mode: "loopback", strategy: "wasapi-loopback" },
+    startedStrategy: "loopback",
+  });
+
+  const result = await api.start({ provider: "local", sessionId: "session-1" });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(
+    events.filter((event) => event.startsWith("strategy:")),
+    ["strategy:wasapi-loopback", "strategy:loopback"]
+  );
 });

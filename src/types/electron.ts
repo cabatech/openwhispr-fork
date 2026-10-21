@@ -15,6 +15,8 @@ import type {
 import type {
   CalendarAvailabilityRequest,
   CalendarAvailabilityResult,
+  CalendarEvent,
+  LinkableCalendarEvent,
   MicrosoftCalendarAccount,
 } from "./calendar";
 import type {
@@ -1374,7 +1376,14 @@ declare global {
         clientSecret?: string;
         environment?: string;
         tenant?: string;
-      }) => Promise<{ success: boolean; error?: string; errorCode?: string; status?: number }>;
+      }) => Promise<{
+        success: boolean;
+        error?: string;
+        errorCode?: string;
+        status?: number;
+        /** The provider gave no verdict (busy, down, unreachable); the setup may be used. */
+        unverified?: boolean;
+      }>;
       pasteText: (
         text: string,
         options?: {
@@ -2380,8 +2389,6 @@ declare global {
         isWlroots: boolean;
         isCosmic: boolean;
         requiresWlCopy: boolean;
-        hasXclip: boolean;
-        hasXsel: boolean;
       }>;
 
       // Globe key listener for hotkey capture (macOS only)
@@ -3282,14 +3289,11 @@ declare global {
       >;
       gcalGetEvent?: (eventId: string) => Promise<{
         success: boolean;
-        event: {
-          id: string;
-          summary: string | null;
-          start_time: string;
-          end_time: string;
-          attendees_count: number;
-          attendees: string | null;
-        } | null;
+        event: CalendarEvent | null;
+      }>;
+      calendarGetLinkableEvents?: () => Promise<{
+        success: boolean;
+        events: LinkableCalendarEvent[];
       }>;
 
       // Contacts

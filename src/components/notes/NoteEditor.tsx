@@ -7,7 +7,6 @@ import {
   Sparkles,
   AlignLeft,
   MessageSquareText,
-  LinkIcon,
   Link2,
   Lock,
   FolderOpen,
@@ -62,6 +61,7 @@ import {
   SPLIT_BUTTON_GROUP_CLASS,
   SPLIT_BUTTON_SEGMENT_CLASS,
 } from "../ui/splitButton";
+import type { CalendarEvent } from "../../types/calendar";
 import type { NoteItem, FolderItem, ActionItem, ActionKind } from "../../types/electron";
 import type { ActionProcessingState } from "../../hooks/useActionProcessing";
 import type { NoteActionProgress } from "../../stores/actionProcessingStore";
@@ -227,7 +227,8 @@ interface NoteEditorProps {
   onSetSessionDiarizationEnabled?: (enabled: boolean) => void;
   onSetSessionExpectedCount?: (count: number) => void;
   folderName?: string | null;
-  calendarEventName?: string | null;
+  /** The linked event's stored row; undefined while it is being looked up. */
+  linkedEvent?: CalendarEvent | null;
   folders?: FolderItem[];
   onMoveToFolder?: (noteId: number, folderId: number) => void;
   onCreateFolderAndMove?: (noteId: number, folderName: string) => void;
@@ -264,7 +265,7 @@ export default function NoteEditor({
   onSetSessionDiarizationEnabled,
   onSetSessionExpectedCount,
   folderName,
-  calendarEventName,
+  linkedEvent,
   folders,
   onMoveToFolder,
   onCreateFolderAndMove,
@@ -1034,13 +1035,12 @@ export default function NoteEditor({
               participants={parsedParticipants}
               dateLabel={shortDate || undefined}
               dateTitle={noteDate}
+              noteCreatedAt={note.created_at}
+              linkedEventId={note.calendar_event_id || null}
+              linkedEvent={linkedEvent}
+              canEdit={canEditNote}
+              ownedByUser={ownedByUser}
             />
-            {calendarEventName && (
-              <span className={cn(NOTE_META_CHIP_CLASS, "cursor-default")}>
-                <LinkIcon size={14} className="shrink-0 text-foreground/60" />
-                <span className="max-w-40 truncate">{calendarEventName}</span>
-              </span>
-            )}
             {isTeamNote && space && (
               <>
                 <button

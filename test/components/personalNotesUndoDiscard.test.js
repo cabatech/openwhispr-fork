@@ -47,7 +47,7 @@ const MOCKS = {
     export const useNotesOnboarding = () => ({ isComplete: true, complete() {} });
   `,
   "/hooks/useTeamSpacesCapability": `export const useTeamSpacesCapability = () => false;`,
-  "/hooks/useAuth": `export const useAuth = () => ({ isSignedIn: false, user: null });`,
+  "/hooks/useAuth": `export const useAuth = () => ({ isSignedIn: false, user: globalThis.__user ?? null });`,
   "/stores/noteStore": `
     const note = () => globalThis.__note;
     export const setActiveNoteId = () => {};
@@ -274,3 +274,96 @@ for (const { name, transcribing, liveNoteId, expectLive } of [
     }
   });
 }
+
+const AI_SUMMARY = {
+  id: 2,
+  kind: "template",
+  name: "AI Summary",
+  prompt: "Summarize",
+  sections: null,
+};
+const PARTICIPANTS = JSON.stringify([
+  { email: "sam@example.com", displayName: "Sam Rivera", self: true },
+  { email: "alice@example.com", displayName: "Alice Ng" },
+]);
+const USER_AND_INVITEE = [
+  { name: "Sam Rivera", email: "sam@example.com" },
+  { name: "Alice Ng", email: "alice@example.com" },
+];
+
+async function runSummaryOn(t, note, speakerMappings = []) {
+  const calls = await mountView(t);
+  globalThis.window.electronAPI.getSpeakerMappings = async () => speakerMappings;
+  globalThis.__noteActionCalls = [];
+  globalThis.__user = { name: "Sam Rivera", email: "sam@example.com" };
+  t.after(() => {
+    delete globalThis.__noteActionCalls;
+    delete globalThis.__user;
+  });
+  globalThis.__note = { ...NOTE, ...note };
+  await calls.rerender();
+  await React.act(async () => {
+    await globalThis.__editorProps.onRunNoteAction(AI_SUMMARY);
+  });
+  assert.equal(globalThis.__noteActionCalls.length, 1);
+  const [, input, , options] = globalThis.__noteActionCalls[0];
+  return { input, options };
+}
+
+test("a transcript stored as plain text runs as one, with the user and the invitees for owner mentions", async (t) => {
+  const transcript = "Alice, can you fix the build by Friday? Sure, I'll do it.";
+  const { input, options } = await runSummaryOn(t, { transcript, participants: PARTICIPANTS });
+  assert.equal(options.hasPlainTranscript, true);
+  assert.equal(options.isMeetingNote, false, "plain text has no speaker lines to split along");
+  assert.deepEqual(options.knownPeople, USER_AND_INVITEE);
+  assert.equal(
+    input,
+    `${NOTE.content}\n\n## Meeting Transcript\n${transcript}`,
+    "no Meeting Context, and the transcript as stored"
+  );
+});
+
+test("a meeting with speakers keeps its Meeting Context, speaker lines and known people", async (t) => {
+  const transcript = JSON.stringify([
+    { source: "mic", timestamp: 100, text: "I'll send the deck." },
+    { source: "system", timestamp: 200, text: "Ship on Friday.", speaker: "speaker_0" },
+  ]);
+  const { input, options } = await runSummaryOn(t, { transcript, participants: PARTICIPANTS }, [
+    { speaker_id: "speaker_0", display_name: "Alice Ng" },
+  ]);
+  assert.equal(options.isMeetingNote, true);
+  assert.ok(!options.hasPlainTranscript);
+  assert.deepEqual(options.knownPeople, USER_AND_INVITEE);
+  assert.ok(
+    input.includes(
+      '## Meeting Context\nThe user taking these notes ("Sam Rivera" in the transcript) is Sam Rivera <sam@example.com>.\nInvited participants: Alice Ng <alice@example.com>.'
+    ),
+    "the owner and the invitee"
+  );
+  assert.ok(input.includes("Sam Rivera: I'll send the deck.\nAlice Ng: Ship on Friday."));
+});
+
+test("a note without a transcript keeps the personal-note run", async (t) => {
+  const { input, options } = await runSummaryOn(t, { transcript: "", participants: PARTICIPANTS });
+  assert.equal(input, NOTE.content);
+  assert.equal(options.isMeetingNote, false);
+  assert.ok(!options.hasPlainTranscript);
+  assert.deepEqual(options.knownPeople, []);
+});
+
+// An upload whose provider returned no segments saves its transcript as the
+// note's text and leaves the transcript empty, so that text is the transcript.
+test("an upload whose transcript is the note's text runs as a plain transcript", async (t) => {
+  const content = "Alice, can you fix the build by Friday? Sure.";
+  const { input, options } = await runSummaryOn(t, {
+    note_type: "upload",
+    content,
+    transcript: "",
+    participants: null,
+  });
+  assert.equal(options.hasPlainTranscript, true);
+  assert.equal(options.isMeetingNote, false);
+  assert.equal(input, `## Meeting Transcript\n${content}`, "not the user's own notes");
+  assert.deepEqual(options.material, { notes: "", meetingContext: "", transcript: content });
+  assert.deepEqual(options.knownPeople, [{ name: "Sam Rivera", email: "sam@example.com" }]);
+});

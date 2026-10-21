@@ -282,6 +282,9 @@
         "openai_gpt_4_1_nano": "GPT-4.1 بأقل زمن انتقال",
         "anthropic_claude_fable_5_1": "نموذج Anthropic الأكثر قدرة، فئة Mythos",
         "anthropic_claude_fable_5": "الرائد السابق من فئة Mythos",
+        "anthropic_claude_opus_5_5": "أحدث نموذج Opus للاستنتاج المعقد، سياق 1 مليون",
+        "anthropic_claude_sonnet_5_5": "أحدث Sonnet: سريع وقادر للعمل اليومي، سياق 1 مليون",
+        "anthropic_claude_haiku_5_5": "أسرع نموذج Claude وأقلّه تكلفة، سياق 1 مليون",
         "anthropic_claude_sonnet_5": "نموذج مساعد سريع وقادر بتكلفة أقل",
         "anthropic_claude_sonnet_4_6": "أداء متوازن",
         "anthropic_claude_sonnet_4_5": "جيل Sonnet السابق",
@@ -302,7 +305,7 @@
         "openai_gpt_5_6_terra": "GPT-5.6 متوازن للعمل اليومي",
         "openai_gpt_5_6_luna": "GPT-5.6 الأسرع والأقل تكلفة",
         "openai_gpt_5_5": "نموذج رائد للاستنتاج المعقد",
-        "anthropic_claude_opus_5": "نموذج Opus الأكثر قدرة، سياق 1 مليون",
+        "anthropic_claude_opus_5": "نموذج Opus الرائد السابق، سياق 1 مليون",
         "anthropic_claude_opus_4_8": "نموذج Opus قوي مضبوط من أجل الصدق والموثوقية",
         "anthropic_claude_opus_4_7": "نموذج Opus قوي",
         "anthropic_claude_opus_4_6": "جيل Opus السابق، سياق 1 مليون",
@@ -1875,18 +1878,6 @@
       "permissionDescription": "يتطلب macOS إذن تسجيل الشاشة لالتقاط شاشتك.",
       "relaunchHint": "تم منح إذن تسجيل الشاشة أثناء تشغيل OpenWhispr. قم بإنهاء OpenWhispr وإعادة فتحه لبدء التقاط لقطات الشاشة."
     },
-    "modes": {
-      "openwhispr": "OpenWhispr Cloud",
-      "openwhisprDesc": "استخدم المساعد المُدار بواسطة OpenWhispr — لا حاجة لمفتاح API.",
-      "providers": "إحضار مفتاحك الخاص",
-      "providersDesc": "اتصل بـ OpenAI أو Anthropic أو Gemini أو Groq باستخدام مفتاح API الخاص بك.",
-      "local": "محلي",
-      "localDesc": "قم بتشغيل LLM محلي على جهازك — خاص بالكامل.",
-      "selfHosted": "مستضاف ذاتيًا",
-      "selfHostedDesc": "اتصل بنقطة نهاية مستضافة ذاتيًا ومتوافقة مع OpenAI.",
-      "enterprise": "للمؤسسات",
-      "enterpriseDesc": "استخدم AWS Bedrock أو Azure OpenAI أو Google Vertex."
-    },
     "prompt": {
       "title": "مطالبة المساعد",
       "description": "مطالبة النظام المستخدمة عند اكتشاف كلمة التفعيل. إذا تُركت فارغة، تُستخدم المطالبة الافتراضية المدمجة."
@@ -1896,19 +1887,7 @@
     "settings": {
       "systemPrompt": "مطالبة النظام",
       "systemPromptDescription": "تعليمات مخصصة للمساعد",
-      "systemPromptPlaceholder": "أدخل مطالبة النظام المخصصة...",
-      "modes": {
-        "openwhispr": "OpenWhispr Cloud",
-        "providers": "مزودو الخدمات السحابية",
-        "local": "محلي",
-        "selfHosted": "مستضاف ذاتيًا",
-        "enterprise": "للمؤسسات",
-        "openwhisprDesc": "دقة موثوقة. لا يتطلب أي إعداد.",
-        "providersDesc": "أحضر مفتاح API الخاص بك.",
-        "localDesc": "نماذج على الجهاز. خاصة بالكامل.",
-        "selfHostedDesc": "الخادم الخاص بك على شبكتك.",
-        "enterpriseDesc": "استخدم الحساب السحابي لمؤسستك (AWS، Azure، GCP)."
-      }
+      "systemPromptPlaceholder": "أدخل مطالبة النظام المخصصة..."
     },
     "chat": {
       "errorPrefix": "خطأ",
@@ -2396,6 +2375,25 @@
       "typeEmail": "اكتب بريدًا إلكترونيًا لإضافته...",
       "me": "(أنا)"
     },
+    "eventLink": {
+      "selectEvent": "اختيار حدث من التقويم",
+      "searchPlaceholder": "البحث عن حدث…",
+      "back": "رجوع",
+      "removeEvent": "إزالة حدث التقويم",
+      "allDay": "طوال اليوم",
+      "noEventsOnDay": "لا توجد أحداث في هذا اليوم",
+      "searchOtherDays": "ابحث للعثور على أحداث من أيام أخرى",
+      "outsideWindow": "يمكن ربط أحداث آخر {{days}} أيام فقط",
+      "noResults": "لا توجد أحداث مطابقة",
+      "noCalendar": "اربط تقويمًا من «التكاملات» لربط الأحداث",
+      "loadFailed": "تعذّر تحميل أحداث التقويم",
+      "join": "انضمام",
+      "calendar": "التقويم",
+      "openInGoogle": "فتح في Google Calendar",
+      "openInOutlook": "فتح في Outlook",
+      "linkedEvent": "حدث التقويم",
+      "unavailable": "هذا الحدث غير موجود في تقاويمك على هذا الجهاز"
+    },
     "upload": {
       "title": "رفع ملف صوتي",
       "using": "باستخدام {{model}}",
@@ -2626,6 +2624,9 @@
         "actionFailed": "فشل الإجراء",
         "noEndpoint": "لم يتم تعيين عنوان URL لخادم مستضاف ذاتيًا. قم بتكوين واحد في الإعدادات.",
         "outputTruncated": "نفدت المساحة لدى نموذج الذكاء الاصطناعي قبل أن ينتهي، لذا بقيت الملاحظة كما هي.",
+        "outputSpentThinking": "استهلك نموذج الذكاء الاصطناعي كامل حد المخرجات في التفكير ولم يكتب أي ملاحظات، لذا بقيت الملاحظة كما هي. فعّل \"تعطيل مخرجات التفكير\" أو اختر نموذجًا يفكر أقل في الإعدادات ← النماذج اللغوية ← تنسيق الملاحظات، ثم حاول مرة أخرى.",
+        "outputSpentThinkingDisabled": "استهلك نموذج الذكاء الاصطناعي كامل حد المخرجات في التفكير ولم يكتب أي ملاحظات، رغم تفعيل \"تعطيل مخرجات التفكير\"، لذا بقيت الملاحظة كما هي. اختر نموذجًا آخر في الإعدادات ← النماذج اللغوية ← تنسيق الملاحظات.",
+        "outputSpentThinkingOtherModel": "استهلك نموذج الذكاء الاصطناعي كامل حد المخرجات في التفكير ولم يكتب أي ملاحظات، لذا بقيت الملاحظة كما هي. اختر نموذجًا يفكر أقل في الإعدادات ← النماذج اللغوية ← تنسيق الملاحظات.",
         "nothingToSummarize": "لا يوجد في هذه الملاحظة ما يمكن تلخيصه بعد، لذا بقي الملخص بالذكاء الاصطناعي كما هو.",
         "saveFailed": "تعذّر الحفظ. تأكد من أن لا شيء أطول من اللازم ثم حاول مرة أخرى."
       },
@@ -2783,6 +2784,16 @@
       "applied": "حدّث المساعد «{{title}}»",
       "changed": "تغيّرت هذه الملاحظة بعد تعديل المساعد. لم يعد التراجع متاحًا.",
       "failed": "تعذّر التراجع عن التعديل. حاول مرة أخرى."
+    },
+    "folderMore": {
+      "more": "{{count}} أخرى",
+      "search": "البحث في {{count}} ملاحظات في {{folder}}",
+      "newest": "الأحدث أولاً",
+      "openFolder": "فتح المجلد",
+      "empty": "لا توجد ملاحظات مطابقة",
+      "loading": "جارٍ تحميل الملاحظات…",
+      "retry": "تعذر تحميل الملاحظات. حاول مجدداً",
+      "results": "{{count}} من {{total}} ملاحظات"
     }
   },
   "onboarding": {
@@ -2911,7 +2922,7 @@
           }
         },
         "byok": {
-          "title": "مزود API",
+          "title": "إحضار مفتاحك الخاص",
           "description": "استخدم مفتاح API الخاص بك."
         },
         "local": {
@@ -2980,15 +2991,14 @@
         "optional": "اختياري",
         "modelId": "معرف النموذج",
         "modelIdPlaceholder": "اكتب معرف النموذج الخاص بك",
-        "testConnection": "اختبار الاتصال",
         "proceed": "متابعة",
         "clinical": "للتفريغ السريري",
         "clientId": "معرف العميل (Client ID)",
         "clientSecret": "سر العميل (Client Secret)",
-        "runTest": "إجراء الاختبار",
         "testing": "جاري الاختبار...",
         "connected": "متصل",
         "connectionFailed": "تعذر التحقق من الاتصال.",
+        "unverified": "تعذر التحقق: {{reason}}",
         "errors": {
           "endpointRequired": "أدخل عنوان URL لنقطة النهاية قبل الاختبار.",
           "invalidUrl": "يجب أن تكون نقطة النهاية عنوان URL صالحًا لـ HTTP أو HTTPS.",
@@ -2997,6 +3007,7 @@
           "apiKeyRequired": "أضف مفتاح API قبل الاختبار.",
           "credentialsRejected": "رفض المزود بيانات الاعتماد هذه.",
           "endpointNotFound": "لا توفر نقطة النهاية قائمة نماذج متوافقة مع OpenAI.",
+          "transcriptionEndpointNotFound": "لا يستقبل هذا العنوان طلبات التفريغ الصوتي.",
           "modelNotFound": "النموذج المحدد غير متوفر من هذا المزود.",
           "providerStatus": "أعاد المزود رمز الحالة {{status}}.",
           "timeout": "انتهت مهلة اختبار الاتصال.",
@@ -3681,12 +3692,12 @@
       "enableTextCleanupDescription": "استخدم الذكاء الاصطناعي لإزالة كلمات الحشو، وإصلاح القواعد، وتنسيق علامات الترقيم",
       "modes": {
         "openwhispr": "OpenWhispr Cloud",
-        "providers": "مزودو الخدمات السحابية",
+        "providers": "إحضار مفتاحك الخاص",
         "local": "محلي",
         "selfHosted": "مستضاف ذاتيًا",
         "enterprise": "مؤسسي",
         "openwhisprDesc": "دقة موثوقة. لا حاجة للإعداد.",
-        "providersDesc": "أحضر مفتاح API الخاص بك.",
+        "providersDesc": "استخدم مفتاح API الخاص بك للاتصال بمزود LLM المفضل لديك.",
         "localDesc": "نماذج على الجهاز. خاصة بالكامل.",
         "selfHostedDesc": "خادمك الخاص على شبكتك.",
         "enterpriseDesc": "استخدم الحساب السحابي لمؤسستك (AWS، Azure، GCP)."
@@ -3704,7 +3715,7 @@
           "title": "تم التبديل إلى الإعداد المخصص"
         },
         "switchedProviders": {
-          "title": "مزودو الخدمات السحابية",
+          "title": "إحضار مفتاحك الخاص",
           "description": "استخدام مفاتيح API الخاصة بك."
         },
         "switchedLocal": {
@@ -3929,15 +3940,11 @@
             "step1Desc": "ابدأ ydotoold وقم بتمكينه ليعمل في كل عملية تسجيل دخول.",
             "step2Title": "التحقق من أنه قيد التشغيل"
           },
-          "xclip": {
-            "step1Title": "تثبيت xclip"
-          },
           "wlCopy": {
             "step1Title": "تثبيت wl-clipboard",
             "step2Title": "التحقق من التثبيت"
           }
         },
-        "xclipDesc": "أداة الحافظة للصق في KDE Wayland (xclip أو xsel)",
         "nixos": {
           "intro": "أنت تستخدم NixOS. يتطلب اللصق التلقائي الوصول إلى ydotool و /dev/uinput، والذي يمنحه NixOS بشكل تصريحي.",
           "detected": "تم الكشف عنه",

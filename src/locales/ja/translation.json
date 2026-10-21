@@ -343,7 +343,7 @@
           }
         },
         "byok": {
-          "title": "API プロバイダー",
+          "title": "自前のキー",
           "description": "自分の API キーを使用します。"
         },
         "local": {
@@ -412,15 +412,14 @@
         "optional": "任意",
         "modelId": "モデル ID",
         "modelIdPlaceholder": "モデル ID を入力",
-        "testConnection": "接続をテスト",
         "proceed": "次へ進む",
         "clinical": "臨床文字起こし向け",
         "clientId": "Client ID",
         "clientSecret": "Client secret",
-        "runTest": "テストを実行",
         "testing": "テスト中…",
         "connected": "接続済み",
         "connectionFailed": "接続を確認できませんでした。",
+        "unverified": "確認できませんでした：{{reason}}",
         "errors": {
           "endpointRequired": "テストの前にエンドポイント URL を入力してください。",
           "invalidUrl": "エンドポイントは有効な HTTP または HTTPS の URL である必要があります。",
@@ -429,6 +428,7 @@
           "apiKeyRequired": "テストの前に API キーを追加してください。",
           "credentialsRejected": "プロバイダーがこの認証情報を拒否しました。",
           "endpointNotFound": "このエンドポイントは OpenAI 互換のモデル一覧を公開していません。",
+          "transcriptionEndpointNotFound": "このアドレスでは文字起こしを受け付けていません。",
           "modelNotFound": "選択したモデルはこのプロバイダーでは利用できません。",
           "providerStatus": "プロバイダーがステータス {{status}} を返しました。",
           "timeout": "接続テストがタイムアウトしました。",
@@ -1862,11 +1862,11 @@
       "enableTextCleanupDescription": "AI がフィラーワードを除去し、文法と句読点を整える",
       "modes": {
         "openwhispr": "OpenWhispr Cloud",
-        "providers": "クラウドプロバイダー",
+        "providers": "自前のキー",
         "local": "ローカル",
         "selfHosted": "セルフホスト",
         "openwhisprDesc": "信頼できる精度。設定不要。",
-        "providersDesc": "自分のAPIキーを使用。",
+        "providersDesc": "自分の API キーで、お好みの LLM プロバイダーに接続します。",
         "localDesc": "端末上のモデル。完全プライベート。",
         "selfHostedDesc": "自前サーバーをネットワーク上に。",
         "enterprise": "エンタープライズ",
@@ -1885,7 +1885,7 @@
           "title": "カスタム設定に切り替えました"
         },
         "switchedProviders": {
-          "title": "クラウドプロバイダー",
+          "title": "自前のキー",
           "description": "独自の API キーを使用します。"
         },
         "switchedLocal": {
@@ -2110,15 +2110,11 @@
             "step1Desc": "ydotoold を起動し、毎回のログイン時に実行されるよう有効化します。",
             "step2Title": "実行中か確認"
           },
-          "xclip": {
-            "step1Title": "xclipをインストール"
-          },
           "wlCopy": {
             "step1Title": "wl-clipboard をインストール",
             "step2Title": "インストールの確認"
           }
         },
-        "xclipDesc": "KDE Waylandの貼り付け用クリップボードツール（xclipまたはxsel）",
         "nixos": {
           "intro": "NixOSをお使いです。自動貼り付けにはydotoolと/dev/uinputへのアクセスが必要で、NixOSでは宣言的に設定できます。",
           "detected": "検出済み",
@@ -2680,6 +2676,9 @@
         "openai_gpt_4_1_nano": "最低レイテンシーの GPT-4.1",
         "anthropic_claude_fable_5_1": "Anthropic の最も高性能なモデル、Mythos クラス",
         "anthropic_claude_fable_5": "前世代の Mythos クラスのフラッグシップ",
+        "anthropic_claude_opus_5_5": "複雑な推論向けの最新 Opus モデル、100 万トークンコンテキスト",
+        "anthropic_claude_sonnet_5_5": "最新の Sonnet：日常業務向けの高速かつ高性能なモデル、100 万トークンコンテキスト",
+        "anthropic_claude_haiku_5_5": "最速かつ最も低コストな Claude モデル、100 万トークンコンテキスト",
         "anthropic_claude_sonnet_5": "低コストで高速かつ高性能なアシスタントモデル",
         "anthropic_claude_sonnet_4_6": "バランスの取れた性能",
         "anthropic_claude_sonnet_4_5": "前世代の Sonnet モデル",
@@ -2700,7 +2699,7 @@
         "openai_gpt_5_6_terra": "日常業務向けのバランス型 GPT-5.6",
         "openai_gpt_5_6_luna": "最速かつ最も低コストの GPT-5.6",
         "openai_gpt_5_5": "複雑な推論のためのフロンティアモデル",
-        "anthropic_claude_opus_5": "最も高性能な Opus モデル、100 万トークンコンテキスト",
+        "anthropic_claude_opus_5": "前世代の Opus フラッグシップ、100 万トークンコンテキスト",
         "anthropic_claude_opus_4_8": "誠実さと信頼性を重視した強力な Opus モデル",
         "anthropic_claude_opus_4_7": "高性能な Opus モデル",
         "anthropic_claude_opus_4_6": "前世代の Opus、100 万トークンコンテキスト",
@@ -2997,6 +2996,25 @@
       "typeEmail": "メールアドレスを入力して追加...",
       "me": "（自分）"
     },
+    "eventLink": {
+      "selectEvent": "カレンダーの予定を選択",
+      "searchPlaceholder": "予定を検索…",
+      "back": "戻る",
+      "removeEvent": "カレンダーの予定を解除",
+      "allDay": "終日",
+      "noEventsOnDay": "この日に予定はありません",
+      "searchOtherDays": "検索すると他の日の予定も見つかります",
+      "outsideWindow": "リンクできるのは過去{{days}}日間の予定のみです",
+      "noResults": "一致する予定はありません",
+      "noCalendar": "予定をリンクするには「連携」でカレンダーを接続してください",
+      "loadFailed": "カレンダーの予定を読み込めませんでした",
+      "join": "参加",
+      "calendar": "カレンダー",
+      "openInGoogle": "Google Calendar で開く",
+      "openInOutlook": "Outlook で開く",
+      "linkedEvent": "カレンダーの予定",
+      "unavailable": "この予定はこのデバイスのカレンダーにありません"
+    },
     "context": {
       "moveToFolder": "フォルダに移動",
       "delete": "削除",
@@ -3090,6 +3108,9 @@
         "actionFailed": "アクションに失敗しました",
         "noEndpoint": "セルフホストサーバーの URL が設定されていません。設定で構成してください。",
         "outputTruncated": "AIモデルが出力の上限に達して最後まで書けなかったため、ノートは変更されていません。",
+        "outputSpentThinking": "AIモデルが出力の上限をすべて思考に使い、ノートを書きませんでした。ノートは変更されていません。設定 → 言語モデル → ノートのフォーマット で「思考出力を無効にする」をオンにするか、思考の少ないモデルを選んで、もう一度お試しください。",
+        "outputSpentThinkingDisabled": "「思考出力を無効にする」がオンでも、AIモデルが出力の上限をすべて思考に使い、ノートを書きませんでした。ノートは変更されていません。設定 → 言語モデル → ノートのフォーマット で別のモデルを選んでください。",
+        "outputSpentThinkingOtherModel": "AIモデルが出力の上限をすべて思考に使い、ノートを書きませんでした。ノートは変更されていません。設定 → 言語モデル → ノートのフォーマット で思考の少ないモデルを選んでください。",
         "nothingToSummarize": "このノートにはまだ要約できる内容がないため、AI要約はそのままです。",
         "saveFailed": "保存できませんでした。長すぎる項目がないか確認して、もう一度お試しください。"
       },
@@ -3403,6 +3424,16 @@
       "applied": "アシスタントが「{{title}}」を更新しました",
       "changed": "アシスタントの編集後にノートが変更されたため、元に戻せません。",
       "failed": "編集を元に戻せませんでした。もう一度お試しください。"
+    },
+    "folderMore": {
+      "more": "他 {{count}} 件",
+      "search": "{{folder}} の {{count}} 件のノートを検索",
+      "newest": "新しい順",
+      "openFolder": "フォルダーを開く",
+      "empty": "一致するノートがありません",
+      "loading": "ノートを読み込み中…",
+      "retry": "ノートを読み込めませんでした。再試行",
+      "results": "{{total}} 件中 {{count}} 件のノート"
     }
   },
   "dictionary": {
@@ -3815,18 +3846,6 @@
       "permissionDescription": "画面をキャプチャするには macOS の画面収録の許可が必要です。",
       "relaunchHint": "画面収録の許可は OpenWhispr の実行中に付与されました。スクリーンショットのキャプチャを開始するには、OpenWhispr を終了して再度開いてください。"
     },
-    "modes": {
-      "openwhispr": "OpenWhispr Cloud",
-      "openwhisprDesc": "OpenWhispr が管理するアシスタントを使用。API キーは不要です。",
-      "providers": "自分の API キーを使用",
-      "providersDesc": "自分の API キーで OpenAI、Anthropic、Gemini、Groq に接続します。",
-      "local": "ローカル",
-      "localDesc": "端末上でローカル LLM を実行。完全プライベート。",
-      "selfHosted": "セルフホスト",
-      "selfHostedDesc": "セルフホストの OpenAI 互換エンドポイントを指定します。",
-      "enterprise": "エンタープライズ",
-      "enterpriseDesc": "AWS Bedrock、Azure OpenAI、Google Vertex を使用します。"
-    },
     "prompt": {
       "title": "アシスタントプロンプト",
       "description": "ウェイクワードが検出されたときに使用するシステムプロンプト。未設定の場合は組み込みのデフォルトが使われます。"
@@ -3836,19 +3855,7 @@
     "settings": {
       "systemPrompt": "システムプロンプト",
       "systemPromptDescription": "アシスタントへのカスタム指示",
-      "systemPromptPlaceholder": "カスタムシステムプロンプトを入力...",
-      "modes": {
-        "openwhispr": "OpenWhispr Cloud",
-        "providers": "クラウドプロバイダー",
-        "local": "ローカル",
-        "selfHosted": "セルフホスト",
-        "openwhisprDesc": "信頼できる精度。設定不要。",
-        "providersDesc": "独自のAPIキーを使用。",
-        "localDesc": "デバイス上のモデル。完全プライベート。",
-        "selfHostedDesc": "ネットワーク上の自分のサーバー。",
-        "enterprise": "エンタープライズ",
-        "enterpriseDesc": "組織のクラウドアカウントを使用 (AWS, Azure, GCP)。"
-      }
+      "systemPromptPlaceholder": "カスタムシステムプロンプトを入力..."
     },
     "chat": {
       "errorPrefix": "エラー",

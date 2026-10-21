@@ -8,6 +8,7 @@ const {
 } = require("./meetingNotificationDestination");
 const { openExternalUrl } = require("./externalUrlOpener");
 const { getMeetingJoinUrl } = require("./meetingJoinUrl");
+const { tagEventAttendeesJson } = require("./eventAttendees");
 const createMeetingAutoEndController = require("./meetingAutoEndController");
 const { createMeetingAudioActivityMonitor } = require("./meetingAudioActivityMonitor");
 const { broadcastToWindows } = require("./windowBroadcast");
@@ -506,7 +507,7 @@ class MeetingDetectionEngine {
         folderId: folder.id,
         spaceId: folder.space_id,
         eventId,
-        participants: calendarEvent?.attendees,
+        participants: tagEventAttendeesJson(calendarEvent?.attendees, eventId),
       });
       note = result.note;
       owner.committedNoteId = note.id;
@@ -633,7 +634,7 @@ class MeetingDetectionEngine {
 
     const updates = { calendar_event_id: calEvent.id };
     if (calEvent.attendees) {
-      updates.participants = calEvent.attendees;
+      updates.participants = tagEventAttendeesJson(calEvent.attendees, calEvent.id);
     }
     const updateResult = this.databaseManager.updateNote(noteResult.note.id, updates);
 

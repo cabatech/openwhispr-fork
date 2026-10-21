@@ -343,7 +343,7 @@
           }
         },
         "byok": {
-          "title": "Provider API",
+          "title": "Porta la tua chiave",
           "description": "Usa la tua chiave API."
         },
         "local": {
@@ -412,15 +412,14 @@
         "optional": "Facoltativo",
         "modelId": "ID modello",
         "modelIdPlaceholder": "Scrivi l’ID del tuo modello",
-        "testConnection": "Prova la connessione",
         "proceed": "Procedi",
         "clinical": "PER LA TRASCRIZIONE CLINICA",
         "clientId": "Client ID",
         "clientSecret": "Client secret",
-        "runTest": "Esegui test",
         "testing": "Test in corso…",
         "connected": "Connesso",
         "connectionFailed": "Non è stato possibile verificare la connessione.",
+        "unverified": "Impossibile verificare: {{reason}}",
         "errors": {
           "endpointRequired": "Inserisci l’URL dell’endpoint prima di eseguire il test.",
           "invalidUrl": "L’endpoint deve essere un URL HTTP o HTTPS valido.",
@@ -429,6 +428,7 @@
           "apiKeyRequired": "Aggiungi una chiave API prima di eseguire il test.",
           "credentialsRejected": "Il provider ha rifiutato queste credenziali.",
           "endpointNotFound": "L’endpoint non espone un elenco di modelli compatibile con OpenAI.",
+          "transcriptionEndpointNotFound": "Questo indirizzo non accetta trascrizioni.",
           "modelNotFound": "Il modello selezionato non è disponibile presso questo provider.",
           "providerStatus": "Il provider ha restituito lo stato {{status}}.",
           "timeout": "Il test di connessione è scaduto.",
@@ -1862,11 +1862,11 @@
       "enableTextCleanupDescription": "L'IA rimuove parole superflue, corregge grammatica e punteggiatura",
       "modes": {
         "openwhispr": "OpenWhispr Cloud",
-        "providers": "Provider cloud",
+        "providers": "Porta la tua chiave",
         "local": "Locale",
         "selfHosted": "Self-hosted",
         "openwhisprDesc": "Risultati affidabili. Nessuna configurazione necessaria.",
-        "providersDesc": "Usa la tua chiave API.",
+        "providersDesc": "Usa la tua chiave API per connettere il tuo provider LLM preferito.",
         "localDesc": "Modelli sul dispositivo. Totalmente privato.",
         "selfHostedDesc": "Il tuo server nella tua rete.",
         "enterprise": "Enterprise",
@@ -1885,7 +1885,7 @@
           "title": "Passato a configurazione personalizzata"
         },
         "switchedProviders": {
-          "title": "Provider cloud",
+          "title": "Porta la tua chiave",
           "description": "Utilizzo delle tue chiavi API."
         },
         "switchedLocal": {
@@ -2110,15 +2110,11 @@
             "step1Desc": "Avvia ydotoold e abilitalo per l'esecuzione a ogni accesso.",
             "step2Title": "Verifica che sia in esecuzione"
           },
-          "xclip": {
-            "step1Title": "Installa xclip"
-          },
           "wlCopy": {
             "step1Title": "Installa wl-clipboard",
             "step2Title": "Verifica l'installazione"
           }
         },
-        "xclipDesc": "Strumento appunti per incollare in KDE Wayland (xclip o xsel)",
         "nixos": {
           "intro": "Stai usando NixOS. L'incolla automatico richiede ydotool e l'accesso a /dev/uinput, che NixOS gestisce in modo dichiarativo.",
           "detected": "Rilevato",
@@ -2680,6 +2676,9 @@
         "openai_gpt_4_1_nano": "GPT-4.1 con la latenza più bassa",
         "anthropic_claude_fable_5_1": "Il modello più capace di Anthropic, classe Mythos",
         "anthropic_claude_fable_5": "Precedente modello di punta di classe Mythos",
+        "anthropic_claude_opus_5_5": "Ultimo modello Opus per il ragionamento complesso, contesto da 1M",
+        "anthropic_claude_sonnet_5_5": "Ultimo Sonnet: veloce e capace per il lavoro quotidiano, contesto da 1M",
+        "anthropic_claude_haiku_5_5": "Il modello Claude più veloce ed economico, contesto da 1M",
         "anthropic_claude_sonnet_5": "Modello assistente veloce e capace a costo inferiore",
         "anthropic_claude_sonnet_4_6": "Prestazioni bilanciate",
         "anthropic_claude_sonnet_4_5": "Generazione Sonnet precedente",
@@ -2700,7 +2699,7 @@
         "openai_gpt_5_6_terra": "GPT-5.6 bilanciato per il lavoro quotidiano",
         "openai_gpt_5_6_luna": "Il GPT-5.6 più veloce ed economico",
         "openai_gpt_5_5": "Modello frontier per ragionamento complesso",
-        "anthropic_claude_opus_5": "Il modello Opus più capace, contesto da 1M",
+        "anthropic_claude_opus_5": "Precedente modello di punta Opus, contesto da 1M",
         "anthropic_claude_opus_4_8": "Potente modello Opus orientato a onestà e affidabilità",
         "anthropic_claude_opus_4_7": "Modello Opus potente",
         "anthropic_claude_opus_4_6": "Generazione Opus precedente, contesto da 1M",
@@ -3102,6 +3101,25 @@
       "typeEmail": "Digita un'email per aggiungere...",
       "me": "(io)"
     },
+    "eventLink": {
+      "selectEvent": "Seleziona evento del calendario",
+      "searchPlaceholder": "Cerca evento…",
+      "back": "Indietro",
+      "removeEvent": "Rimuovi evento del calendario",
+      "allDay": "Tutto il giorno",
+      "noEventsOnDay": "Nessun evento in questo giorno",
+      "searchOtherDays": "Cerca per trovare eventi di altri giorni",
+      "outsideWindow": "Si possono collegare solo eventi degli ultimi {{days}} giorni",
+      "noResults": "Nessun evento corrispondente",
+      "noCalendar": "Collega un calendario in Integrazioni per collegare eventi",
+      "loadFailed": "Impossibile caricare gli eventi del calendario",
+      "join": "Partecipa",
+      "calendar": "Calendario",
+      "openInGoogle": "Apri in Google Calendar",
+      "openInOutlook": "Apri in Outlook",
+      "linkedEvent": "Evento del calendario",
+      "unavailable": "Questo evento non è nei tuoi calendari su questo dispositivo"
+    },
     "upload": {
       "title": "Carica audio",
       "using": "Utilizzando {{model}}",
@@ -3310,6 +3328,9 @@
         "actionFailed": "Azione non riuscita",
         "noEndpoint": "Nessun URL del server self-hosted impostato. Configurane uno nelle Impostazioni.",
         "outputTruncated": "Il modello AI ha esaurito lo spazio prima di finire, quindi la nota è rimasta com'era.",
+        "outputSpentThinking": "Il modello AI ha usato tutto il suo limite di output per ragionare e non ha scritto note, quindi la nota è rimasta com'era. Attiva \"Disattiva output di ragionamento\" o scegli un modello che ragiona meno in Impostazioni → Modelli linguistici → Formattazione note e riprova.",
+        "outputSpentThinkingDisabled": "Il modello AI ha usato tutto il suo limite di output per ragionare e non ha scritto note, anche con \"Disattiva output di ragionamento\" attivo, quindi la nota è rimasta com'era. Scegli un altro modello in Impostazioni → Modelli linguistici → Formattazione note.",
+        "outputSpentThinkingOtherModel": "Il modello AI ha usato tutto il suo limite di output per ragionare e non ha scritto note, quindi la nota è rimasta com'era. Scegli un modello che ragiona meno in Impostazioni → Modelli linguistici → Formattazione note.",
         "nothingToSummarize": "Questa nota non ha ancora nulla da riassumere, quindi il riepilogo AI è rimasto invariato.",
         "saveFailed": "Impossibile salvare. Controlla che nulla sia troppo lungo e riprova."
       },
@@ -3475,6 +3496,16 @@
       "applied": "L’assistente ha aggiornato «{{title}}»",
       "changed": "Questa nota è cambiata dopo la modifica dell’assistente. Non è più possibile annullarla.",
       "failed": "Impossibile annullare la modifica. Riprova."
+    },
+    "folderMore": {
+      "more": "Altre {{count}}",
+      "search": "Cerca {{count}} note in {{folder}}",
+      "newest": "Più recenti prima",
+      "openFolder": "Apri cartella",
+      "empty": "Nessuna nota corrispondente",
+      "loading": "Caricamento delle note…",
+      "retry": "Impossibile caricare le note. Riprova",
+      "results": "{{count}} di {{total}} note"
     }
   },
   "dictionary": {
@@ -3815,18 +3846,6 @@
       "permissionDescription": "macOS richiede l'autorizzazione alla registrazione dello schermo per catturare lo schermo.",
       "relaunchHint": "La registrazione dello schermo è stata concessa mentre OpenWhispr era in esecuzione. Chiudi e riapri OpenWhispr per iniziare a catturare gli screenshot."
     },
-    "modes": {
-      "openwhispr": "OpenWhispr Cloud",
-      "openwhisprDesc": "Usa l'assistente gestito da OpenWhispr, senza bisogno di chiave API.",
-      "providers": "Usa la tua chiave API",
-      "providersDesc": "Connettiti a OpenAI, Anthropic, Gemini o Groq con la tua chiave API.",
-      "local": "Locale",
-      "localDesc": "Esegui un LLM locale sul tuo dispositivo, totalmente privato.",
-      "selfHosted": "Self-hosted",
-      "selfHostedDesc": "Punta a un endpoint self-hosted compatibile con OpenAI.",
-      "enterprise": "Enterprise",
-      "enterpriseDesc": "Usa AWS Bedrock, Azure OpenAI o Google Vertex."
-    },
     "prompt": {
       "title": "Prompt dell'assistente",
       "description": "Il prompt di sistema usato quando viene rilevata la parola di attivazione. In assenza, usa quello predefinito integrato."
@@ -3836,19 +3855,7 @@
     "settings": {
       "systemPrompt": "Prompt di Sistema",
       "systemPromptDescription": "Istruzioni personalizzate per l'assistente",
-      "systemPromptPlaceholder": "Inserisci un prompt di sistema personalizzato...",
-      "modes": {
-        "openwhispr": "OpenWhispr Cloud",
-        "providers": "Provider Cloud",
-        "local": "Locale",
-        "selfHosted": "Self-Hosted",
-        "openwhisprDesc": "Risultati affidabili. Nessuna configurazione necessaria.",
-        "providersDesc": "Porta la tua chiave API.",
-        "localDesc": "Modelli sul dispositivo. Completamente privato.",
-        "selfHostedDesc": "Il tuo server sulla tua rete.",
-        "enterprise": "Enterprise",
-        "enterpriseDesc": "Usa l'account cloud della tua organizzazione (AWS, Azure, GCP)."
-      }
+      "systemPromptPlaceholder": "Inserisci un prompt di sistema personalizzato..."
     },
     "chat": {
       "errorPrefix": "Errore",
