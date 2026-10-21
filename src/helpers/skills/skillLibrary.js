@@ -9,6 +9,8 @@ const {
   displayNameFor,
   slugifySkillName,
   buildSkillMarkdown,
+  replaceFrontmatterValue,
+  replaceSkillBody,
   isTextFile,
   isScriptPath,
   contentHash,
@@ -23,6 +25,8 @@ const SKILL_CREATOR = "skill-creator";
 // File text a model read may carry, and what an assistant proposal may write.
 const MODEL_FILES_MAX_BYTES = 200 * 1024;
 const PROPOSAL_LIMITS = { maxFiles: 20, maxFileBytes: 200 * 1024, maxBytes: 1024 * 1024 };
+// Copies kept per skill for Undo, newest first; older ones are deleted.
+const VERSIONS_KEPT = 5;
 
 // A name the library can address on disk: one path segment that isn't hidden. Wider than
 // SKILL_NAME_PATTERN, so a folder dropped in under any name can still be shown and removed.
@@ -151,6 +155,17 @@ function proposalSizeProblem(files) {
   return bytes > PROPOSAL_LIMITS.maxBytes ? { code: "tooLarge" } : null;
 }
 
+const foldPath = (relPath) => relPath.normalize("NFC").toLowerCase();
+
+function versionIds(folder) {
+  if (!fs.existsSync(folder)) return [];
+  return fs
+    .readdirSync(folder)
+    .filter((entry) => /^\d+$/.test(entry))
+    .map(Number)
+    .sort((a, b) => a - b);
+}
+
 /**
  * The user's skills: one folder each under userData/skills, which is the only copy of a
  * skill's content. The database keeps only each skill's on/off state.
@@ -260,6 +275,7 @@ class SkillLibrary {
       if (error.code !== "ENOENT") throw writeError(error);
     }
     this._removeQuietly(trash);
+    this._removeQuietly(path.join(this.versionsDir, name));
     this.inspected.delete(name);
     this.database.deleteSkillState(name);
   }
@@ -399,9 +415,14 @@ class SkillLibrary {
     return { name, displayName: skill.displayName, body, files };
   }
 
-  // Checked before the user sees a card, so the assistant can fix what it proposed.
-  checkProposal({ proposal }) {
-    const { name, existing, problems } = this._proposedSkill(proposal);
+  // Checked before the user sees a card, so the assistant can fix what it proposed. An update
+  // needs a skill that is on and valid; null means there's none to change.
+  checkProposal(request) {
+    if (request.kind === "update") {
+      const updated = this._updatedSkill(request.update);
+      return updated && { name: request.update.name, existing: true, problems: updated.problems };
+    }
+    const { name, existing, problems } = this._proposedSkill(request.proposal);
     return { name, existing, problems };
   }
 
@@ -409,20 +430,54 @@ class SkillLibrary {
   saveProposal(proposal) {
     const { name, existing, problems, files } = this._proposedSkill(proposal);
     if (problems.length > 0) return { problems };
-    const versionId = existing ? this.saveVersion(name) : null;
-    this._install(name, files);
-    return versionId ? { name, versionId } : { name };
+    if (!existing) {
+      this._install(name, files);
+      return { name };
+    }
+    const versionId = this._withVersion(name, () => this._writeSkillFolder(name, files));
+    this._stamp(name, files, { enabled: true });
+    return { name, versionId };
   }
 
-  // A copy of the skill as it is now, for Undo to put back.
+  // An approved change to a skill that is on and valid: the header keeps every other line,
+  // and every file it doesn't change stays byte for byte.
+  applyUpdate(update) {
+    const updated = this._updatedSkill(update);
+    if (!updated || updated.problems.length > 0) return updated && { problems: updated.problems };
+    const versionId = this._withVersion(update.name, () =>
+      this._writeSkillFolder(update.name, updated.files)
+    );
+    this._stamp(update.name, updated.files, {});
+    return { name: update.name, versionId };
+  }
+
+  // Puts a kept copy back in one swap, then forgets it. False when there is no such copy.
+  undo(name, versionId) {
+    const versionDir = path.join(this.versionsDir, name, versionId);
+    if (!fs.existsSync(versionDir)) return false;
+    const walked = walkSkillFolder(versionDir);
+    if (walked.unreadable) return false;
+    const files = walked.files.map((file) => ({
+      path: file.path,
+      data: fs.readFileSync(file.fullPath),
+    }));
+    this._writeSkillFolder(name, files);
+    this._stamp(name, files, {});
+    this._removeQuietly(versionDir);
+    return true;
+  }
+
+  // A copy of the skill as it is now, for Undo to put back. Ids only grow, so the newest
+  // copies are always the ones kept.
   saveVersion(name) {
     const folder = path.join(this.versionsDir, name);
-    let versionId = Date.now();
-    while (fs.existsSync(path.join(folder, String(versionId)))) versionId += 1;
-    fs.cpSync(path.join(this.skillsDir, name), path.join(folder, String(versionId)), {
-      recursive: true,
-    });
-    return String(versionId);
+    const kept = versionIds(folder);
+    const versionId = String(Math.max(Date.now(), (kept.at(-1) ?? 0) + 1));
+    fs.cpSync(path.join(this.skillsDir, name), path.join(folder, versionId), { recursive: true });
+    for (const old of kept.slice(0, Math.max(0, kept.length + 1 - VERSIONS_KEPT))) {
+      this._removeQuietly(path.join(folder, String(old)));
+    }
+    return versionId;
   }
 
   markUsed(name) {
@@ -519,10 +574,57 @@ class SkillLibrary {
     return { name, existing, problems, files: skillFiles };
   }
 
+  _updatedSkill({ name, description, instructions, files }) {
+    const skill = this.get(name);
+    if (!skill?.enabled || !skill.valid) return null;
+    const refuse = (problem) => ({ problems: [problem], files: [] });
+    const changed = proposalFiles(files);
+    if (changed.problem) return refuse(changed.problem);
+    let markdown = skill.markdown;
+    if (description !== undefined) {
+      markdown = replaceFrontmatterValue(markdown, "description", description.trim());
+    }
+    if (instructions !== undefined) markdown = replaceSkillBody(markdown, instructions);
+    const skillFile = { path: "SKILL.md", data: Buffer.from(markdown) };
+    // The skill's size was checked when it arrived; the change is held to proposal limits.
+    const limit = proposalSizeProblem(
+      instructions !== undefined ? [skillFile, ...changed.files] : changed.files
+    );
+    if (limit) return refuse(limit);
+    const replaced = new Set(changed.files.map((file) => foldPath(file.path)));
+    const kept = walkSkillFolder(this.skillDir(name))
+      .files.filter((file) => file.path !== "SKILL.md" && !replaced.has(foldPath(file.path)))
+      .map((file) => ({ path: file.path, data: fs.readFileSync(file.fullPath) }));
+    const skillFiles = [skillFile, ...kept, ...changed.files];
+    if (hasClashingPaths(skillFiles.map((file) => file.path))) {
+      return refuse({ code: "unsafePath" });
+    }
+    const size = sizeProblem(skillFiles);
+    if (size) return refuse(size);
+    const { problems } = validateSkillFiles(skillFiles, { folderName: name, source: "app" });
+    return { problems, files: skillFiles };
+  }
+
+  // Keeps a version, then writes; a failed write leaves the skill and its versions as they were.
+  _withVersion(name, write) {
+    const versionId = this.saveVersion(name);
+    try {
+      write();
+    } catch (error) {
+      this._removeQuietly(path.join(this.versionsDir, name, versionId));
+      throw error;
+    }
+    return versionId;
+  }
+
   _install(name, files) {
     this._writeSkillFolder(name, files);
+    this._stamp(name, files, { enabled: true });
+  }
+
+  _stamp(name, files, state) {
     this.inspected.delete(name);
-    this.database.upsertSkillState(name, { enabled: true, contentHash: contentHash(files) });
+    this.database.upsertSkillState(name, { ...state, contentHash: contentHash(files) });
   }
 
   // Writes into a staging folder, then swaps it in, so a failure never leaves half a skill.

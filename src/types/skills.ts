@@ -129,6 +129,15 @@ export interface SkillProposal {
   files: { path: string; content: string }[];
 }
 
+/** A change the assistant proposes to one of the user's skills; nothing changes until approved. */
+export interface SkillUpdate {
+  name: string;
+  description?: string;
+  instructions?: string;
+  /** The full new text of each file it changes or adds. */
+  files: { path: string; content: string }[];
+}
+
 export interface SkillProposalCheck {
   /** The folder saving writes. */
   name: string;

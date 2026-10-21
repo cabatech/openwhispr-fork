@@ -109,6 +109,7 @@ const TOOL_GROUPS: Record<string, string> = {
   copy_to_clipboard: "Clipboard",
   load_skill: "The user's skills",
   propose_skill: "The user's skills",
+  update_skill: "The user's skills",
 };
 
 // A skill is the user's own guidance, but its text may come from anywhere (an upload), so

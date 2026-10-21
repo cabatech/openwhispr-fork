@@ -15,7 +15,12 @@ import {
   registerConnectorTools,
   type ConnectorToolSettings,
 } from "./connectors/connectorToolModules";
-import { createLoadSkillTool, createProposeSkillTool, type SkillToolDeps } from "./skillTools";
+import {
+  createLoadSkillTool,
+  createProposeSkillTool,
+  createUpdateSkillTool,
+  type SkillToolDeps,
+} from "./skillTools";
 import type { ContainerScope } from "../../types/chat";
 
 export { ToolRegistry } from "./ToolRegistry";
@@ -72,7 +77,10 @@ export function createToolRegistry(settings: ToolRegistrySettings): ToolRegistry
   if (settings.connectors) registerConnectorTools(registry, settings.connectors);
 
   if (settings.skills) {
-    if (settings.skills.usable.length > 0) registry.register(createLoadSkillTool(settings.skills));
+    if (settings.skills.usable.length > 0) {
+      registry.register(createLoadSkillTool(settings.skills));
+      registry.register(createUpdateSkillTool(settings.skills.usable));
+    }
     // A skill card writes only on this computer, so it needs no sign-in, plan or connector.
     registry.register(createProposeSkillTool());
   }

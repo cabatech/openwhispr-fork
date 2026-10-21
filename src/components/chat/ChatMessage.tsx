@@ -27,7 +27,7 @@ import { useSkillApprovalStore } from "../../stores/skillApprovalStore";
 
 // Their card stands in for their step: once the call is over, a call that showed no card
 // (the proposal went back to the model to fix) leaves nothing behind.
-const SKILL_CARD_TOOLS = new Set(["propose_skill"]);
+const SKILL_CARD_TOOLS = new Set(["propose_skill", "update_skill"]);
 
 interface ChatMessageProps {
   messageId: string;

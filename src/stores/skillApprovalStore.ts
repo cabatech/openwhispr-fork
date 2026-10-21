@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { ToolExecutionContext } from "../services/tools/ToolRegistry";
-import type { SkillProposal } from "../types/skills";
+import type { SkillProposal, SkillUpdate } from "../types/skills";
 import { APPROVAL_TTL_MS, approvalKey } from "./connectorApprovalStore";
 import { playSkillIcon } from "./skillsStore";
 
@@ -10,24 +10,51 @@ import { playSkillIcon } from "./skillsStore";
 export type SkillApprovalState =
   "pending" | "saving" | "saved" | "failed" | "skipped" | "not_saved" | "undone";
 
-export interface SkillApprovalEntry {
+interface SkillApprovalBase {
   /** approvalKey(messageId, toolCallId). */
   key: string;
   messageId: string;
   toolCallId: string;
-  kind: "create";
   /** The folder it writes. */
   name: string;
+  state: SkillApprovalState;
+  /** The copy Undo restores, after a save that replaced a skill's folder. */
+  versionId?: string;
+}
+
+/** A new skill. One named like a skill the user has updates it. */
+export interface SkillCreateApproval extends SkillApprovalBase {
+  kind: "create";
   /** A skill already has this name, so saving updates it. */
   replacesExisting?: boolean;
   /** What Save writes; Edit changes it. */
   draft: SkillProposal;
   /** As proposed, to tell the model whether the user edited it. */
   original: SkillProposal;
-  state: SkillApprovalState;
-  /** The copy Undo restores, after a save that replaced a skill. */
-  versionId?: string;
 }
+
+/** A change to one of the user's skills. */
+export interface SkillUpdateApproval extends SkillApprovalBase {
+  kind: "update";
+  displayName: string;
+  draft: SkillUpdate;
+  original: SkillUpdate;
+  /** The skill's text before the change, for the diff. */
+  current: { description: string; instructions: string; files: Record<string, string> };
+  /** One line: what changes and why. */
+  intent: string;
+  removals: string[];
+  learnedFrom: { title: string; createdAt: string } | null;
+}
+
+export type SkillApprovalEntry = SkillCreateApproval | SkillUpdateApproval;
+
+type SkillApprovalRequest =
+  | Pick<SkillCreateApproval, "kind" | "name" | "replacesExisting" | "draft">
+  | Pick<
+      SkillUpdateApproval,
+      "kind" | "name" | "displayName" | "draft" | "current" | "intent" | "removals" | "learnedFrom"
+    >;
 
 export type SkillApprovalOutcome =
   | { state: "saved"; name: string; edited: boolean }
@@ -48,36 +75,32 @@ interface PendingResolution {
 // Promise resolvers stay outside zustand state: they are not renderable.
 const resolutions = new Map<string, PendingResolution>();
 
-const copyProposal = (proposal: SkillProposal): SkillProposal => ({
-  ...proposal,
-  files: proposal.files.map((file) => ({ ...file })),
+// The draft and the original are copies, so an edit never reaches back into the request.
+const copyDraft = <T extends SkillProposal | SkillUpdate>(draft: T): T => ({
+  ...draft,
+  files: draft.files.map((file) => ({ ...file })),
 });
-
-function proposalEdited(draft: SkillProposal, original: SkillProposal): boolean {
-  return (
-    draft.title !== original.title ||
-    draft.description !== original.description ||
-    draft.instructions !== original.instructions ||
-    JSON.stringify(draft.files) !== JSON.stringify(original.files)
-  );
-}
 
 function entryFor(key: string): SkillApprovalEntry | undefined {
   return useSkillApprovalStore.getState().entries[key];
 }
 
-function patchEntry(key: string, patch: Partial<SkillApprovalEntry>): void {
+function patchEntry(
+  key: string,
+  patch: Partial<SkillApprovalBase> | { draft: SkillProposal | SkillUpdate }
+): void {
   useSkillApprovalStore.setState((state) => {
     const entry = state.entries[key];
     if (!entry) return state;
-    return { entries: { ...state.entries, [key]: { ...entry, ...patch } } };
+    // A patch keeps the entry's kind: a draft is only ever replaced by its own kind.
+    return { entries: { ...state.entries, [key]: { ...entry, ...patch } as SkillApprovalEntry } };
   });
 }
 
 function settle(
   key: string,
   outcome: SkillApprovalOutcome,
-  patch: Partial<SkillApprovalEntry>
+  patch: Partial<SkillApprovalBase>
 ): void {
   const pending = resolutions.get(key);
   if (!pending) return;
@@ -97,7 +120,7 @@ function withdraw(key: string, reason: "conversation_ended" | "expired"): void {
 
 export function requestSkillApproval(
   context: ToolExecutionContext,
-  request: Pick<SkillApprovalEntry, "kind" | "name" | "replacesExisting" | "draft">
+  request: SkillApprovalRequest
 ): Promise<SkillApprovalOutcome> {
   const { messageId, toolCallId, signal } = context;
   const key = approvalKey(messageId, toolCallId);
@@ -115,28 +138,27 @@ export function requestSkillApproval(
       timer,
       detach: () => signal.removeEventListener("abort", onAbort),
     });
-    useSkillApprovalStore.setState((state) => ({
-      entries: {
-        ...state.entries,
-        [key]: {
-          key,
-          messageId,
-          toolCallId,
-          ...request,
-          draft: copyProposal(request.draft),
-          original: copyProposal(request.draft),
-          state: "pending",
-        },
-      },
-    }));
+    const entry = {
+      key,
+      messageId,
+      toolCallId,
+      ...request,
+      draft: copyDraft(request.draft),
+      original: copyDraft(request.draft),
+      state: "pending",
+    } as SkillApprovalEntry;
+    useSkillApprovalStore.setState((state) => ({ entries: { ...state.entries, [key]: entry } }));
     context.onApprovalRequested();
   });
 }
 
-export function updateSkillDraft(key: string, patch: Partial<SkillProposal>): void {
+export function updateSkillDraft(
+  key: string,
+  patch: Partial<SkillProposal> | Partial<SkillUpdate>
+): void {
   const entry = entryFor(key);
   if (!entry || entry.state !== "pending") return;
-  patchEntry(key, { draft: { ...entry.draft, ...patch } });
+  patchEntry(key, { draft: { ...entry.draft, ...patch } as SkillProposal | SkillUpdate });
 }
 
 // Save writes the draft the card shows, edits included, and main checks it again first.
@@ -144,15 +166,20 @@ export async function saveSkillApproval(key: string): Promise<void> {
   const entry = entryFor(key);
   if (!entry || entry.state !== "pending") return;
   patchEntry(key, { state: "saving" });
-  const result = await window.electronAPI?.skillsSaveProposal?.(entry.draft).catch(() => null);
+  const saving =
+    entry.kind === "update"
+      ? window.electronAPI?.skillsApplyUpdate?.(entry.draft)
+      : window.electronAPI?.skillsSaveProposal?.(entry.draft);
+  const result = await saving?.catch(() => null);
   if (!result?.ok) {
     settle(key, { state: "failed" }, { state: "failed" });
     return;
   }
-  playSkillIcon(result.name);
+  if (entry.kind === "create") playSkillIcon(result.name);
+  const edited = JSON.stringify(entry.draft) !== JSON.stringify(entry.original);
   settle(
     key,
-    { state: "saved", name: result.name, edited: proposalEdited(entry.draft, entry.original) },
+    { state: "saved", name: result.name, edited },
     { state: "saved", name: result.name, versionId: result.versionId }
   );
 }

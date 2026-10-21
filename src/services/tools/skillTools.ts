@@ -1,6 +1,12 @@
 import { buildSkillBlock, buildSkillFileBlock } from "../../utils/skillContext";
 import { requestSkillApproval, type SkillApprovalOutcome } from "../../stores/skillApprovalStore";
-import type { SkillForModel, SkillProposal, SkillRef, SkillSummary } from "../../types/skills";
+import type {
+  SkillForModel,
+  SkillProposal,
+  SkillRef,
+  SkillSummary,
+  SkillUpdate,
+} from "../../types/skills";
 import type { ToolDefinition, ToolResult } from "./ToolRegistry";
 
 const SKILL_CARD_SLOT = "skill_card";
@@ -81,6 +87,20 @@ export function createLoadSkillTool({
 
 const asText = (value: unknown): string => (typeof value === "string" ? value : "");
 
+const FILES_PARAMETER = {
+  type: "array",
+  maxItems: MAX_PROPOSAL_FILES,
+  items: {
+    type: "object",
+    properties: { path: { type: "string" }, content: { type: "string" } },
+    required: ["path", "content"],
+    additionalProperties: false,
+  },
+};
+
+const problemsText = (codes: string, tool: string): string =>
+  `Not proposed: ${codes}. Fix these and call ${tool} again. Don't mention them to the user.`;
+
 function proposedFiles(value: unknown): SkillProposal["files"] {
   if (!Array.isArray(value)) return [];
   return value
@@ -88,10 +108,10 @@ function proposedFiles(value: unknown): SkillProposal["files"] {
     .map((file: { path: string; content: string }) => ({ path: file.path, content: file.content }));
 }
 
-function outcomeText(outcome: SkillApprovalOutcome): string {
+function outcomeText(outcome: SkillApprovalOutcome, done: "Saved" | "Updated"): string {
   switch (outcome.state) {
     case "saved":
-      return `Saved the ${outcome.name} skill. Tell the user it's saved and how it's used.${
+      return `${done} the ${outcome.name} skill. Tell the user it's ${done.toLowerCase()} and how it's used.${
         outcome.edited ? " The user edited it before saving." : ""
       }`;
     case "skipped":
@@ -125,15 +145,8 @@ export function createProposeSkillTool(): ToolDefinition {
           description: "The skill's instructions, as short headed sections",
         },
         files: {
-          type: "array",
-          maxItems: MAX_PROPOSAL_FILES,
+          ...FILES_PARAMETER,
           description: "Optional files, such as references/examples.md",
-          items: {
-            type: "object",
-            properties: { path: { type: "string" }, content: { type: "string" } },
-            required: ["path", "content"],
-            additionalProperties: false,
-          },
         },
       },
       required: ["title", "description", "instructions"],
@@ -163,11 +176,7 @@ export function createProposeSkillTool(): ToolDefinition {
       if (check.problems.length > 0) {
         context.releaseTurnSlot(SKILL_CARD_SLOT);
         const codes = check.problems.map((problem) => problem.code).join(", ");
-        return {
-          success: true,
-          data: `Not proposed: ${codes}. Fix these and call propose_skill again. Don't mention them to the user.`,
-          displayText: "",
-        };
+        return { success: true, data: problemsText(codes, "propose_skill"), displayText: "" };
       }
       const outcome = await requestSkillApproval(context, {
         kind: "create",
@@ -176,7 +185,110 @@ export function createProposeSkillTool(): ToolDefinition {
         draft: proposal,
       });
       // The card stands in for the step, so the step has no text of its own.
-      return { success: true, data: outcomeText(outcome), displayText: "" };
+      return { success: true, data: outcomeText(outcome, "Saved"), displayText: "" };
+    },
+  };
+}
+
+// The text the card diffs against: the instructions, and each file the change touches.
+async function currentText(skill: SkillSummary, update: SkillUpdate) {
+  const read = (ref: SkillRef & { file?: string; withFiles?: boolean }) =>
+    window.electronAPI?.skillsReadForModel?.(ref).catch(() => null) ?? Promise.resolve(null);
+  const loaded = await read({ name: skill.name, withFiles: true });
+  if (!loaded) return null;
+  const files: Record<string, string> = {};
+  for (const { path } of update.files) {
+    const listed = loaded.files.find((file) => file.path === path);
+    // A file the change adds has no current text, and its diff is all additions.
+    if (!listed?.text) continue;
+    const content =
+      listed.content ??
+      (await read({ name: skill.name, file: path }))?.files.find((file) => file.path === path)
+        ?.content;
+    if (content !== undefined) files[path] = content;
+  }
+  return { description: skill.description, instructions: loaded.body, files };
+}
+
+async function learnedFromNote(id: unknown) {
+  if (typeof id !== "number" || !Number.isInteger(id)) return null;
+  const note = await window.electronAPI?.getNote?.(id).catch(() => null);
+  return note ? { title: note.title, createdAt: note.created_at } : null;
+}
+
+export function createUpdateSkillTool(usable: SkillSummary[]): ToolDefinition {
+  return {
+    name: "update_skill",
+    description:
+      "Propose one change to a user's skill. Combine every change for that skill into one call. The user approves it on a card; nothing changes before that.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          enum: usable.map((skill) => skill.name),
+          description: "The skill's name, exactly as listed",
+        },
+        intent: { type: "string", description: "One line: what changes and why" },
+        removals: {
+          type: "array",
+          maxItems: 5,
+          items: { type: "string" },
+          description: "What the change removes, in plain words",
+        },
+        learned_from_note_id: {
+          type: "integer",
+          description: "The note this change was learned from, if any",
+        },
+        description: { type: "string", description: "The new description, if it changes" },
+        instructions: { type: "string", description: "The full new instructions, if they change" },
+        files: { ...FILES_PARAMETER, description: "The full new text of each file it changes" },
+      },
+      required: ["name", "intent"],
+      additionalProperties: false,
+    },
+    readOnly: false,
+
+    async execute(args: Record<string, unknown>, context): Promise<ToolResult> {
+      if (!context) return failure("A skill can only be changed in a chat");
+      const skill = usable.find((entry) => entry.name === args.name);
+      if (!skill) return failure(`No skill named "${asText(args.name)}"`);
+      if (!context.claimTurnSlot(SKILL_CARD_SLOT, MAX_SKILL_CARDS_PER_ANSWER)) {
+        return failure("Only three skill cards per answer.");
+      }
+      const update: SkillUpdate = {
+        name: skill.name,
+        ...(typeof args.description === "string" ? { description: args.description } : {}),
+        ...(typeof args.instructions === "string" ? { instructions: args.instructions } : {}),
+        files: proposedFiles(args.files),
+      };
+      const [current, check] = await Promise.all([
+        currentText(skill, update),
+        window.electronAPI?.skillsCheckProposal?.({ kind: "update", update }).catch(() => null),
+      ]);
+      if (!current || !check || !("problems" in check)) {
+        context.releaseTurnSlot(SKILL_CARD_SLOT);
+        return failure(`The ${skill.name} skill couldn't be read`);
+      }
+      if (check.problems.length > 0) {
+        context.releaseTurnSlot(SKILL_CARD_SLOT);
+        const codes = check.problems.map((problem) => problem.code).join(", ");
+        return { success: true, data: problemsText(codes, "update_skill"), displayText: "" };
+      }
+      const removals = Array.isArray(args.removals)
+        ? args.removals.filter((removal): removal is string => typeof removal === "string")
+        : [];
+      const outcome = await requestSkillApproval(context, {
+        kind: "update",
+        name: skill.name,
+        displayName: skill.displayName,
+        draft: update,
+        current,
+        intent: asText(args.intent),
+        removals: removals.slice(0, 5),
+        learnedFrom: await learnedFromNote(args.learned_from_note_id),
+      });
+      return { success: true, data: outcomeText(outcome, "Updated"), displayText: "" };
     },
   };
 }

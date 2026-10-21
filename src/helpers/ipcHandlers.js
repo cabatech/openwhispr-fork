@@ -4407,8 +4407,9 @@ class IPCHandlers {
         errors.push(`Device setting files: ${e.message}`);
       }
       // "connectors" holds encrypted connector logins (Slack, Gmail), all
-      // revoked above. "skills" holds the user's assistant skills.
-      for (const directoryName of ["bin", "llama-cpp", "connectors", "skills"]) {
+      // revoked above. "skills" holds the user's assistant skills, and
+      // "skill-versions" the copies Undo restores.
+      for (const directoryName of ["bin", "llama-cpp", "connectors", "skills", "skill-versions"]) {
         try {
           fs.rmSync(path.join(app.getPath("userData"), directoryName), {
             recursive: true,

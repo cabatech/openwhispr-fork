@@ -4080,6 +4080,7 @@
       "update_noteStatus": "Updating note...",
       "load_skillStatus": "Loading skill…",
       "propose_skillStatus": "Preparing the skill…",
+      "update_skillStatus": "Preparing the change…",
       "copiedToClipboard": "Copied to your clipboard",
       "openNote": "Open note",
       "unknownTool": "Unknown tool: {{name}}",
@@ -4862,7 +4863,16 @@
       "undo": "Undo",
       "undone": "Undone. The skill is back as it was.",
       "failed": "Couldn't save the skill.",
-      "notSaved": "Nothing was saved."
+      "notSaved": "Nothing was saved.",
+      "updateHeader": "Update skill",
+      "removes": "Removes:",
+      "learnedFrom": "Learned from: {{title}} · {{date}}",
+      "today": "Today",
+      "seeChanges": "See exact changes",
+      "added": "Added:",
+      "removed": "Removed:",
+      "update": "Update skill",
+      "skippedUpdate": "Skipped. The skill wasn't changed."
     }
   },
   "notesView": {

@@ -31,15 +31,31 @@ function isModelRef(ref) {
   );
 }
 
+const isProposalFiles = (files) =>
+  Array.isArray(files) &&
+  files.every((file) => typeof file?.path === "string" && typeof file?.content === "string");
+
 function isProposal(proposal) {
   return (
     Boolean(proposal) &&
     ["title", "description", "instructions"].every((key) => typeof proposal[key] === "string") &&
-    Array.isArray(proposal.files) &&
-    proposal.files.every(
-      (file) => typeof file?.path === "string" && typeof file?.content === "string"
-    )
+    isProposalFiles(proposal.files)
   );
+}
+
+function isUpdate(update) {
+  return (
+    Boolean(update) &&
+    isSkillFolderName(update.name) &&
+    isOptional(update.description, "string") &&
+    isOptional(update.instructions, "string") &&
+    isProposalFiles(update.files)
+  );
+}
+
+function isProposalRequest(request) {
+  if (request?.kind === "create") return isProposal(request.proposal);
+  return request?.kind === "update" && isUpdate(request.update);
 }
 
 function writeErrorCode(error) {
@@ -146,8 +162,8 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
   );
 
   ipcMain.handle("skills-check-proposal", (_event, request) => {
-    if (request?.kind !== "create" || !isProposal(request.proposal)) return INVALID;
-    return library.checkProposal(request);
+    if (!isProposalRequest(request)) return INVALID;
+    return library.checkProposal(request) ?? INVALID;
   });
 
   ipcMain.handle("skills-save-proposal", (_event, proposal) => {
@@ -157,6 +173,28 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     } catch (error) {
       return { ok: false, error: writeErrorCode(error) };
     }
+  });
+
+  ipcMain.handle("skills-apply-update", (_event, update) => {
+    if (!isUpdate(update)) return INVALID;
+    try {
+      return saved(library.applyUpdate(update));
+    } catch (error) {
+      return { ok: false, error: writeErrorCode(error) };
+    }
+  });
+
+  ipcMain.handle("skills-undo", (_event, name, versionId) => {
+    if (!isSkillFolderName(name) || typeof versionId !== "string" || !/^\d+$/.test(versionId)) {
+      return INVALID;
+    }
+    try {
+      if (!library.undo(name, versionId)) return INVALID;
+    } catch (error) {
+      return { ok: false, error: writeErrorCode(error) };
+    }
+    changed();
+    return { ok: true };
   });
 
   // Bookkeeping, not a change to any skill, so the windows aren't told.

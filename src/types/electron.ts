@@ -45,6 +45,7 @@ import type {
   SkillRef,
   SkillSaveResult,
   SkillSummary,
+  SkillUpdate,
   SkillUploadItem,
   SkillUploadPreview,
   SkillWriteError,
@@ -1727,11 +1728,12 @@ declare global {
       skillsReadForModel?: (
         ref: SkillRef & { file?: string; withFiles?: boolean }
       ) => Promise<SkillForModel | null>;
-      skillsCheckProposal?: (request: {
-        kind: "create";
-        proposal: SkillProposal;
-      }) => Promise<SkillProposalCheck | SkillInvalidRequest>;
+      skillsCheckProposal?: (
+        request:
+          { kind: "create"; proposal: SkillProposal } | { kind: "update"; update: SkillUpdate }
+      ) => Promise<SkillProposalCheck | SkillInvalidRequest>;
       skillsSaveProposal?: (proposal: SkillProposal) => Promise<SkillSaveResult>;
+      skillsApplyUpdate?: (update: SkillUpdate) => Promise<SkillSaveResult>;
       skillsMarkUsed?: (name: string) => Promise<void>;
       /** Puts back the copy a save or update kept, then forgets it. */
       skillsUndo?: (

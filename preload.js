@@ -225,6 +225,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   skillsReadForModel: (ref) => ipcRenderer.invoke("skills-read-for-model", ref),
   skillsCheckProposal: (request) => ipcRenderer.invoke("skills-check-proposal", request),
   skillsSaveProposal: (proposal) => ipcRenderer.invoke("skills-save-proposal", proposal),
+  skillsApplyUpdate: (update) => ipcRenderer.invoke("skills-apply-update", update),
   skillsMarkUsed: (name) => ipcRenderer.invoke("skills-mark-used", name),
   skillsUndo: (name, versionId) => ipcRenderer.invoke("skills-undo", name, versionId),
   onSkillsChanged: (callback) => {

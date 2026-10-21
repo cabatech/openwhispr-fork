@@ -228,6 +228,39 @@ function buildSkillMarkdown({ name, title, description, instructions }) {
   ].join("\n");
 }
 
+// The lines of a SKILL.md and the index of its header's closing line.
+function headerLines(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const close = lines.findIndex((line, i) => i > 0 && /^(---|\.\.\.)\s*$/.test(line));
+  if (lines[0].replace(/^﻿/, "") !== "---" || close < 0) throw new Error("no header");
+  return { lines, close };
+}
+
+const lineEnding = (markdown) => (markdown.includes("\r\n") ? "\r\n" : "\n");
+
+/** Sets one top-level header key; every other line, line endings included, stays as it was. */
+function replaceFrontmatterValue(markdown, key, value) {
+  const { lines, close } = headerLines(markdown);
+  const start = lines.findIndex((line, i) => i > 0 && i < close && line.startsWith(`${key}:`));
+  const entry = `${key}: ${JSON.stringify(value)}`;
+  if (start < 0) {
+    lines.splice(close, 0, entry);
+  } else {
+    let end = start + 1; // the value's continuation lines are indented or blank
+    while (end < close && (/^\s/.test(lines[end]) || lines[end] === "")) end++;
+    lines.splice(start, end - start, entry);
+  }
+  return lines.join(lineEnding(markdown));
+}
+
+/** A new body under the header exactly as stored, in the file's own line ending. */
+function replaceSkillBody(markdown, body) {
+  const { lines, close } = headerLines(markdown);
+  return [...lines.slice(0, close + 1), "", ...body.trim().split(/\r?\n/), ""].join(
+    lineEnding(markdown)
+  );
+}
+
 function contentHash(files) {
   const hash = crypto.createHash("sha256");
   const sorted = [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
@@ -252,6 +285,8 @@ module.exports = {
   displayNameFor,
   slugifySkillName,
   buildSkillMarkdown,
+  replaceFrontmatterValue,
+  replaceSkillBody,
   isTextFile,
   isScriptPath,
   contentHash,
