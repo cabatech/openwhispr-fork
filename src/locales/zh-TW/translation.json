@@ -3918,6 +3918,9 @@
       "search_openwhispr_helpName": "搜尋 OpenWhispr 說明",
       "read_openwhispr_helpName": "閱讀 OpenWhispr 說明",
       "get_openwhispr_contextName": "讀取 OpenWhispr 設定",
+      "load_skillName": "載入技能",
+      "propose_skillName": "提議技能",
+      "update_skillName": "更新技能",
       "search_openwhispr_helpStatus": "正在搜尋 OpenWhispr 說明...",
       "read_openwhispr_helpStatus": "正在閱讀 OpenWhispr 說明...",
       "get_openwhispr_contextStatus": "正在讀取 OpenWhispr 設定..."

@@ -3918,6 +3918,9 @@
       "search_openwhispr_helpName": "OpenWhisprのヘルプを検索",
       "read_openwhispr_helpName": "OpenWhisprのヘルプを読む",
       "get_openwhispr_contextName": "OpenWhisprの設定を読む",
+      "load_skillName": "スキルを読み込み",
+      "propose_skillName": "スキルを提案",
+      "update_skillName": "スキルを更新",
       "search_openwhispr_helpStatus": "OpenWhisprのヘルプを検索中...",
       "read_openwhispr_helpStatus": "OpenWhisprのヘルプを読み込み中...",
       "get_openwhispr_contextStatus": "OpenWhisprの設定を読み込み中..."

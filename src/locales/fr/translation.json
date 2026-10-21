@@ -4088,6 +4088,9 @@
       "search_openwhispr_helpName": "Rechercher dans l’aide OpenWhispr",
       "read_openwhispr_helpName": "Lire l’aide OpenWhispr",
       "get_openwhispr_contextName": "Lire les paramètres OpenWhispr",
+      "load_skillName": "Charger une compétence",
+      "propose_skillName": "Proposer une compétence",
+      "update_skillName": "Mettre à jour une compétence",
       "search_openwhispr_helpStatus": "Recherche dans l’aide OpenWhispr...",
       "read_openwhispr_helpStatus": "Lecture de l’aide OpenWhispr...",
       "get_openwhispr_contextStatus": "Lecture des paramètres OpenWhispr..."

@@ -4088,6 +4088,9 @@
       "search_openwhispr_helpName": "OpenWhispr-Hilfe suchen",
       "read_openwhispr_helpName": "OpenWhispr-Hilfe lesen",
       "get_openwhispr_contextName": "OpenWhispr-Einstellungen lesen",
+      "load_skillName": "Skill laden",
+      "propose_skillName": "Skill vorschlagen",
+      "update_skillName": "Skill aktualisieren",
       "search_openwhispr_helpStatus": "OpenWhispr-Hilfe wird durchsucht...",
       "read_openwhispr_helpStatus": "OpenWhispr-Hilfe wird gelesen...",
       "get_openwhispr_contextStatus": "OpenWhispr-Einstellungen werden gelesen..."

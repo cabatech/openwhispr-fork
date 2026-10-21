@@ -3918,6 +3918,9 @@
       "search_openwhispr_helpName": "Cerca nella guida di OpenWhispr",
       "read_openwhispr_helpName": "Leggi la guida di OpenWhispr",
       "get_openwhispr_contextName": "Leggi le impostazioni di OpenWhispr",
+      "load_skillName": "Carica skill",
+      "propose_skillName": "Proponi skill",
+      "update_skillName": "Aggiorna skill",
       "search_openwhispr_helpStatus": "Ricerca nella guida di OpenWhispr...",
       "read_openwhispr_helpStatus": "Lettura della guida di OpenWhispr...",
       "get_openwhispr_contextStatus": "Lettura delle impostazioni di OpenWhispr..."

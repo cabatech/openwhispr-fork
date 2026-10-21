@@ -3970,6 +3970,9 @@
       "search_openwhispr_helpName": "Buscar ayuda de OpenWhispr",
       "read_openwhispr_helpName": "Leer ayuda de OpenWhispr",
       "get_openwhispr_contextName": "Leer ajustes de OpenWhispr",
+      "load_skillName": "Cargar habilidad",
+      "propose_skillName": "Proponer habilidad",
+      "update_skillName": "Actualizar habilidad",
       "search_openwhispr_helpStatus": "Buscando en la ayuda de OpenWhispr...",
       "read_openwhispr_helpStatus": "Leyendo la ayuda de OpenWhispr...",
       "get_openwhispr_contextStatus": "Leyendo los ajustes de OpenWhispr..."

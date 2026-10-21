@@ -2024,6 +2024,9 @@
       "search_openwhispr_helpName": "البحث في مساعدة OpenWhispr",
       "read_openwhispr_helpName": "قراءة مساعدة OpenWhispr",
       "get_openwhispr_contextName": "قراءة إعدادات OpenWhispr",
+      "load_skillName": "تحميل مهارة",
+      "propose_skillName": "اقتراح مهارة",
+      "update_skillName": "تحديث المهارة",
       "search_openwhispr_helpStatus": "جاري البحث في مساعدة OpenWhispr...",
       "read_openwhispr_helpStatus": "جاري قراءة مساعدة OpenWhispr...",
       "get_openwhispr_contextStatus": "جاري قراءة إعدادات OpenWhispr..."

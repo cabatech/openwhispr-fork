@@ -3962,6 +3962,9 @@
       "search_openwhispr_helpName": "Поиск справки OpenWhispr",
       "read_openwhispr_helpName": "Чтение справки OpenWhispr",
       "get_openwhispr_contextName": "Чтение настроек OpenWhispr",
+      "load_skillName": "Загрузить навык",
+      "propose_skillName": "Предложить навык",
+      "update_skillName": "Обновить навык",
       "search_openwhispr_helpStatus": "Поиск в справке OpenWhispr...",
       "read_openwhispr_helpStatus": "Чтение справки OpenWhispr...",
       "get_openwhispr_contextStatus": "Чтение настроек OpenWhispr..."
