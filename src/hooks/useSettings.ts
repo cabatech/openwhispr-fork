@@ -111,6 +111,8 @@ export interface PrivacySettings {
   telemetryEnabled: boolean;
   audioRetentionDays: number;
   transcriptRetentionDays: number;
+  chatRetentionDays: number;
+  meetingTranscriptRetentionDays: number;
   dataRetentionEnabled: boolean;
   saveDiscardedTranscriptions: boolean;
 }
@@ -196,7 +198,13 @@ function useSettingsInternal() {
   }, []);
 
   // Retention periods are enforced by the main process cleanup sweep
-  const { audioRetentionDays, transcriptRetentionDays, dataRetentionEnabled } = store;
+  const {
+    audioRetentionDays,
+    transcriptRetentionDays,
+    chatRetentionDays,
+    meetingTranscriptRetentionDays,
+    dataRetentionEnabled,
+  } = store;
   const enforcedAudioRetentionDays = usePolicyStore((policyState) =>
     effectiveAudioRetentionDays(policyState, audioRetentionDays)
   );
@@ -212,12 +220,16 @@ function useSettingsInternal() {
     window.electronAPI?.syncRetentionSettings?.({
       audioRetentionDays: enforcedAudioRetentionDays,
       transcriptRetentionDays,
+      chatRetentionDays,
+      meetingTranscriptRetentionDays,
       dataRetentionEnabled: enforcedDataRetentionEnabled,
       localHistoryPolicyResolved,
     });
   }, [
     enforcedAudioRetentionDays,
     transcriptRetentionDays,
+    chatRetentionDays,
+    meetingTranscriptRetentionDays,
     enforcedDataRetentionEnabled,
     localHistoryPolicyResolved,
   ]);
@@ -457,6 +469,10 @@ function useSettingsInternal() {
     setAudioRetentionDays: store.setAudioRetentionDays,
     transcriptRetentionDays: store.transcriptRetentionDays,
     setTranscriptRetentionDays: store.setTranscriptRetentionDays,
+    chatRetentionDays: store.chatRetentionDays,
+    setChatRetentionDays: store.setChatRetentionDays,
+    meetingTranscriptRetentionDays: store.meetingTranscriptRetentionDays,
+    setMeetingTranscriptRetentionDays: store.setMeetingTranscriptRetentionDays,
     dataRetentionEnabled: store.dataRetentionEnabled,
     setDataRetentionEnabled: store.setDataRetentionEnabled,
     saveDiscardedTranscriptions: store.saveDiscardedTranscriptions,

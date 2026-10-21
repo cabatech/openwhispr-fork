@@ -1630,6 +1630,8 @@ declare global {
       syncRetentionSettings?: (settings: {
         audioRetentionDays: number;
         transcriptRetentionDays: number;
+        chatRetentionDays: number;
+        meetingTranscriptRetentionDays: number;
         dataRetentionEnabled: boolean;
         localHistoryPolicyResolved: boolean;
       }) => void;
