@@ -195,3 +195,31 @@ test("marking a skill used stamps its last use", (t) => {
 
   assert.match(library.scan()[0].lastUsedAt, /^2026-10-20T/);
 });
+
+test("two proposals with non-Latin titles become two skills", (t) => {
+  const { library } = setup(t);
+
+  const first = library.saveProposal(proposal({ title: "会議の準備" }));
+  assert.deepEqual(check(library, { title: "メール返信" }).existing, false);
+  const second = library.saveProposal(proposal({ title: "メール返信" }));
+
+  assert.notEqual(second.name, first.name);
+  assert.equal(second.versionId, undefined, "nothing was replaced");
+  assert.deepEqual(library.scan().map((skill) => skill.displayName).sort(), [
+    "メール返信",
+    "会議の準備",
+  ]);
+});
+
+test("a title shown by one of the user's skills updates that skill", (t) => {
+  const { library } = setup(t);
+  library.create({ title: "Weekly recap", description: "Recaps.", instructions: "Old", files: [] });
+
+  // Its folder name alone is not enough: this title only shares the slug.
+  assert.deepEqual(check(library, { title: "Weekly-recap!" }).existing, false);
+  assert.deepEqual(check(library, { title: "weekly RECAP" }), {
+    name: "weekly-recap",
+    existing: true,
+    problems: [],
+  });
+});

@@ -561,9 +561,11 @@ class SkillLibrary {
 
   _proposedSkill({ title, description, instructions, files }) {
     const cleanTitle = title.trim();
-    // The title's own name, even when a skill has it: saving then updates that skill.
-    const name = slugifySkillName(cleanTitle, new Set());
-    const existing = this._exists(name);
+    // A title one of the user's skills shows updates that skill. Any other gets a folder of its
+    // own, as Create does: titles with no Latin letters all slug to the same fallback name.
+    const existingName = this._skillTitled(cleanTitle);
+    const name = existingName ?? slugifySkillName(cleanTitle, this._takenNames());
+    const existing = existingName !== null;
     const refuse = (problem) => ({ name, existing, problems: [problem], files: [] });
     if (!cleanTitle) return refuse({ code: "missingName" });
     const attachments = proposalFiles(files);
@@ -662,6 +664,11 @@ class SkillLibrary {
       throw writeError(error);
     }
     if (trash) this._removeQuietly(trash);
+  }
+
+  _skillTitled(title) {
+    const key = (text) => text.trim().replace(/\s+/g, " ").normalize("NFC").toLowerCase();
+    return this.scan().find((skill) => key(skill.displayName) === key(title))?.name ?? null;
   }
 
   _exists(name) {
