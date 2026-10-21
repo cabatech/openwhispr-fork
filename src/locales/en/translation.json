@@ -4873,6 +4873,12 @@
       "removed": "Removed:",
       "update": "Update skill",
       "skippedUpdate": "Skipped. The skill wasn't changed."
+    },
+    "code": {
+      "paste": "Paste into app",
+      "pasteNote": "Pastes without pressing Enter, so you choose when to run it.",
+      "pasted": "Pasted",
+      "pasteFailed": "Couldn't paste. The text is on your clipboard."
     }
   },
   "notesView": {

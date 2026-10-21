@@ -285,3 +285,87 @@ test("Accessibility settings opens the macOS system pane and reports launch fail
     error: "launch failed",
   });
 });
+
+test("raw paste skips smart spacing and AutoLearn", async (t) => {
+  const originalSetTimeout = global.setTimeout;
+  t.after(() => {
+    global.setTimeout = originalSetTimeout;
+    target._autoLearnEnabled = false;
+    target.textEditMonitor = null;
+  });
+  global.setTimeout = (callback) => {
+    callback();
+    return 1;
+  };
+  const monitored = [];
+  target._autoLearnEnabled = true;
+  target.textEditMonitor = {
+    lastTargetPid: 42,
+    activateTargetPid: async () => true,
+    startMonitoring: (...args) => monitored.push(args),
+  };
+  target.windowManager = { isOnboardingDemoActive: () => false };
+  const pastes = [];
+  target.clipboardManager = {
+    pasteText: async (text, options) => {
+      pastes.push({ text, options });
+    },
+  };
+
+  const result = await handlers.get("paste-text")({ sender: { id: 1 } }, "ls -la", { raw: true });
+
+  assert.deepEqual(result, { success: true, pasted: true });
+  assert.deepEqual(
+    pastes.map((paste) => paste.text),
+    ["ls -la"]
+  );
+  assert.equal("raw" in pastes[0].options, false, "the option stays in this handler");
+  assert.deepEqual(monitored, []);
+});
+
+test("a normal paste still adds its smart space", async () => {
+  target.windowManager = { isOnboardingDemoActive: () => false };
+  const pastes = [];
+  target.clipboardManager = {
+    pasteText: async (text) => {
+      pastes.push(text);
+    },
+  };
+
+  await handlers.get("paste-text")({ sender: { id: 1 } }, "ls -la");
+
+  assert.deepEqual(pastes, ["ls -la "]);
+});
+
+test("raw paste still hands focus back on Linux and Windows", async () => {
+  const original = Object.getOwnPropertyDescriptor(process, "platform");
+  try {
+    for (const [platform, expected] of [
+      ["linux", ["blur", "return", "paste ls -la"]],
+      ["win32", ["blur", "paste ls -la"]],
+    ]) {
+      Object.defineProperty(process, "platform", { value: platform, configurable: true });
+      const order = [];
+      target.windowManager = {
+        isOnboardingDemoActive: () => false,
+        mainWindow: {
+          isDestroyed: () => false,
+          isFocused: () => true,
+          blur: () => order.push("blur"),
+        },
+        returnLinuxKeyboardFocus: () => order.push("return"),
+      };
+      target.clipboardManager = {
+        pasteText: async (text) => {
+          order.push(`paste ${text}`);
+        },
+      };
+
+      await handlers.get("paste-text")({ sender: { id: 1 } }, "ls -la", { raw: true });
+
+      assert.deepEqual(order, expected, platform);
+    }
+  } finally {
+    Object.defineProperty(process, "platform", original);
+  }
+});

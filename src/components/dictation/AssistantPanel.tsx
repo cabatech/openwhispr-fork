@@ -6,6 +6,7 @@ import { HelpEvidence } from "../chat/GroundedHelpEvidence";
 import { extractHelpEvidence } from "../chat/helpEvidence";
 import { helpAnswerPlainText } from "../chat/helpEvidenceText";
 import { MarkdownRenderer } from "../ui/MarkdownRenderer";
+import { CodeBlockActions } from "../chat/CodeBlockActions";
 import { TechnicalErrorDetails } from "../ui/TechnicalErrorDetails";
 import { openProviderSettings } from "../../utils/describeProviderError";
 import { Button } from "../ui/button";
@@ -91,6 +92,8 @@ interface AssistantPanelProps {
 
 // Avoid reparsing Markdown when only the selection indicator changes.
 const StableAssistantMarkdown = memo(MarkdownRenderer);
+// The panel keeps the app it opened over as its paste target, so code can go straight there.
+const pasteCodeBlock = (code: string) => <CodeBlockActions code={code} paste />;
 
 export function AssistantPanel({
   pendingCommand,
@@ -538,6 +541,7 @@ export function AssistantPanel({
                 >
                   <StableAssistantMarkdown
                     content={displayedResponse}
+                    codeBlockActions={pasteCodeBlock}
                     className="text-[15px] leading-relaxed text-foreground selection:bg-agent-brand/35 selection:text-foreground [&_p]:text-[15px] [&_li]:text-[15px]"
                   />
                   {latestAssistantMessage?.isStreaming && (

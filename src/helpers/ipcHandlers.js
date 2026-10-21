@@ -3315,11 +3315,14 @@ class IPCHandlers {
         }
       }
 
+      // A raw paste (a command from a code block) lands exactly as given: no smart
+      // space, and no AutoLearn watching the user edit it.
+      const { raw, ...pasteOptions } = options ?? {};
       // Smart spacing (#856): append a trailing space so the next paste's leading
       // space self-corrects the gap. Reading the char before the cursor to space
       // the front instead would take a macOS Accessibility read costing hundreds
       // of ms — too slow for the paste hot path.
-      const textToPaste = applySmartSpacing(text);
+      const textToPaste = raw === true ? text : applySmartSpacing(text);
 
       // Windows: restore the foreground window captured at record start so the
       // paste lands in the field the user was dictating into, not wherever focus
@@ -3344,7 +3347,7 @@ class IPCHandlers {
       let pasteResult;
       try {
         pasteResult = await this.clipboardManager.pasteText(textToPaste, {
-          ...options,
+          ...pasteOptions,
           webContents: event.sender,
           targetWindow,
           silentAccessibilityCheck: true,
@@ -3367,7 +3370,7 @@ class IPCHandlers {
         targetPid,
         pasted,
       });
-      if (pasted && this.textEditMonitor && this._autoLearnEnabled) {
+      if (raw !== true && pasted && this.textEditMonitor && this._autoLearnEnabled) {
         setTimeout(() => {
           try {
             debugLogger.debug("[AutoLearn] Starting monitoring", {
