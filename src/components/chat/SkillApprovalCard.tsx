@@ -10,7 +10,6 @@ import { useTranslation } from "react-i18next";
 import { ChevronDown, Trash2 } from "../icons";
 import { cn } from "../lib/utils";
 import { Button } from "../ui/button";
-import { LineNumberedTextarea } from "../ui/LineNumberedTextarea";
 import { SkillIcon } from "../skills/SkillIcon";
 import { APPROVAL_CARD_CLASS } from "./ApprovalCard";
 import { useSkillChatActions } from "./skillChatActions";
@@ -30,6 +29,7 @@ import { formatShortDate, normalizeDbDate } from "../../utils/dateFormatting";
 
 const FIELD_CLASS = "w-full rounded-md border border-border/70 bg-background px-2 py-1";
 const INLINE_LINK_CLASS = "h-auto px-1.5 py-0";
+const EDITOR_CLASS = "min-h-24 font-mono text-[11px] leading-relaxed";
 const PREVIEW_CLASS =
   "mt-1.5 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-border/70 bg-background px-2.5 py-2 font-mono text-[11px] leading-relaxed text-foreground/85";
 
@@ -254,23 +254,29 @@ function UpdateSkillBody({
               onChange={(event) => updateSkillDraft(entry.key, { description: event.target.value })}
             />
           )}
+          {/* Text boxes that wrap: in the narrow card, a line-numbered editor's unwrapped
+              lines would scroll sideways. */}
           {draft.instructions !== undefined && (
-            <LineNumberedTextarea
+            <textarea
               id={`${editorId}-instructions`}
-              ariaLabel="SKILL.md"
-              minLines={4}
+              aria-label="SKILL.md"
+              className={cn(FIELD_CLASS, EDITOR_CLASS)}
+              dir="auto"
               value={draft.instructions}
-              onChange={(value) => updateSkillDraft(entry.key, { instructions: value })}
+              onChange={(event) =>
+                updateSkillDraft(entry.key, { instructions: event.target.value })
+              }
             />
           )}
           {draft.files.map((file, index) => (
-            <LineNumberedTextarea
+            <textarea
               key={file.path}
               id={`${editorId}-file-${index}`}
-              ariaLabel={file.path}
-              minLines={4}
+              aria-label={file.path}
+              className={cn(FIELD_CLASS, EDITOR_CLASS)}
+              dir="auto"
               value={file.content}
-              onChange={(value) => setFile(file.path, value)}
+              onChange={(event) => setFile(file.path, event.target.value)}
             />
           ))}
         </div>
@@ -324,7 +330,8 @@ export function SkillApprovalCard({ entry }: { entry: SkillApprovalEntry }): Rea
   // Esc while editing ends editing and keeps the draft. It must not reach the assistant
   // panel, whose Esc cancels the whole turn and withdraws the card.
   const onEditorKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key !== "Escape") return;
+    // An Esc that only ends an input method's composition stays with the text field.
+    if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
     event.preventDefault();
     event.stopPropagation();
     setEditing(false);
@@ -371,6 +378,9 @@ export function SkillApprovalCard({ entry }: { entry: SkillApprovalEntry }): Rea
               {t("skills.approval.undo")}
             </Button>
           </p>
+        )}
+        {entry.state === "saved" && entry.undoFailed && (
+          <p className="mt-1 text-destructive">{t("skills.approval.undoFailed")}</p>
         )}
         {entry.state === "saved" && !entry.versionId && (
           <p className="mt-2 text-foreground">

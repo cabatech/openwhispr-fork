@@ -4717,6 +4717,7 @@
       "undo": "撤销",
       "undone": "已撤销，技能已恢复原样。",
       "undoStale": "无法撤销，此后技能已被更改。",
+      "undoFailed": "无法撤销，请重试。",
       "failed": "无法保存技能。",
       "notSaved": "未保存任何内容。",
       "updateHeader": "更新技能",

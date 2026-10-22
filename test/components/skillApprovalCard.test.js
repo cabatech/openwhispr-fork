@@ -52,9 +52,10 @@ async function mountCard(
           calls.apply.push(update);
           return { ok: true, name: update.name, versionId: "1760950800000" };
         },
+        // A function answers each press in turn.
         skillsUndo: async (name, versionId) => {
           calls.undo.push([name, versionId]);
-          return undoResult;
+          return typeof undoResult === "function" ? undoResult() : undoResult;
         },
         // Where Save writes, as the card was told when it opened.
         skillsCheckProposal: async () => ({
@@ -267,6 +268,16 @@ test("Esc while editing stops editing and doesn't reach the panel", async (t) =>
   assert.equal(approvals.useSkillApprovalStore.getState().entries[key].state, "pending");
 });
 
+test("an Esc that ends text composition keeps editing", async (t) => {
+  const { buttonLabelled, fieldLabelled } = await mountCard(t);
+  await click(buttonLabelled("connectors.approval.edit"));
+  const name = fieldLabelled("skills.approval.nameLabel");
+
+  await React.act(async () => dispatch(name, "keydown", { key: "Escape", isComposing: true }));
+
+  assert.ok(fieldLabelled("skills.approval.nameLabel"), "still editing");
+});
+
 // ---- The Update card ----
 
 const OBJECTIONS = "references/objections.md";
@@ -378,4 +389,65 @@ test("Undo restores the previous version and says so", async (t) => {
 
   assert.deepEqual(calls.undo, [[UPDATE.name, "1760950800000"]]);
   assert.match(container.textContent, /skills\.approval\.undone/);
+});
+
+// Main refuses a second Undo of the same save, so pressing twice would end on "changed since".
+test("a second Undo press while one runs undoes once", async (t) => {
+  let finish;
+  const answers = [
+    new Promise((resolve) => {
+      finish = () => resolve({ ok: true });
+    }),
+    { ok: false, error: "invalid" },
+  ];
+  const { container, calls, buttonLabelled } = await mountCard(t, {
+    request: UPDATE,
+    undoResult: () => answers.shift(),
+  });
+  await click(buttonLabelled("skills.approval.update"));
+  await settle();
+
+  await click(buttonLabelled("skills.approval.undo"));
+  await click(buttonLabelled("skills.approval.undo"));
+  finish();
+  await settle();
+
+  assert.equal(calls.undo.length, 1);
+  assert.match(container.textContent, /skills\.approval\.undone/);
+});
+
+async function undoThatFails(t, undoResult) {
+  const { container, buttonLabelled } = await mountCard(t, { request: UPDATE, undoResult });
+  await click(buttonLabelled("skills.approval.update"));
+  await settle();
+
+  await click(buttonLabelled("skills.approval.undo"));
+  await settle();
+
+  assert.match(container.textContent, /skills\.approval\.undoFailed/);
+  assert.doesNotMatch(container.textContent, /skills\.approval\.undoStale/);
+  assert.ok(buttonLabelled("skills.approval.undo"), "Undo is offered again");
+}
+
+test("an Undo that can't be written says so and can be tried again", async (t) => {
+  await undoThatFails(t, { ok: false, error: "noSpace" });
+});
+
+test("an Undo whose request fails says so and can be tried again", async (t) => {
+  await undoThatFails(t, () => Promise.reject(new Error("Error invoking remote method")));
+});
+
+// The card sits in a narrow panel, where a line that doesn't wrap scrolls sideways.
+test("the update card's editors wrap their lines", async (t) => {
+  const instructions = "## Steps\nAsk about budget and SSO.\n";
+  const { buttonLabelled, fieldLabelled } = await mountCard(t, {
+    request: { ...UPDATE, draft: { ...UPDATE.draft, instructions } },
+  });
+
+  await click(buttonLabelled("connectors.approval.edit"));
+
+  for (const field of ["SKILL.md", OBJECTIONS]) {
+    assert.equal(fieldLabelled(field).tagName, "TEXTAREA", field);
+    assert.notEqual(fieldLabelled(field).getAttribute("wrap"), "off", field);
+  }
 });

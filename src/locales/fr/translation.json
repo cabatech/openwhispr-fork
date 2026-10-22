@@ -4887,6 +4887,7 @@
       "undo": "Annuler",
       "undone": "Annulé. La compétence est revenue à son état précédent.",
       "undoStale": "Impossible d'annuler. La compétence a changé depuis.",
+      "undoFailed": "Impossible d'annuler. Réessayez.",
       "failed": "Impossible d'enregistrer la compétence.",
       "notSaved": "Rien n'a été enregistré.",
       "updateHeader": "Mettre à jour la compétence",

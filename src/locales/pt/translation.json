@@ -4717,6 +4717,7 @@
       "undo": "Desfazer",
       "undone": "Desfeito. A habilidade voltou a ser como era.",
       "undoStale": "Não foi possível desfazer. A habilidade mudou desde então.",
+      "undoFailed": "Não foi possível desfazer. Tente novamente.",
       "failed": "Não foi possível salvar a habilidade.",
       "notSaved": "Nada foi salvo.",
       "updateHeader": "Atualizar habilidade",

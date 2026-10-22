@@ -28,6 +28,8 @@ interface SkillApprovalBase {
   state: SkillApprovalState;
   /** The copy Undo restores, after a save that replaced a skill's folder. */
   versionId?: string;
+  /** The last Undo couldn't be written; the card says so and offers Undo again. */
+  undoFailed?: boolean;
   /** Why main refused the last Save; the card stays open so the user can fix it. */
   problems?: SkillIssue<SkillProblemCode>[];
 }
@@ -236,13 +238,25 @@ export function skipSkillApproval(key: string): void {
   settle(key, { state: "skipped" }, { state: "skipped" });
 }
 
+// Undos under way. Main refuses a second Undo of one save, so a second press would end on
+// "changed since" although the first one worked.
+const undoing = new Set<string>();
+
 /** Puts back the skill a save replaced; the tool call has already settled by then. */
 export async function undoSkillApproval(key: string): Promise<void> {
   const entry = entryFor(key);
-  if (!entry || entry.state !== "saved" || !entry.versionId) return;
-  const result = await window.electronAPI
-    ?.skillsUndo?.(entry.name, entry.versionId)
-    .catch(() => null);
-  // Main refuses once a later save changed the skill: undoing this one would lose that.
-  if (result) patchEntry(key, { state: result.ok ? "undone" : "changed_since" });
+  if (!entry || entry.state !== "saved" || !entry.versionId || undoing.has(key)) return;
+  undoing.add(key);
+  try {
+    const result = await window.electronAPI
+      ?.skillsUndo?.(entry.name, entry.versionId)
+      .catch(() => null);
+    if (result?.ok) patchEntry(key, { state: "undone" });
+    // Main refuses once a later save changed the skill: undoing this one would lose that.
+    else if (result?.error === "invalid") patchEntry(key, { state: "changed_since" });
+    // A write that failed leaves the save in place, so Undo can be tried again.
+    else patchEntry(key, { undoFailed: true });
+  } finally {
+    undoing.delete(key);
+  }
 }

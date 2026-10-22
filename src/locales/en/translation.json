@@ -4887,6 +4887,7 @@
       "undo": "Undo",
       "undone": "Undone. The skill is back as it was.",
       "undoStale": "Couldn't undo. The skill has changed since.",
+      "undoFailed": "Couldn't undo. Try again.",
       "failed": "Couldn't save the skill.",
       "notSaved": "Nothing was saved.",
       "updateHeader": "Update skill",
