@@ -16,13 +16,16 @@ const {
 const COPIED = "\uFEFF---\r\nname: x\r\n---\r\n";
 
 async function renderManage(t, { skills, api = {} }) {
-  const calls = { opened: [], back: 0, revealed: [], clipboard: [], switched: [] };
+  const calls = { opened: [], focusedAtOpen: [], back: 0, revealed: [], clipboard: [], switched: [] };
   const mounted = await mountSkillsComponent(t, {
     modulePath: "/components/skills/ManageSkillsScreen.tsx",
     exportName: "ManageSkillsScreen",
     skills,
     props: {
-      onOpenSkill: (name, confirmUninstall) => calls.opened.push([name, confirmUninstall]),
+      onOpenSkill: (name, confirmUninstall) => {
+        calls.opened.push([name, confirmUninstall]);
+        calls.focusedAtOpen.push(globalThis.document.activeElement);
+      },
       onBack: () => calls.back++,
     },
     api: {
@@ -157,6 +160,36 @@ test("a copy that fails says so", async (t) => {
     skills: [skill("recap")],
     api: {
       writeClipboard: async () => ({ success: false }),
+    },
+  });
+
+  await click(button(container, "skills.menu.copyMarkdown"));
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.copyFailed", variant: "destructive" }]);
+});
+
+// The pop-up returns focus to what had it when it opened, and a menu item goes away with its
+// menu, so the row's ⋯ button takes focus first.
+test("Uninstall from a row's menu leaves focus on that row's ⋯ button", async (t) => {
+  const { container, calls } = await renderManage(t, { skills: [skill("recap"), skill("notes")] });
+
+  await click(button(rowFor(container, "notes"), "skills.menu.uninstall"));
+
+  const more = findElement(rowFor(container, "notes"), (node) => {
+    return ariaLabel(node).startsWith("skills.detail.more");
+  });
+  assert.deepEqual(calls.opened, [["notes", true]]);
+  assert.equal(calls.focusedAtOpen[0] === more, true);
+});
+
+test("a copy whose skill can't be read says so", async (t) => {
+  const { container, toasts } = await renderManage(t, {
+    skills: [skill("recap")],
+    api: {
+      skillsGet: async () => {
+        throw new Error("Error invoking remote method 'skills-get'");
+      },
     },
   });
 

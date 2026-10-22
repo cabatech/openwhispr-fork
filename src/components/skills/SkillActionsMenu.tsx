@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import { useRef, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Copy, FolderOpen, MoreHorizontal, Trash2 } from "../icons";
 import { Button } from "../ui/button";
@@ -34,10 +34,12 @@ export function SkillActionsMenu({
   const { t } = useTranslation();
   const { toast } = useToast();
   const { copyText } = useCopyFeedback("");
+  const trigger = useRef<HTMLButtonElement>(null);
 
   // Copies SKILL.md exactly as it's stored, so it pastes into another app unchanged.
   const copyMarkdown = async () => {
-    const text = markdown ?? (await window.electronAPI?.skillsGet?.(skill.name))?.markdown;
+    const text =
+      markdown ?? (await window.electronAPI?.skillsGet?.(skill.name)?.catch(() => null))?.markdown;
     const copied = text !== undefined ? await copyText(text) : false;
     toast(
       copied
@@ -58,6 +60,7 @@ export function SkillActionsMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
+          ref={trigger}
           variant="ghost"
           size="sm"
           aria-label={t("skills.detail.more", { name: skill.displayName })}
@@ -79,7 +82,12 @@ export function SkillActionsMenu({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={onUninstall}
+              onSelect={() => {
+                // The pop-up this opens returns focus to what had it, and the item goes away
+                // with the menu, so the menu's button takes focus first.
+                trigger.current?.focus();
+                onUninstall();
+              }}
               className="text-xs gap-2 rounded-lg px-2.5 py-1.5 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
             >
               <Trash2 size={12} />
