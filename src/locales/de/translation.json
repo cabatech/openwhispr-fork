@@ -4849,7 +4849,7 @@
       },
       "decision-log": {
         "title": "Entscheidungsprotokoll",
-        "description": "Führt eine fortlaufende Liste der Entscheidungen aus meinen Meetings. Nutzen, wenn ich frage, was wir entschieden haben."
+        "description": "Findet die Entscheidungen in meinen Meeting-Notizen, jeweils mit Datum und Meeting. Nutzen, wenn ich frage, was wir entschieden haben."
       }
     }
   },

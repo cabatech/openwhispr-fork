@@ -4849,7 +4849,7 @@
       },
       "decision-log": {
         "title": "Journal des décisions",
-        "description": "Tient à jour la liste des décisions prises dans mes réunions. À utiliser quand je demande ce que nous avons décidé."
+        "description": "Retrouve les décisions dans les notes de mes réunions, avec la date et la réunion de chacune. À utiliser quand je demande ce que nous avons décidé."
       }
     }
   },

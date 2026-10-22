@@ -1,6 +1,6 @@
 ---
 name: decision-log
-description: "Keeps a running list of decisions from the user's meetings. Use when the user asks what was decided, or asks to log a decision."
+description: "Finds the decisions in the user's meeting notes, with the date and meeting of each. Use when the user asks what was decided."
 metadata:
   display_name: "Decision log"
 ---
@@ -11,7 +11,7 @@ Never re-argue a settled decision.
 
 ## When to use
 
-When the user asks what was decided about something, or asks to log a decision.
+When the user asks what was decided about something.
 
 ## Steps
 

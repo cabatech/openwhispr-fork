@@ -4849,7 +4849,7 @@
       },
       "decision-log": {
         "title": "Decision log",
-        "description": "Keeps a running list of decisions from my meetings. Use when I ask what we decided."
+        "description": "Finds the decisions in my meeting notes, with the date and meeting of each. Use when I ask what we decided."
       }
     }
   },

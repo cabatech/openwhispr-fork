@@ -4679,7 +4679,7 @@
       },
       "decision-log": {
         "title": "Registro de decisões",
-        "description": "Mantém uma lista atualizada das decisões das minhas reuniões. Use quando eu perguntar o que decidimos."
+        "description": "Encontra as decisões nas notas das minhas reuniões, com a data e a reunião de cada uma. Use quando eu perguntar o que decidimos."
       }
     }
   },
