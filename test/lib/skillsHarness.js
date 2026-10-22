@@ -52,6 +52,10 @@ const SKILLS_MOCKS = {
     }
     export const DropdownMenuSeparator = () => createElement("div", { role: "separator" });
   `,
+  // Each backup push a screen starts, so a test can count them.
+  "/services/syncAfterLocalWrite": `
+    export const syncAfterLocalWrite = (method) => globalThis.__skillPushes?.push(method);
+  `,
   "/ui/useToast": `
     export const useToast = () => ({ toast: (props) => globalThis.__skillToasts.push(props) });
   `,
@@ -175,6 +179,9 @@ async function mountSkillsComponent(
   const toasts = [];
   globalThis.__skillToasts = toasts;
   t.after(() => delete globalThis.__skillToasts);
+  const pushes = [];
+  globalThis.__skillPushes = pushes;
+  t.after(() => delete globalThis.__skillPushes);
   installBrowserGlobals(t, {
     window: {
       electronAPI: {
@@ -204,7 +211,7 @@ async function mountSkillsComponent(
     await React.act(async () => root.unmount());
     root = null;
   };
-  return { container, toasts, store, vite, unmount };
+  return { container, toasts, pushes, store, vite, unmount };
 }
 
 
