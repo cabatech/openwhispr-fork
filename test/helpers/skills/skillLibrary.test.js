@@ -316,6 +316,18 @@ test("one skill uploaded twice, the second replacing the first, is listed once",
   assert.match(readSkill(skillsDir, "weekly"), /description: Second\./);
 });
 
+test("a window's uploads are let go when it goes away, and no other window's", async (t) => {
+  const { library } = setup(t);
+  const [kept] = await library.previewUploads([markdownUpload("kept.md", skillText("kept"))], 1);
+  const [gone] = await library.previewUploads([markdownUpload("gone.md", skillText("gone"))], 2);
+
+  library.discardUploadsFrom(2);
+  const result = library.commitUploads({ tokens: [kept.token, gone.token], replace: [] });
+
+  assert.deepEqual(result.installed, ["kept"]);
+  assert.equal(result.failed.length, 1);
+});
+
 test("Replace keeps the skill's switch as it was", async (t) => {
   const { library } = setup(t);
   await upload(library, [markdownUpload("off.md", skillText("off", "Old."))]);

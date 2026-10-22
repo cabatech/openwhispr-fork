@@ -48,7 +48,13 @@ const invalid = (fileName, code) => ({
 // previewQueue answers each preview call in turn, for screens that take several drops.
 async function renderUpload(
   t,
-  { previews = [], previewQueue = null, commit = null, previewFails = false } = {}
+  {
+    previews = [],
+    previewQueue = null,
+    commit = null,
+    previewFails = false,
+    previewAnswered = null,
+  } = {}
 ) {
   const calls = { previewed: [], committed: [], discarded: [], done: [], back: 0 };
   const mounted = await mountSkillsComponent(t, {
@@ -59,6 +65,7 @@ async function renderUpload(
       skillsPreviewUpload: async (items) => {
         calls.previewed.push(items);
         if (previewFails) throw new Error("Error invoking remote method 'skills-preview-upload'");
+        await previewAnswered;
         return { items: previewQueue ? previewQueue.shift() : previews.slice(0, items.length) };
       },
       skillsCommitUpload: async (request) => {
@@ -165,6 +172,22 @@ test("leaving the screen frees the uploads it previewed", async (t) => {
   await unmount();
 
   assert.deepEqual(calls.discarded, [["token-a", "token-b"]]);
+});
+
+test("uploads previewed after the screen closed are let go too", async (t) => {
+  let answer;
+  const previewAnswered = new Promise((resolve) => (answer = resolve));
+  const { calls, drop, unmount } = await renderUpload(t, {
+    previews: [ready("late.zip", "late")],
+    previewAnswered,
+  });
+  await drop(fakeFile("late.zip"));
+
+  await unmount();
+  answer();
+  await settle();
+
+  assert.deepEqual(calls.discarded, [[], ["token-late"]]);
 });
 
 test("Upload can't be pressed again once it has saved", async (t) => {

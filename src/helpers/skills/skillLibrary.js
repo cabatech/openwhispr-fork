@@ -305,12 +305,13 @@ class SkillLibrary {
     }
   }
 
-  async previewUploads(items) {
+  // `owner` is the window previewing them, so they can be let go when it goes away.
+  async previewUploads(items, owner) {
     const batchNames = new Set();
     const previews = [];
     for (const item of items) {
       try {
-        previews.push(await this._previewUpload(item, batchNames));
+        previews.push(await this._previewUpload(item, batchNames, owner));
       } catch (error) {
         // Refused alone, so one file the reader can't handle doesn't hide the rest of the drop.
         debugLogger.warn(
@@ -351,9 +352,16 @@ class SkillLibrary {
     return { installed, failed };
   }
 
-  // A previewed upload is held until it installs or the screen that previewed it lets go.
+  // A previewed upload is held until it installs, or the screen or window that previewed it
+  // lets go.
   discardUploads(tokens) {
     for (const token of tokens) this.uploads.delete(token);
+  }
+
+  discardUploadsFrom(owner) {
+    for (const [token, upload] of this.uploads) {
+      if (upload.owner === owner) this.uploads.delete(token);
+    }
   }
 
   create({ title, description, instructions, files }) {
@@ -445,7 +453,7 @@ class SkillLibrary {
     return inspected;
   }
 
-  async _previewUpload({ fileName, data }, batchNames) {
+  async _previewUpload({ fileName, data }, batchNames, owner) {
     const refuse = (problems) => refusedUpload(fileName, problems);
     if (data.length > SKILL_LIMITS.maxBytes) return refuse([{ code: "tooLarge" }]);
     const extension = path.extname(fileName).toLowerCase();
@@ -473,6 +481,7 @@ class SkillLibrary {
       fileName,
       name: result.name,
       files,
+      owner,
     });
     return {
       fileName,

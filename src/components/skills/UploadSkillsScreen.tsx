@@ -46,6 +46,7 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
   const nextRowId = useRef(0);
   // Every upload this screen previewed; whatever didn't install is let go when it closes.
   const issued = useRef(new Set<string>());
+  const closed = useRef(false);
   const hintId = useId();
   const toInstall = rows.filter(willInstall);
 
@@ -71,7 +72,13 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
         ? await window.electronAPI?.skillsPreviewUpload?.(items)?.catch(() => null)
         : null;
     const previews = result && "items" in result ? result.items : [];
-    for (const preview of previews) if (preview.token) issued.current.add(preview.token);
+    const tokens = previews.flatMap((preview) => (preview.token ? [preview.token] : []));
+    // Previewed after the screen closed, so nothing here will install or free them.
+    if (closed.current) {
+      void window.electronAPI?.skillsDiscardUploads?.(tokens);
+      return;
+    }
+    for (const token of tokens) issued.current.add(token);
     let next = 0;
     const added = read.map((entry): UploadRow => ({
       id: nextRowId.current++,
@@ -97,8 +104,12 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
   };
 
   useEffect(() => {
+    closed.current = false;
     const held = issued.current;
-    return () => void window.electronAPI?.skillsDiscardUploads?.([...held]);
+    return () => {
+      closed.current = true;
+      void window.electronAPI?.skillsDiscardUploads?.([...held]);
+    };
   }, []);
 
   const choose = (id: number, choice?: UploadRow["choice"]) =>

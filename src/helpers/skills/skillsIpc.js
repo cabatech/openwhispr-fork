@@ -35,6 +35,25 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     return { ok: true, name: result.name };
   };
 
+  // A window's previewed uploads are let go when it closes, crashes or reloads, since the
+  // screen holding them can't let go then.
+  const owners = new Set();
+  const releaseWhenGone = (sender) => {
+    const { id } = sender;
+    if (owners.has(id)) return;
+    owners.add(id);
+    const release = () => library.discardUploadsFrom(id);
+    sender.once("destroyed", () => {
+      owners.delete(id);
+      release();
+    });
+    sender.on("render-process-gone", release);
+    // A main-frame navigation, such as a reload, replaces the renderer that held them.
+    sender.on("did-start-navigation", (details) => {
+      if (details?.isMainFrame && !details.isSameDocument) release();
+    });
+  };
+
   ipcMain.handle("skills-list", () => ({ skills: library.scan() }));
 
   ipcMain.handle("skills-get", (_event, name) =>
@@ -74,9 +93,10 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
 
   // Files cross as bytes and come back as one-time tokens, so what installs is exactly
   // what the user saw previewed.
-  ipcMain.handle("skills-preview-upload", async (_event, items) => {
+  ipcMain.handle("skills-preview-upload", async (event, items) => {
     if (!Array.isArray(items) || !items.every(isUploadItem)) return INVALID;
-    return { items: await library.previewUploads(items) };
+    releaseWhenGone(event.sender);
+    return { items: await library.previewUploads(items, event.sender.id) };
   });
 
   ipcMain.handle("skills-discard-uploads", (_event, tokens) => {
