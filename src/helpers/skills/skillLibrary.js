@@ -533,7 +533,7 @@ class SkillLibrary {
   _writeSkillFolder(name, files) {
     const staging = path.join(this.skillsDir, `.staging-${crypto.randomUUID()}`);
     const target = path.join(this.skillsDir, name);
-    let trash = null;
+    let movedAside = null;
     try {
       for (const file of files) {
         const destination = path.join(staging, ...file.path.split("/"));
@@ -541,19 +541,19 @@ class SkillLibrary {
         fs.writeFileSync(destination, file.data);
       }
       if (this._exists(name)) {
-        trash = path.join(this.skillsDir, `.replaced-${crypto.randomUUID()}-${name}`);
-        renameWithRetry(target, trash);
+        movedAside = path.join(this.skillsDir, `.replaced-${crypto.randomUUID()}-${name}`);
+        renameWithRetry(target, movedAside);
       }
       renameWithRetry(staging, target);
     } catch (error) {
       this._removeQuietly(staging);
-      if (trash && fs.existsSync(trash) && !this._exists(name)) {
+      if (movedAside && fs.existsSync(movedAside) && !this._exists(name)) {
         try {
-          renameWithRetry(trash, target);
+          renameWithRetry(movedAside, target);
         } catch (restoreError) {
           debugLogger.error(
             "Could not put a skill back after a failed write",
-            { name, trash, error: restoreError.message },
+            { name, movedAside, error: restoreError.message },
             "skills"
           );
         }
@@ -561,7 +561,16 @@ class SkillLibrary {
       debugLogger.error("Failed to write a skill", { name, error: error.message }, "skills");
       throw writeError(error);
     }
-    if (trash) this._removeQuietly(trash);
+    if (!movedAside) return;
+    // Renamed to trash first, so an old copy that can't be removed now is cleared when the
+    // library next opens, rather than put back as a replace cut short.
+    const trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
+    try {
+      renameWithRetry(movedAside, trash);
+      this._removeQuietly(trash);
+    } catch {
+      this._removeQuietly(movedAside);
+    }
   }
 
   _skillTitled(title) {

@@ -602,6 +602,25 @@ test("a replace that finished leaves no old copy once the library next opens", a
   );
 });
 
+test("a skill uninstalled after its replace left the old copy behind stays gone", async (t) => {
+  const { library, database, userDataDir, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
+  const newer = markdownUpload("b.md", skillText("keep", "New."));
+  const [preview] = await library.previewUploads([newer]);
+  // The old copy can't be removed for now, as when Windows holds one of its files.
+  t.mock.method(fs, "rmSync", () => {
+    throw Object.assign(new Error("busy"), { code: "EBUSY" });
+  });
+  library.commitUploads({ tokens: [preview.token], replace: ["keep"] });
+  t.mock.restoreAll();
+  library.uninstall("keep");
+
+  const reopened = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(reopened.scan(), []);
+  assert.deepEqual(listDir(skillsDir), []);
+});
+
 test("an uninstall or a write cut short leaves nothing once the library next opens", async (t) => {
   const { library, database, userDataDir, skillsDir } = setup(t);
   await upload(library, [markdownUpload("gone.md", skillText("gone"))]);
