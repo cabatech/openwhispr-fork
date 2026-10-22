@@ -213,6 +213,27 @@ test("a file that isn't a zip is refused", async () => {
   assert.deepEqual(await readSkillArchive(corrupt), refusal("unreadableArchive"));
 });
 
+test("an entry whose bytes don't match its checksum is refused", async () => {
+  for (const deflate of [false, true]) {
+    const result = await read([
+      { path: "SKILL.md", data: SKILL },
+      { path: "references/notes.md", data: "Notes", deflate, crc: 0xdeadbeef },
+    ]);
+    assert.deepEqual(result, refusal("unreadableArchive"), `deflate ${deflate}`);
+  }
+});
+
+// Each entry inflates its own bytes, so entries that share them would repeat that work.
+test("entries that share one stretch of data are refused", async () => {
+  const result = await read([
+    { path: "SKILL.md", data: SKILL },
+    { path: "assets/a.bin", data: Buffer.alloc(2000, 7) },
+    { path: "assets/b.bin", sharesDataOf: 1 },
+    { path: "assets/c.bin", sharesDataOf: 1 },
+  ]);
+  assert.deepEqual(result, refusal("unreadableArchive"));
+});
+
 test("file bytes come back unchanged", async () => {
   const logo = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1, 2, 254, 255]);
   const crlf = "---\r\nname: my-skill\r\ndescription: Does it.\r\n---\r\n\r\nSteps\r\n";

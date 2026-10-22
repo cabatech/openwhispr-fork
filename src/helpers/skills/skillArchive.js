@@ -1,3 +1,4 @@
+const zlib = require("zlib");
 const unzipper = require("unzipper");
 const { SKILL_LIMITS, WINDOWS_RESERVED_NAME } = require("./skillFormat");
 
@@ -66,7 +67,8 @@ function hasClashingPaths(paths) {
   return [...files].some((key) => folders.has(key));
 }
 
-// The central directory's sizes can lie, so the cap counts the bytes actually read.
+// The central directory's sizes and checksums can lie, so the cap counts the bytes actually
+// read and the checksum is checked against them.
 async function readCapped(entry, budget) {
   const chunks = [];
   let size = 0;
@@ -77,7 +79,9 @@ async function readCapped(entry, budget) {
     chunks.push(chunk);
   }
   budget.remaining -= size;
-  return Buffer.concat(chunks);
+  const data = Buffer.concat(chunks);
+  if (zlib.crc32(data) !== entry.crc32) throw new Error("The entry's checksum doesn't match");
+  return data;
 }
 
 function refuse(code) {
@@ -103,6 +107,10 @@ async function readSkillArchive(buffer, { limits: overrides } = {}) {
   const entries = directory.files.filter(
     (entry) => entry.type !== "Directory" && !isJunk(entry.path)
   );
+  // Each entry is inflated from its own stretch of the file, so entries that point at the
+  // same bytes would inflate them again and again.
+  const compressedBytes = entries.reduce((total, entry) => total + entry.compressedSize, 0);
+  if (compressedBytes > buffer.length) return refuse("unreadableArchive");
   if (entries.some((entry) => !isSafeArchivePath(entry.path))) return refuse("unsafePath");
   if (entries.some(isSymlinkEntry)) return refuse("symlink");
   const paths = entries.map((entry) => entry.path.replace(/^\.\//, ""));
