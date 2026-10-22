@@ -49,6 +49,8 @@ export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps)
   const [leaving, setLeaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Counts the drafts discarded or saved, so files still being read for one are dropped.
+  const draftsCleared = useRef(0);
   const controls = {
     name: useRef<HTMLInputElement>(null),
     description: useRef<HTMLTextAreaElement>(null),
@@ -100,13 +102,24 @@ export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps)
       sizes.set(key, file.size);
       return true;
     });
+    const startedFor = draftsCleared.current;
     const read = await Promise.all(
-      fitting.map(async (file) => ({
-        fileName: file.name,
-        data: new Uint8Array(await file.arrayBuffer()),
-      }))
+      fitting.map(async (file) => {
+        try {
+          return [{ fileName: file.name, data: new Uint8Array(await file.arrayBuffer()) }];
+        } catch {
+          // Moved or changed since it was picked; the others are still added.
+          toast({
+            title: file.name,
+            description: t("skills.problems.unreadableArchive"),
+            variant: "destructive",
+          });
+          return [];
+        }
+      })
     );
-    const added = new Map(read.map((file) => [fileKey(file.fileName), file] as const));
+    if (draftsCleared.current !== startedFor) return;
+    const added = new Map(read.flat().map((file) => [fileKey(file.fileName), file] as const));
     const current = currentDraft();
     setCreateDraft({
       ...current,
@@ -126,6 +139,7 @@ export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps)
   const requestLeave = () => (dirty ? setLeaving(true) : onBack());
 
   const discard = () => {
+    draftsCleared.current += 1;
     setCreateDraft(null);
     onBack();
   };
@@ -157,6 +171,7 @@ export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps)
     const result = await window.electronAPI?.skillsCreate?.(draft);
     setSaving(false);
     if (result?.ok) {
+      draftsCleared.current += 1;
       setCreateDraft(null);
       // Listed before going home, so its card is there to play and take focus.
       await refreshSkills();
