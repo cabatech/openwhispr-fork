@@ -14,7 +14,13 @@ import { SkillActionsMenu } from "./SkillActionsMenu";
 import { SkillTile } from "./SkillCards";
 import { problemKey, writeFailedToast } from "./skillCopy";
 
-function SkillFileRow({ skillName, file }: { skillName: string; file: SkillFileInfo }) {
+function SkillFileRow({
+  skillName,
+  file,
+}: {
+  skillName: string;
+  file: SkillFileInfo;
+}): ReactElement {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { copied, copyText, confirmCopied } = useCopyFeedback("");

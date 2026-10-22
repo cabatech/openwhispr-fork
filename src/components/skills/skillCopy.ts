@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { ToastProps } from "../ui/useToast";
 import type {
   SkillIssue,
   SkillProblemCode,
@@ -24,7 +25,7 @@ const WRITE_ERROR_REASONS: Partial<Record<SkillWriteError | "exists", string>> =
 };
 
 /** The toast for a save that failed, with its reason when there is one. */
-export function writeFailedToast(t: TFunction, error?: string) {
+export function writeFailedToast(t: TFunction, error?: string): ToastProps {
   const reason = error ? WRITE_ERROR_REASONS[error as keyof typeof WRITE_ERROR_REASONS] : undefined;
   return {
     title: t("skills.toasts.writeFailed"),

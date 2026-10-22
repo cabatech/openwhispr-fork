@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type ReactElement } from "react";
 import { SkillStack } from "../icons";
 import { cn } from "../lib/utils";
 import "../../styles/skill-icon.css";
@@ -10,7 +10,7 @@ interface SkillIconProps {
   playKey?: number;
 }
 
-export function SkillIcon({ size, className, playKey = 0 }: SkillIconProps) {
+export function SkillIcon({ size, className, playKey = 0 }: SkillIconProps): ReactElement {
   const mountedKey = useRef(playKey);
   const playing = playKey !== mountedKey.current;
   // A new key mounts a new svg, so its animation starts from the first frame.
