@@ -258,6 +258,24 @@ test("a file still being read when an empty draft is left doesn't come back", as
   assert.equal(store.useSkillsStore.getState().createDraft?.files.length ?? 0, 0);
 });
 
+// A half-written draft is kept when the screen is left, and so is a file still being read for it.
+test("a file still being read when a draft with text is left lands in that draft", async (t) => {
+  const { container, store, unmount } = await renderCreate(t);
+  await fill(container, { name: "Half done" });
+  const slow = slowFile("late.md");
+  await pick(container, [slow]);
+  await unmount();
+
+  await React.act(async () => slow.finishRead());
+  await settle();
+
+  const draft = store.useSkillsStore.getState().createDraft;
+  assert.deepEqual(
+    [draft.title, draft.files.map((file) => file.fileName)],
+    ["Half done", ["late.md"]]
+  );
+});
+
 test("a file still being read when the skill is created doesn't join the next draft", async (t) => {
   const { container, store } = await renderCreate(t);
   await fill(container, { name: "Weekly", description: "Recaps.", instructions: "Go" });
