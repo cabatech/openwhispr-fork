@@ -1,6 +1,5 @@
 import { useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge } from "../ui/badge";
 import { Breadcrumb } from "../ui/Breadcrumb";
 import { SettingsPanel } from "../ui/SettingsSection";
 import { Toggle } from "../ui/toggle";
@@ -78,9 +77,6 @@ export function ManageSkillsScreen({ onOpenSkill, onBack }: ManageSkillsScreenPr
                   </div>
                 </button>
                 {!skill.valid && <NeedsFixLabel />}
-                <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
-                  {t("skills.manage.personal")}
-                </Badge>
                 <SkillActionsMenu skill={skill} onUninstall={() => onOpenSkill(skill.name, true)} />
                 <Toggle
                   checked={skill.enabled && skill.valid}

@@ -4583,7 +4583,6 @@
     "manage": {
       "title": "Gestisci skill",
       "description": "Attiva o disattiva le skill, oppure rimuovi quelle che non usi. Ognuna è salvata su questo computer.",
-      "personal": "Personale",
       "noMatches": "Nessuna skill corrisponde a \"{{query}}\".",
       "none": "Ancora nessuna skill."
     },

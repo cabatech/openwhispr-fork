@@ -4635,7 +4635,6 @@
     "manage": {
       "title": "Gestionar habilidades",
       "description": "Activa o desactiva habilidades, o elimina las que no uses. Cada una se guarda en este equipo.",
-      "personal": "Personal",
       "noMatches": "Ninguna habilidad coincide con \"{{query}}\".",
       "none": "Aún no hay habilidades."
     },

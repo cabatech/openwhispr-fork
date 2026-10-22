@@ -4583,7 +4583,6 @@
     "manage": {
       "title": "Gerenciar habilidades",
       "description": "Ative ou desative habilidades, ou remova as que você não usa. Cada uma fica salva neste computador.",
-      "personal": "Pessoal",
       "noMatches": "Nenhuma habilidade corresponde a \"{{query}}\".",
       "none": "Nenhuma habilidade ainda."
     },

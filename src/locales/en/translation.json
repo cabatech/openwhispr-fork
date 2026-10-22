@@ -4753,7 +4753,6 @@
     "manage": {
       "title": "Manage skills",
       "description": "Turn skills on or off, or remove the ones you don't use. Each one is saved on this computer.",
-      "personal": "Personal",
       "noMatches": "No skills match \"{{query}}\".",
       "none": "No skills yet."
     },

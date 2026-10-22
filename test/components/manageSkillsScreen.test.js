@@ -58,7 +58,7 @@ const button = (root, text) =>
   findElement(root, (node) => node.tagName === "BUTTON" && label(node) === text);
 
 test(
-  "Manage lists every skill with its badge, menu and switch, and a row opens the detail",
+  "Manage lists every skill with its menu and switch, and a row opens the detail",
   async (t) => {
     const skills = [
       ...Array.from({ length: 7 }, (_, index) => skill(`skill-${index + 1}`)),
@@ -75,7 +75,8 @@ test(
 
     assert.equal(rows(container).length, 9);
     for (const row of rows(container)) {
-      assert.match(label(row), /skills\.manage\.personal/);
+      // Every skill here is the user's own, so no row carries a badge saying so.
+      assert.doesNotMatch(label(row), /skills\.manage\.personal/);
       assert.ok(findElement(row, (node) => ariaLabel(node).startsWith("skills.detail.more")));
     }
     const switchOf = (name) =>

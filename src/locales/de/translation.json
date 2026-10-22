@@ -4753,7 +4753,6 @@
     "manage": {
       "title": "Skills verwalten",
       "description": "Schalte Skills ein oder aus oder entferne die, die du nicht nutzt. Jeder wird auf diesem Computer gespeichert.",
-      "personal": "Persönlich",
       "noMatches": "Keine Skills passen zu „{{query}}“.",
       "none": "Noch keine Skills."
     },

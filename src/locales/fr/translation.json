@@ -4753,7 +4753,6 @@
     "manage": {
       "title": "Gérer les compétences",
       "description": "Activez ou désactivez des compétences, ou supprimez celles que vous n'utilisez pas. Chacune est enregistrée sur cet ordinateur.",
-      "personal": "Personnelle",
       "noMatches": "Aucune compétence ne correspond à « {{query}} ».",
       "none": "Aucune compétence pour l'instant."
     },

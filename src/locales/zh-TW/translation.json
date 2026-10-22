@@ -4583,7 +4583,6 @@
     "manage": {
       "title": "管理技能",
       "description": "開啟或關閉技能，或移除不用的技能。每個技能都儲存在這台電腦上。",
-      "personal": "個人",
       "noMatches": "沒有符合「{{query}}」的技能。",
       "none": "尚無技能。"
     },
