@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement, ReactNode, Ref } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLink, Sparkles } from "../icons";
 import { Button } from "../ui/button";
@@ -10,6 +10,7 @@ interface IntegrationsPaneProps {
   actions?: ReactNode;
   /** A trail above the title, for a screen opened from another one. */
   breadcrumb?: ReactNode;
+  headingRef?: Ref<HTMLHeadingElement>;
   children: ReactNode;
 }
 
@@ -20,6 +21,7 @@ export function IntegrationsPane({
   actions,
   docsUrl,
   breadcrumb,
+  headingRef,
   children,
 }: IntegrationsPaneProps): ReactElement {
   const { t } = useTranslation();
@@ -31,7 +33,7 @@ export function IntegrationsPane({
         <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
           <div className="flex-1 basis-60 min-w-0">
             {/* Focusable so a link that opens another section can move focus here. */}
-            <h2 tabIndex={-1} className="text-base text-foreground outline-none">
+            <h2 ref={headingRef} tabIndex={-1} className="text-base text-foreground outline-none">
               {title}
             </h2>
             <p className="text-xs text-muted-foreground/80 mt-1 leading-relaxed">{description}</p>

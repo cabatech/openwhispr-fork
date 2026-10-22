@@ -4635,7 +4635,7 @@
       "removedFromComputer": "Se eliminó de este equipo.",
       "copiedMarkdown": "Markdown copiado",
       "copyFailed": "No se pudo copiar",
-      "revealFailed": "No se encontró la carpeta de la habilidad",
+      "revealFailed": "No se pudo encontrar la carpeta de la habilidad",
       "writeFailed": "No se pudo guardar la habilidad",
       "writeFailedNoSpace": "Tu disco está lleno.",
       "writeFailedPermission": "OpenWhispr no puede escribir en su carpeta de habilidades.",
@@ -4715,6 +4715,7 @@
       "unreadableArchive": "No se puede abrir este archivo",
       "nameMismatch": "El nombre dentro de SKILL.md no coincide con su carpeta",
       "unreadable": "No se pueden leer los archivos de la habilidad",
+      "skillFileNotUtf8": "SKILL.md debe guardarse como texto UTF-8",
       "placeholder": "Primero reemplaza el marcador [TODO: …]",
       "nameTaken": "Ya tienes una habilidad llamada {{name}}"
     },
@@ -4728,7 +4729,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Tareas a Linear",
-        "description": "Extrae las tareas de una reunión y prepara borradores de incidencias de Linear para que los apruebes. Úsala después de una reunión cuando pida las tareas."
+        "description": "Extrae las tareas de una reunión y prepara borradores de incidencias de Linear para que yo los apruebe. Úsala después de una reunión cuando pida las tareas."
       },
       "meeting-summary-to-slack": {
         "title": "Resumen de reunión a Slack",

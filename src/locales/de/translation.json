@@ -4753,7 +4753,7 @@
       "removedFromComputer": "Von diesem Computer entfernt.",
       "copiedMarkdown": "Markdown kopiert",
       "copyFailed": "Kopieren fehlgeschlagen",
-      "revealFailed": "Ordner des Skills wurde nicht gefunden",
+      "revealFailed": "Ordner des Skills konnte nicht gefunden werden",
       "writeFailed": "Skill konnte nicht gespeichert werden",
       "writeFailedNoSpace": "Deine Festplatte ist voll.",
       "writeFailedPermission": "OpenWhispr kann nicht in seinen Skills-Ordner schreiben.",
@@ -4833,6 +4833,7 @@
       "unreadableArchive": "Diese Datei kann nicht geöffnet werden",
       "nameMismatch": "Der Name in SKILL.md passt nicht zu seinem Ordner",
       "unreadable": "Die Dateien des Skills können nicht gelesen werden",
+      "skillFileNotUtf8": "SKILL.md muss als UTF-8-Text gespeichert sein",
       "placeholder": "Ersetze zuerst den Platzhalter [TODO: …]",
       "nameTaken": "Du hast schon einen Skill namens {{name}}"
     },
@@ -4846,7 +4847,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Aufgaben nach Linear",
-        "description": "Zieht die Aufgaben aus einem Meeting und entwirft Linear-Issues, die du freigibst. Nutzen nach einem Meeting, wenn ich nach den Aufgaben frage."
+        "description": "Zieht die Aufgaben aus einem Meeting und entwirft Linear-Issues, die ich freigebe. Nutzen nach einem Meeting, wenn ich nach den Aufgaben frage."
       },
       "meeting-summary-to-slack": {
         "title": "Meeting-Zusammenfassung nach Slack",

@@ -49,11 +49,13 @@ export function SkillsPane({
   const root = useRef<HTMLDivElement>(null);
 
   // Opening the pane rereads the folder, as does a window focus while it shows, so a skill
-  // edited outside the app shows up.
+  // edited outside the app shows up. A list that never loaded has home's card with Retry, so
+  // only a reread that fails after a good one says so here.
   useEffect(() => {
     if (!active) return;
     void refreshSkills().then(() => {
-      if (useSkillsStore.getState().loadError) {
+      const { loaded, loadError } = useSkillsStore.getState();
+      if (loaded && loadError) {
         toast({ title: t("skills.toasts.loadFailed"), variant: "destructive" });
       }
     });

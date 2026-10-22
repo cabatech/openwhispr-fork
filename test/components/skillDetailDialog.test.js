@@ -320,6 +320,78 @@ test("an invalid skill's switch is off and disabled, and its problem is shown", 
   );
 });
 
+// The list still shows it as fine: its files were readable when the folder was last listed.
+test("a skill whose files can't be read says so, and its switch is off and disabled", async (t) => {
+  const summary = skill("meeting-prep");
+  const unreadable = { valid: false, problem: { code: "unreadable" }, markdown: "", files: [] };
+  const { container } = await openDetail(t, {
+    summary,
+    api: { skillsGet: async () => ({ ...summary, ...unreadable }) },
+  });
+
+  assert.equal(toggle(container).getAttribute("aria-checked"), "false");
+  assert.equal(toggle(container).getAttribute("disabled"), "");
+  assert.match(
+    label(dialog(container)),
+    /skills\.detail\.problem\{"reason":"skills\.problems\.unreadable"\}/
+  );
+});
+
+// As when the chat's Open skill opens it: the button pressed is gone, so the page had focus.
+test("a pop-up opened while the page had focus hands focus to the fallback when it closes", async (t) => {
+  let fallbacks = 0;
+  const { container } = await mountSkillsComponent(t, {
+    modulePath: "/components/skills/SkillDetailDialog.tsx",
+    exportName: "SkillDetailDialog",
+    skills: [skill("meeting-prep")],
+    api: { skillsGet: async (name) => ({ ...skill(name), markdown: MARKDOWN, files: [] }) },
+    wrap: (SkillDetailDialog) => {
+      const { body } = globalThis.document;
+      body.isConnected = true;
+      globalThis.document.activeElement = body;
+      function Harness() {
+        const [open, setOpen] = React.useState(true);
+        return React.createElement(SkillDetailDialog, {
+          name: "meeting-prep",
+          open,
+          onOpenChange: setOpen,
+          focusFallback: () => fallbacks++,
+        });
+      }
+      return React.createElement(Harness);
+    },
+  });
+
+  await pressEscape(dialog(container));
+
+  assert.equal(fallbacks, 1);
+});
+
+test("a reread that fails stops showing the earlier read", async (t) => {
+  let fails = false;
+  const summary = skill("meeting-prep");
+  const { container, store } = await openDetail(t, {
+    summary,
+    api: {
+      skillsGet: async (name) => {
+        if (fails) throw new Error("Error invoking remote method 'skills-get'");
+        return { ...summary, name, markdown: MARKDOWN, files: FILES };
+      },
+    },
+  });
+  const markdown = () =>
+    findElement(container, (node) => node.getAttribute("data-markdown") !== null);
+  assert.ok(markdown());
+
+  fails = true;
+  await React.act(async () =>
+    store.useSkillsStore.setState({ skills: [{ ...summary, updatedAt: "2026-10-22T10:00:00Z" }] })
+  );
+  await settle();
+
+  assert.equal(markdown(), null);
+});
+
 test("the reveal label follows the platform", async (t) => {
   installBrowserGlobals(t);
   const vite = await createRendererServer(t, { cachePrefix: "openwhispr-platform-label-test-" });

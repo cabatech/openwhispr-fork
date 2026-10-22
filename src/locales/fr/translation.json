@@ -4833,6 +4833,7 @@
       "unreadableArchive": "Impossible d'ouvrir ce fichier",
       "nameMismatch": "Le nom dans SKILL.md ne correspond pas à son dossier",
       "unreadable": "Les fichiers de la compétence sont illisibles",
+      "skillFileNotUtf8": "SKILL.md doit être enregistré en texte UTF-8",
       "placeholder": "Remplacez d'abord l'espace réservé [TODO: …]",
       "nameTaken": "Vous avez déjà une compétence nommée {{name}}"
     },
@@ -4846,7 +4847,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Actions vers Linear",
-        "description": "Extrait les actions d'une réunion et prépare des tickets Linear que vous approuvez. À utiliser après une réunion quand je demande les actions."
+        "description": "Extrait les actions d'une réunion et prépare des tickets Linear soumis à mon approbation. À utiliser après une réunion quand je demande les actions."
       },
       "meeting-summary-to-slack": {
         "title": "Résumé de réunion vers Slack",

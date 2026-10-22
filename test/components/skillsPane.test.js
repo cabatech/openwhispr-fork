@@ -65,8 +65,6 @@ test("Esc on a screen goes back, and focus returns to the See link that opened i
   assert.equal(focused(container) === buttonStarting(container, "skills.pane.seeOne"), true);
 });
 
-// The control that opened a screen is gone once it opens, so without this the keyboard
-// would be left on the page body, where Esc can't reach the pane.
 const searchBox = (container) =>
   find(container, (node) => node.tagName === "INPUT" && ariaLabel(node) === "skills.pane.search");
 
@@ -83,17 +81,21 @@ test("Esc in Manage's search clears it first, then goes back", async (t) => {
   assert.equal(label(heading(container)), "Skills");
 });
 
-test("an Esc that ends text composition doesn't leave the screen", async (t) => {
+test("an Esc that ends text composition neither clears the search nor leaves", async (t) => {
   const { container } = await renderPane(t, [skill("meeting-prep")]);
   await click(gear(container));
+  await typeInto(searchBox(container), "会議");
 
   await React.act(async () =>
     dispatch(searchBox(container), "keydown", { key: "Escape", isComposing: true })
   );
 
+  assert.equal(searchBox(container).value, "会議");
   assert.equal(label(heading(container)), "skills.manage.title");
 });
 
+// The control that opened a screen is gone once it opens, so without this the keyboard
+// would be left on the page body, where Esc can't reach the pane.
 test("a screen opens with focus on its heading, so Esc goes back from there", async (t) => {
   const { container } = await renderPane(t, [skill("meeting-prep")]);
   for (const [open, title] of [
@@ -285,4 +287,94 @@ test("Create keeps a half-written skill on Esc, and a saved one lands on home", 
   const card = find(container, (node) => ariaLabel(node).startsWith("skills.pane.cardLabel"));
   assert.equal(focused(container) === card, true);
   assert.deepEqual(store.useSkillsStore.getState().iconPlays, { "weekly-recap": 1 });
+});
+
+async function renderPaneWith(t, { skillsList, active = true }) {
+  let setActive;
+  const listeners = new Set();
+  const mounted = await mountSkillsComponent(t, {
+    modulePath: "/components/integrations/SkillsPane.tsx",
+    exportName: "SkillsPane",
+    skills: [],
+    api: { skillsList },
+    wrap: (SkillsPane) => {
+      // The window's focus listeners are kept here, so a test can focus the window.
+      const target = globalThis.window;
+      const { addEventListener, removeEventListener } = target;
+      target.addEventListener = (type, listener, options) =>
+        type === "focus"
+          ? listeners.add(listener)
+          : addEventListener?.call(target, type, listener, options);
+      target.removeEventListener = (type, listener, options) =>
+        type === "focus"
+          ? listeners.delete(listener)
+          : removeEventListener?.call(target, type, listener, options);
+      function Harness() {
+        const [shown, setShown] = React.useState(active);
+        setActive = setShown;
+        return React.createElement(SkillsPane, { title: "Skills", active: shown });
+      }
+      return React.createElement(Harness);
+    },
+  });
+  const focusWindow = async () => {
+    for (const listener of [...listeners]) listener();
+    await settle();
+  };
+  const show = (next) => React.act(async () => setActive(next));
+  return { ...mounted, focusWindow, show, listeners };
+}
+
+// Opening the pane reloads the list; a later failure keeps the last list, so a toast says so.
+test("a first load that fails shows its card alone, and a later one says so in a toast", async (t) => {
+  let fails = true;
+  const { container, toasts, show, store } = await renderPaneWith(t, {
+    active: false,
+    skillsList: async () => {
+      if (fails) throw new Error("Error invoking remote method 'skills-list'");
+      return { skills: [skill("recap")] };
+    },
+  });
+  await React.act(async () => store.useSkillsStore.setState({ skills: [], loaded: false }));
+  const reopen = async () => {
+    await show(false);
+    await show(true);
+    await settle();
+  };
+  await show(true);
+  await settle();
+  assert.match(label(container), /common\.retry/);
+  assert.deepEqual(toasts, []);
+
+  fails = false;
+  await reopen();
+  fails = true;
+  await reopen();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.loadFailed", variant: "destructive" }]);
+  assert.match(label(container), /recap/);
+});
+
+test("a window focus rereads the skills only while the pane shows", async (t) => {
+  let lists = 0;
+  const { focusWindow, show, listeners } = await renderPaneWith(t, {
+    active: false,
+    skillsList: async () => {
+      lists += 1;
+      return { skills: [] };
+    },
+  });
+  await focusWindow();
+  assert.equal(lists, 0);
+
+  await show(true);
+  await settle();
+  const opened = lists;
+  await focusWindow();
+  assert.equal(lists, opened + 1);
+
+  await show(false);
+  await focusWindow();
+  assert.equal(lists, opened + 1);
+  assert.equal(listeners.size, 0);
 });

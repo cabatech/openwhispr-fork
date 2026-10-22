@@ -52,6 +52,12 @@ function isSymlinkEntry(entry) {
   return ((entry.externalFileAttributes >>> 16) & 0o170000) === 0o120000;
 }
 
+// A size of 0xffffffff sends the reader to the entry's zip64 field. Without one the entry has
+// no size, and the reader would read it on to the end of the file.
+function hasSizes(entry) {
+  return Number.isFinite(entry.compressedSize) && Number.isFinite(entry.uncompressedSize);
+}
+
 // Paths a case-insensitive disk would write to the same place, or a file where a folder goes.
 function hasClashingPaths(paths) {
   const files = new Set();
@@ -108,6 +114,7 @@ async function readSkillArchive(buffer, { limits: overrides } = {}) {
   const entries = directory.files.filter(
     (entry) => entry.type !== "Directory" && !isJunk(entry.path)
   );
+  if (!entries.every(hasSizes)) return refuse("unreadableArchive");
   // Each entry is inflated from its own stretch of the file, so entries that point at the
   // same bytes would inflate them again and again.
   const compressedBytes = entries.reduce((total, entry) => total + entry.compressedSize, 0);

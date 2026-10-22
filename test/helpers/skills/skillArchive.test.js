@@ -183,6 +183,8 @@ test("a name this computer can't save is refused", async () => {
     "references/con.md",
     "references/COM1",
     "references/CONIN$",
+    "references/con .md",
+    "nul  .txt",
     "conout$.md",
     "lpt¹.txt",
     "a?.md",
@@ -242,6 +244,18 @@ test("entries that share one stretch of data are refused", async () => {
   assert.deepEqual(result, refusal("unreadableArchive"));
 });
 
+// Without the zip64 field its listing points at, an entry has no size to keep its read to
+// its own bytes, so entries could share data unnoticed.
+test("entries whose listed sizes point at a missing zip64 field are refused", async () => {
+  const result = await read([
+    { path: "SKILL.md", data: SKILL },
+    { path: "assets/a.bin", data: Buffer.alloc(2000, 7) },
+    { path: "assets/b.bin", sharesDataOf: 1, sizeInZip64: true },
+    { path: "assets/c.bin", sharesDataOf: 1, sizeInZip64: true },
+  ]);
+  assert.deepEqual(result, refusal("unreadableArchive"));
+});
+
 test("file bytes come back unchanged", async () => {
   const logo = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1, 2, 254, 255]);
   const crlf = "---\r\nname: my-skill\r\ndescription: Does it.\r\n---\r\n\r\nSteps\r\n";
@@ -261,4 +275,5 @@ test("archive paths are checked the way the folder will be written", () => {
   assert.equal(isSafeArchivePath(""), false);
   assert.equal(isSafeArchivePath("references/"), false);
   assert.equal(isSafeArchivePath('say"hi".md'), false);
+  assert.equal(isSafeArchivePath("references/con x.md"), true);
 });

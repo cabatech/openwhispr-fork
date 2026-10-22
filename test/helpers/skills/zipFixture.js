@@ -6,8 +6,10 @@ const MADE_BY_UNIX = (3 << 8) | 20;
 /**
  * Builds a zip in memory, so tests can make archives no zip tool would write: any raw
  * path, a Unix mode (a symlink), a declared size that understates the real data, a checksum
- * that doesn't match it, or an entry that points at an earlier entry's data.
- * Entries: { path, data = "", mode = 0o100644, declaredSize, deflate, crc, sharesDataOf }.
+ * that doesn't match it, an entry that points at an earlier entry's data, or a listing whose
+ * sizes point at a zip64 field the entry doesn't have.
+ * Entries: { path, data = "", mode = 0o100644, declaredSize, deflate, crc, sharesDataOf,
+ * sizeInZip64 }.
  */
 function buildZip(entries) {
   const parts = [];
@@ -48,8 +50,9 @@ function buildZip(entries) {
     central.writeUInt16LE(UTF8_NAMES, 8);
     central.writeUInt16LE(record.method, 10);
     central.writeUInt32LE(record.crc, 16);
-    central.writeUInt32LE(record.compressed, 20);
-    central.writeUInt32LE(record.size, 24);
+    // 0xffffffff sends a reader to the entry's zip64 field for its sizes.
+    central.writeUInt32LE(entry.sizeInZip64 ? 0xffffffff : record.compressed, 20);
+    central.writeUInt32LE(entry.sizeInZip64 ? 0xffffffff : record.size, 24);
     central.writeUInt16LE(name.length, 28);
     central.writeUInt32LE(((entry.mode ?? 0o100644) << 16) >>> 0, 38);
     central.writeUInt32LE(record.offset, 42);

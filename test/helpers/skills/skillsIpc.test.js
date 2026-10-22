@@ -129,6 +129,38 @@ test("a window that closes, crashes or reloads lets go of the uploads it preview
   ]);
 });
 
+// The tokens are made once the files are read, after a window that went away meanwhile
+// was told to let go.
+test("uploads a window was still reading when it closed or reloaded are let go once read", async () => {
+  const reload = { isMainFrame: true, isSameDocument: false };
+  for (const [what, goAway, discarded] of [
+    ["reload", (panel) => panel.emit("did-start-navigation", reload), [["late"]]],
+    ["close", (panel) => panel.emit("destroyed"), [["late"]]],
+    ["neither", () => {}, []],
+  ]) {
+    let finishReading;
+    const reading = new Promise((resolve) => {
+      finishReading = resolve;
+    });
+    const late = { fileName: "a.md", status: "ready", token: "late", problems: [], warnings: [] };
+    const { callAs, library } = setup({
+      previewUploads: async () => {
+        await reading;
+        return [late];
+      },
+    });
+    const panel = fakeSender(7);
+
+    const previewed = callAs(panel, "skills-preview-upload", [upload()]);
+    goAway(panel);
+    finishReading();
+
+    assert.deepEqual(await previewed, { items: [late] }, what);
+    const discards = library.calls.filter(([method]) => method === "discardUploads");
+    assert.deepEqual(discards.map(([, tokens]) => tokens), discarded, what);
+  }
+});
+
 test("every write broadcasts skills-changed", async () => {
   const { call, broadcasts } = setup();
 

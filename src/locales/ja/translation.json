@@ -4583,7 +4583,7 @@
       "removedFromComputer": "このコンピューターから削除しました。",
       "copiedMarkdown": "Markdownをコピーしました",
       "copyFailed": "コピーできませんでした",
-      "revealFailed": "スキルのフォルダが見つかりませんでした",
+      "revealFailed": "スキルのフォルダーが見つかりませんでした",
       "writeFailed": "スキルを保存できませんでした",
       "writeFailedNoSpace": "ディスクの空き容量がありません。",
       "writeFailedPermission": "OpenWhisprがスキルフォルダーに書き込めません。",
@@ -4663,8 +4663,9 @@
       "unreadableArchive": "このファイルを開けません",
       "nameMismatch": "SKILL.md内の名前がフォルダー名と一致しません",
       "unreadable": "スキルのファイルを読み取れません",
+      "skillFileNotUtf8": "SKILL.mdはUTF-8のテキストとして保存する必要があります",
       "placeholder": "先に [TODO: …] のプレースホルダーを置き換えてください",
-      "nameTaken": "{{name}}という名前のスキルはすでにあります"
+      "nameTaken": "「{{name}}」という名前のスキルはすでにあります"
     },
     "warnings": {
       "folderRenamed": "フォルダー名はスキル名に合わせて変更されます",

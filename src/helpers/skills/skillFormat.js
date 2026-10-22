@@ -164,7 +164,7 @@ function validateSkillFiles(files, { folderName, source }) {
     ? refused("noSkillFile")
     : isTextFile(skillFile.data)
       ? parseSkillMarkdown(skillFile.data.toString("utf8"))
-      : refused("unreadable");
+      : refused("skillFileNotUtf8");
   const name = typeof parsed.data?.name === "string" ? parsed.data.name : "";
   const problems = [...parsed.problems];
   const warnings = [];

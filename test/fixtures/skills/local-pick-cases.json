@@ -1,7 +1,7 @@
 {
   "skills": {
     "en": [
-      { "name": "action-items-to-linear", "displayName": "Action items to Linear", "description": "Pulls action items from a meeting and drafts Linear issues for you to approve. Use after a meeting when I ask for action items." },
+      { "name": "action-items-to-linear", "displayName": "Action items to Linear", "description": "Pulls action items from a meeting and drafts Linear issues for me to approve. Use after a meeting when I ask for action items." },
       { "name": "meeting-summary-to-slack", "displayName": "Meeting summary to Slack", "description": "Writes a short meeting summary and drafts it to a Slack channel. Use when I ask to share a meeting summary." },
       { "name": "one-on-one-prep", "displayName": "1:1 prep", "description": "Gathers what changed since my last one-on-one with someone. Use when I ask to prep for a 1:1." },
       { "name": "decision-log", "displayName": "Decision log", "description": "Finds the decisions in my meeting notes, with the date and meeting of each. Use when I ask what we decided." },
@@ -10,7 +10,7 @@
       { "name": "weekly-recap", "displayName": "Weekly recap", "description": "Writes my weekly recap from this week's notes. Use on Fridays or when I ask for a recap of the week." }
     ],
     "es": [
-      { "name": "action-items-to-linear", "displayName": "Tareas a Linear", "description": "Extrae las tareas de una reunión y prepara borradores de incidencias de Linear para que los apruebes. Úsala después de una reunión cuando pida las tareas." },
+      { "name": "action-items-to-linear", "displayName": "Tareas a Linear", "description": "Extrae las tareas de una reunión y prepara borradores de incidencias de Linear para que yo los apruebe. Úsala después de una reunión cuando pida las tareas." },
       { "name": "meeting-summary-to-slack", "displayName": "Resumen de reunión a Slack", "description": "Escribe un resumen breve de la reunión y prepara un borrador para un canal de Slack. Úsala cuando pida compartir un resumen de la reunión." },
       { "name": "one-on-one-prep", "displayName": "Preparación de 1:1", "description": "Reúne lo que ha cambiado desde mi última reunión individual con alguien. Úsala cuando pida preparar un 1:1." },
       { "name": "decision-log", "displayName": "Registro de decisiones", "description": "Encuentra las decisiones en las notas de mis reuniones, con la fecha y la reunión de cada una. Úsala cuando pregunte qué decidimos." },

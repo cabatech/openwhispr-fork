@@ -182,17 +182,17 @@ test("a skill folder removed outside the app drops its record", async (t) => {
 });
 
 test(
-  "a duplicate upload offers replace; replace swaps the folder and skip leaves it",
+  "a duplicate upload offers replace; replace swaps the folder, and without it the folder stays",
   async (t) => {
     const { library, skillsDir } = setup(t);
     await upload(library, [markdownUpload("a.md", skillText("dup", "First."))]);
     const second = markdownUpload("b.md", skillText("dup", "Second."));
 
-    const [skipped] = await library.previewUploads([second]);
-    assert.equal(skipped.status, "duplicate");
-    assert.deepEqual(library.commitUploads({ tokens: [skipped.token], replace: [] }), {
+    const [kept] = await library.previewUploads([second]);
+    assert.equal(kept.status, "duplicate");
+    assert.deepEqual(library.commitUploads({ tokens: [kept.token], replace: [] }), {
       installed: [],
-      failed: [],
+      failed: [{ fileName: "b.md", error: "exists" }],
     });
     assert.match(readSkill(skillsDir, "dup"), /First\./);
 
@@ -397,12 +397,20 @@ test("an upload that fails for a reason the app can't name reports it as unknown
 
 test("an upload whose skill appeared after its preview is reported, not dropped", async (t) => {
   const { library, skillsDir } = setup(t);
-  const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("weekly"))]);
+  // The second is previewed as a copy of the first, and is sent alone once that one is removed.
+  const [first, copy] = await library.previewUploads([
+    markdownUpload("a.md", skillText("weekly")),
+    markdownUpload("b.md", skillText("weekly")),
+  ]);
   writeFolder(skillsDir, "weekly", { "SKILL.md": skillText("weekly", "Made meanwhile.") });
 
-  const result = library.commitUploads({ tokens: [preview.token], replace: [] });
-
-  assert.deepEqual(result, { installed: [], failed: [{ fileName: "a.md", error: "exists" }] });
+  for (const [preview, fileName] of [
+    [first, "a.md"],
+    [copy, "b.md"],
+  ]) {
+    const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+    assert.deepEqual(result, { installed: [], failed: [{ fileName, error: "exists" }] });
+  }
   assert.match(readSkill(skillsDir, "weekly"), /Made meanwhile\./);
 });
 
@@ -538,6 +546,25 @@ test("a replace that finished leaves no old copy once the library next opens", a
   );
 });
 
+test("a skill uninstalled after its replace left the old copy behind stays gone", async (t) => {
+  const { library, database, userDataDir, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
+  const newer = markdownUpload("b.md", skillText("keep", "New."));
+  const [preview] = await library.previewUploads([newer]);
+  // The old copy can't be removed for now, as when Windows holds one of its files.
+  t.mock.method(fs, "rmSync", () => {
+    throw Object.assign(new Error("busy"), { code: "EBUSY" });
+  });
+  library.commitUploads({ tokens: [preview.token], replace: ["keep"] });
+  t.mock.restoreAll();
+  library.uninstall("keep");
+
+  const reopened = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(reopened.scan(), []);
+  assert.deepEqual(listDir(skillsDir), []);
+});
+
 test("an uninstall or a write cut short leaves nothing once the library next opens", async (t) => {
   const { library, database, userDataDir, skillsDir } = setup(t);
   await upload(library, [markdownUpload("gone.md", skillText("gone"))]);
@@ -608,7 +635,7 @@ test("a symlinked skill folder or file is never followed", (t) => {
   assert.deepEqual([library.get("linked").markdown, library.get("linked").files], ["", []]);
 });
 
-test("a skill whose files can't be read opens with no instructions instead of failing", (t) => {
+test("a skill whose files can't be read opens as one that can't be read, not as empty", (t) => {
   const { library, skillsDir } = setup(t);
   writeFolder(skillsDir, "locked", {
     "SKILL.md": skillText("locked"),
@@ -643,7 +670,12 @@ test("a skill whose files can't be read opens with no instructions instead of fa
     "",
     [],
   ]);
-  assert.deepEqual([racy.markdown, racy.files], ["", []]);
+  assert.deepEqual([racy.valid, racy.problem, racy.markdown, racy.files], [
+    false,
+    { code: "unreadable" },
+    "",
+    [],
+  ]);
 });
 
 test("readFile refuses paths outside the skill and binary files", (t) => {
@@ -729,8 +761,8 @@ test("create names the folder from the title and keeps it unique", (t) => {
   assert.equal(fs.readFileSync(path.join(created, "scripts", "export.sh"), "utf8"), "echo hi");
 });
 
-// Two skills never show the same title, so their cards can be told apart.
-test("create refuses a title one of your skills already shows", (t) => {
+// Create and Add refuse a title another skill already shows, so their cards can be told apart.
+test("create refuses a title one of your skills already shows, naming that skill", (t) => {
   const { library, skillsDir } = setup(t);
   const make = (title) =>
     library.create({ title, description: "Recaps.", instructions: "Go", files: [] });
@@ -738,7 +770,7 @@ test("create refuses a title one of your skills already shows", (t) => {
 
   for (const title of ["Weekly report", "  weekly   REPORT "]) {
     assert.deepEqual(make(title), {
-      problems: [{ code: "nameTaken", values: { name: title.trim() } }],
+      problems: [{ code: "nameTaken", values: { name: "Weekly report" } }],
     });
   }
   assert.deepEqual(listDir(skillsDir), ["weekly-report"]);

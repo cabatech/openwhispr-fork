@@ -4833,6 +4833,7 @@
       "unreadableArchive": "This file can't be opened",
       "nameMismatch": "The name inside SKILL.md doesn't match its folder",
       "unreadable": "The skill's files can't be read",
+      "skillFileNotUtf8": "SKILL.md must be saved as UTF-8 text",
       "placeholder": "Replace the [TODO: …] placeholder first",
       "nameTaken": "You already have a skill called {{name}}"
     },
@@ -4846,7 +4847,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Action items to Linear",
-        "description": "Pulls action items from a meeting and drafts Linear issues for you to approve. Use after a meeting when I ask for action items."
+        "description": "Pulls action items from a meeting and drafts Linear issues for me to approve. Use after a meeting when I ask for action items."
       },
       "meeting-summary-to-slack": {
         "title": "Meeting summary to Slack",

@@ -108,7 +108,11 @@ export function SkillDetailDialog({
   });
   // A read is shown only for the skill it was made for, never for the next one opened.
   const shown = detail?.name === name ? detail : null;
-  const skill = summary ?? shown;
+  // The list's copy stays live, but a read that couldn't get at the files marks it for fixing.
+  const skill =
+    summary && shown && !shown.valid
+      ? { ...summary, valid: false, problem: shown.problem }
+      : (summary ?? shown);
   const problem = skill && !skill.valid ? skill.problem : undefined;
 
   // Reread on open, and when the skill changes on disk while it's open. A skill that is
@@ -191,7 +195,8 @@ export function SkillDetailDialog({
           event.preventDefault();
           const back = uninstalled.current ? null : opener.current;
           uninstalled.current = false;
-          if (back?.isConnected) back.focus();
+          // The page itself had focus when the button that opened it went away.
+          if (back?.isConnected && back !== document.body) back.focus();
           else focusFallback?.();
         }}
       >

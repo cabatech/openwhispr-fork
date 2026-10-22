@@ -148,9 +148,10 @@ function refusedUpload(fileName, problems) {
   return { fileName, status: "invalid", problems, warnings: [] };
 }
 
-// Two skills never show the same title, so their cards can be told apart.
-function titleTaken(title) {
-  return { code: "nameTaken", values: { name: title } };
+// Create and Add refuse a title another skill already shows, so their cards can be told
+// apart. The message names that skill as its card shows it.
+function titleTaken(skill) {
+  return { code: "nameTaken", values: { name: skill.displayName } };
 }
 
 function sizeProblem(files) {
@@ -286,8 +287,15 @@ class SkillLibrary {
   get(name) {
     const summary = this.scan().find((skill) => skill.name === name);
     if (!summary) return null;
-    // As the list shows it, with nothing to read: the pop-up then shows its problem, if any.
-    const unreadable = { ...summary, markdown: "", files: [] };
+    // Marked as needing a fix, so nothing takes a skill whose files can't be read for one with
+    // no instructions; the pop-up shows why.
+    const unreadable = {
+      ...summary,
+      valid: false,
+      problem: { code: "unreadable" },
+      markdown: "",
+      files: [],
+    };
     const folder = this.skillDir(name);
     if (!folder) return unreadable;
     try {
@@ -398,9 +406,9 @@ class SkillLibrary {
         continue;
       }
       if (this._exists(upload.name) && !replace.includes(upload.name)) {
-        // Previewed as new, but a skill by that name arrived since: it isn't replaced unasked.
-        if (!upload.duplicate) failed.push({ fileName: upload.fileName, error: "exists" });
-        else this.uploads.delete(token);
+        // A skill by that name is there, as when one arrived since the preview: it isn't
+        // replaced unasked, and the upload stays so it can be sent again to replace it.
+        failed.push({ fileName: upload.fileName, error: "exists" });
         continue;
       }
       try {
@@ -432,7 +440,8 @@ class SkillLibrary {
   create({ title, description, instructions, files }) {
     const cleanTitle = title.trim();
     if (!cleanTitle) return { problems: [{ code: "missingName" }] };
-    if (this._skillTitled(cleanTitle)) return { problems: [titleTaken(cleanTitle)] };
+    const twin = this._skillTitled(cleanTitle);
+    if (twin) return { problems: [titleTaken(twin)] };
     const unsafe = files.find(
       (file) => file.fileName.includes("/") || !isSafeArchivePath(file.fileName)
     );
@@ -473,7 +482,8 @@ class SkillLibrary {
       return null;
     }
     if (this._exists(id)) return { name: id };
-    if (this._skillTitled(title)) return { problems: [titleTaken(title.trim())] };
+    const twin = this._skillTitled(title);
+    if (twin) return { problems: [titleTaken(twin)] };
     const markdown = buildSkillMarkdown({
       name: id,
       title,
@@ -656,13 +666,7 @@ class SkillLibrary {
     const duplicate = batchNames.has(result.name) || this._exists(result.name);
     batchNames.add(result.name);
     const token = crypto.randomUUID();
-    this.uploads.set(token, {
-      fileName,
-      name: result.name,
-      files,
-      owner,
-      duplicate,
-    });
+    this.uploads.set(token, { fileName, name: result.name, files, owner });
     return {
       fileName,
       status: duplicate ? "duplicate" : "ready",
@@ -678,9 +682,9 @@ class SkillLibrary {
     const cleanTitle = title.trim();
     // A title one of the user's skills shows updates that skill. Any other gets a folder of its
     // own, as Create does: titles with no Latin letters all slug to the same fallback name.
-    const existingName = this._skillTitled(cleanTitle);
+    const existingName = this._skillTitled(cleanTitle)?.name;
     const name = existingName ?? this._newSkillName(cleanTitle);
-    const existing = existingName !== null;
+    const existing = existingName !== undefined;
     const refuse = (problem) => ({ name, existing, problems: [problem], files: [] });
     if (!cleanTitle) return refuse({ code: "missingName" });
     const attachments = proposalFiles(files);
@@ -769,7 +773,7 @@ class SkillLibrary {
   _writeSkillFolder(name, files) {
     const staging = path.join(this.skillsDir, `.staging-${crypto.randomUUID()}`);
     const target = path.join(this.skillsDir, name);
-    let trash = null;
+    let movedAside = null;
     try {
       for (const file of files) {
         const destination = path.join(staging, ...file.path.split("/"));
@@ -777,19 +781,19 @@ class SkillLibrary {
         fs.writeFileSync(destination, file.data);
       }
       if (this._exists(name)) {
-        trash = path.join(this.skillsDir, `.replaced-${crypto.randomUUID()}-${name}`);
-        renameWithRetry(target, trash);
+        movedAside = path.join(this.skillsDir, `.replaced-${crypto.randomUUID()}-${name}`);
+        renameWithRetry(target, movedAside);
       }
       renameWithRetry(staging, target);
     } catch (error) {
       this._removeQuietly(staging);
-      if (trash && fs.existsSync(trash) && !this._exists(name)) {
+      if (movedAside && fs.existsSync(movedAside) && !this._exists(name)) {
         try {
-          renameWithRetry(trash, target);
+          renameWithRetry(movedAside, target);
         } catch (restoreError) {
           debugLogger.error(
             "Could not put a skill back after a failed write",
-            { name, trash, error: restoreError.message },
+            { name, movedAside, error: restoreError.message },
             "skills"
           );
         }
@@ -797,12 +801,22 @@ class SkillLibrary {
       debugLogger.error("Failed to write a skill", { name, error: error.message }, "skills");
       throw writeError(error);
     }
-    if (trash) this._removeQuietly(trash);
+    if (!movedAside) return;
+    // Renamed to trash first, so an old copy that can't be removed now is cleared when the
+    // library next opens, rather than put back as a replace cut short.
+    const trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
+    try {
+      renameWithRetry(movedAside, trash);
+      this._removeQuietly(trash);
+    } catch {
+      this._removeQuietly(movedAside);
+    }
   }
 
+  // The skill already showing this title, ignoring case, spacing and how accents are encoded.
   _skillTitled(title) {
     const key = (text) => text.trim().replace(/\s+/g, " ").normalize("NFC").toLowerCase();
-    return this.scan().find((skill) => key(skill.displayName) === key(title))?.name ?? null;
+    return this.scan().find((skill) => key(skill.displayName) === key(title));
   }
 
   // A starter skill's name stays free, so that starter can still be added.
