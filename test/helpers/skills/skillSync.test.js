@@ -261,6 +261,38 @@ test("a pulled tombstone removes the folder and its versions", (t) => {
   assert.deepEqual(ctx.database.getPendingSkillDeletes(), [], "nothing to send back");
 });
 
+test("a pulled tombstone also removes an old copy a replace couldn't clear", (t) => {
+  const ctx = setup(t);
+  if (!ctx) return;
+  ctx.library.applyFromCloud(cloudSkill("recap", [utf8("SKILL.md", skillText("recap"))]));
+  // What a replace leaves when its old copy can't be removed: put back at the next start.
+  writeFolder(ctx.skillsDir, `.replaced-${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}-recap`, {
+    "SKILL.md": skillText("recap", "Old.", "Old.\n"),
+  });
+
+  ctx.library.applyFromCloud(cloudSkill("recap", [], { deleted_at: "2026-10-21T10:00:00.000Z" }));
+  const reopened = new SkillLibrary({
+    userDataDir: path.dirname(ctx.skillsDir),
+    database: ctx.database,
+    recommendedDir: RECOMMENDED_DIR,
+  });
+
+  assert.deepEqual(reopened.scan(), []);
+});
+
+test("a pulled tombstone applies on a computer with no skills yet", (t) => {
+  const ctx = setup(t);
+  if (!ctx) return;
+  assert.equal(fs.existsSync(ctx.skillsDir), false);
+
+  const removed = ctx.library.applyFromCloud(
+    cloudSkill("recap", [], { deleted_at: "2026-10-21T10:00:00.000Z" })
+  );
+
+  assert.equal(removed, true);
+  assert.equal(ctx.database.getSkillForCloudMerge({ name: "recap" }).deleted_at !== null, true);
+});
+
 test("uninstalling, or removing a folder by hand, leaves a tombstone for a synced skill", (t) => {
   const ctx = setup(t);
   if (!ctx) return;

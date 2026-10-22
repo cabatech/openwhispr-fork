@@ -871,8 +871,10 @@ class SkillLibrary {
     }
     this._removeQuietly(trash);
     // Every copy goes: an old one a finished replace couldn't remove would otherwise come back
-    // as this skill when the library next opens.
-    for (const entry of fs.readdirSync(this.skillsDir)) {
+    // as this skill when the library next opens. A tombstone pulled before any skill was
+    // written here finds no skills folder at all.
+    const entries = fs.existsSync(this.skillsDir) ? fs.readdirSync(this.skillsDir) : [];
+    for (const entry of entries) {
       if (MOVED_ASIDE.exec(entry)?.[1] === name) this._discard(path.join(this.skillsDir, entry));
     }
     this._removeQuietly(path.join(this.versionsDir, name));
