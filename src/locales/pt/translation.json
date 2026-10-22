@@ -4653,6 +4653,7 @@
       "unreadableArchive": "Não é possível abrir este arquivo",
       "nameMismatch": "O nome dentro do SKILL.md não corresponde à pasta",
       "unreadable": "Não é possível ler os arquivos da habilidade",
+      "skillFileNotUtf8": "O SKILL.md precisa ser salvo como texto UTF-8",
       "placeholder": "Substitua primeiro o marcador [TODO: …]",
       "nameTaken": "Você já tem uma habilidade chamada {{name}}"
     },

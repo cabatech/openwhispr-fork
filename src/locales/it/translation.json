@@ -4653,6 +4653,7 @@
       "unreadableArchive": "Impossibile aprire questo file",
       "nameMismatch": "Il nome in SKILL.md non corrisponde alla sua cartella",
       "unreadable": "Impossibile leggere i file della skill",
+      "skillFileNotUtf8": "SKILL.md deve essere salvato come testo UTF-8",
       "placeholder": "Sostituisci prima il segnaposto [TODO: …]",
       "nameTaken": "Hai già una skill chiamata {{name}}"
     },

@@ -4653,6 +4653,7 @@
       "unreadableArchive": "無法開啟此檔案",
       "nameMismatch": "SKILL.md 中的名稱與其資料夾不一致",
       "unreadable": "無法讀取此技能的檔案",
+      "skillFileNotUtf8": "SKILL.md 必須儲存為 UTF-8 文字",
       "placeholder": "請先取代 [TODO: …] 預留位置",
       "nameTaken": "您已有名為 {{name}} 的技能"
     },

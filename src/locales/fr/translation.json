@@ -4823,6 +4823,7 @@
       "unreadableArchive": "Impossible d'ouvrir ce fichier",
       "nameMismatch": "Le nom dans SKILL.md ne correspond pas à son dossier",
       "unreadable": "Les fichiers de la compétence sont illisibles",
+      "skillFileNotUtf8": "SKILL.md doit être enregistré en texte UTF-8",
       "placeholder": "Remplacez d'abord l'espace réservé [TODO: …]",
       "nameTaken": "Vous avez déjà une compétence nommée {{name}}"
     },

@@ -21,6 +21,7 @@ export type SkillProblemCode =
   | "unreadableArchive"
   | "nameMismatch"
   | "unreadable"
+  | "skillFileNotUtf8"
   | "placeholder"
   | "nameTaken";
 
