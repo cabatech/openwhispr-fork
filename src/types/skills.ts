@@ -126,6 +126,9 @@ export type SkillWriteError = "noSpace" | "permission" | "unknown";
 /** A request the main process refused before reading it. */
 export type SkillInvalidRequest = { ok: false; error: "invalid" };
 
+/** A Cloud backup lookup the main process couldn't finish; not the same as "no such skill". */
+export type SkillSyncUnavailable = { ok: false; error: "unavailable" };
+
 export interface SkillCommitResult {
   installed: string[];
   /** "exists" when a skill by that name is there and wasn't named to be replaced. */

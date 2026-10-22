@@ -20,7 +20,7 @@ import { syncPendingAnalytics } from "./AnalyticsService.js";
 import { DictionaryService } from "./DictionaryService.js";
 import { SnippetService, type CloudSnippetEntry } from "./SnippetService.js";
 import { SkillsService } from "./SkillsService.js";
-import type { CloudSkillEntry } from "../types/skills";
+import type { CloudSkillEntry, SkillSyncUnavailable } from "../types/skills";
 import { CloudApiError, isAuthContextError } from "./cloudApi.js";
 import { LeaderboardService } from "./LeaderboardService";
 import {
@@ -100,6 +100,10 @@ function skillBatches<T>(entries: T[]): T[][] {
 // How a skills pull went: the names it couldn't write, "failed" when it stopped early, or
 // "unsupported" on an API without skills routes.
 type SkillPullResult = { unwritten: Set<string> } | "failed" | "unsupported";
+
+// A lookup of this computer's copy of a skill that main couldn't finish.
+const isSkillLookupFailed = (row: unknown): row is SkillSyncUnavailable =>
+  (row as SkillSyncUnavailable | null | undefined)?.error === "unavailable";
 
 function isHttpStatus(err: unknown, status: number): boolean {
   return err instanceof CloudApiError && err.status === status;
@@ -3060,6 +3064,8 @@ export class SyncService {
           // Edited meanwhile, it is sent again next pass. Uninstalled meanwhile, the copy
           // that got through must go too, or the next pull would bring it back.
           const row = await window.electronAPI.getSkillForCloudMerge?.(server);
+          // A lookup that failed leaves the copy for a later pass to compare.
+          if (isSkillLookupFailed(row)) continue;
           if (!row || row.deleted_at) {
             await SkillsService.delete(server.id).catch((deleteErr) =>
               console.error("Skill orphan cleanup failed:", deleteErr)
@@ -3114,6 +3120,8 @@ export class SyncService {
         for (const cloudEntry of entries) {
           const cloudTs = normalizeTimestamp(cloudEntry.updated_at);
           const local = await window.electronAPI.getSkillForCloudMerge?.(cloudEntry);
+          // Comparing with nothing would take the cloud's copy over this one.
+          if (isSkillLookupFailed(local)) throw new Error("Couldn't read a skill on this computer");
 
           if (cloudTs > maxUpdatedAt) {
             maxUpdatedAt = cloudTs;
@@ -3135,7 +3143,11 @@ export class SyncService {
                   local.cloud_id !== cloudEntry.id);
           if (!shouldApply) continue;
           try {
-            if (await window.electronAPI.applySkillFromCloud?.(cloudEntry)) changed = true;
+            const applied = await window.electronAPI.applySkillFromCloud?.(cloudEntry);
+            if (typeof applied === "object") {
+              throw new Error(`Couldn't write the skill: ${applied.error}`);
+            }
+            if (applied) changed = true;
           } catch (err) {
             unwritten.add(cloudEntry.name);
             console.error("Skill pull could not write a skill:", err);

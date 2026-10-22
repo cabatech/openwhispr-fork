@@ -36,8 +36,8 @@ function inertSnippetApi() {
   };
 }
 
-// The skill sync surface, as skillsIpc.js serves it: over a real SkillLibrary when the test
-// gives one, otherwise empty so a notes pass doesn't trip the binding check.
+// The skill sync surface, served by skillsIpc.js over a real SkillLibrary when the test gives
+// one, otherwise empty so a notes pass doesn't trip the binding check.
 function skillApi(library, onBroadcast) {
   if (!library) {
     return {
@@ -52,21 +52,29 @@ function skillApi(library, onBroadcast) {
       broadcastSkillsUpdated: async () => undefined,
     };
   }
-  const db = library.database;
+  // The real handlers, so what a failing step answers is what SyncService reads.
+  const { registerSkillsIpc } = require("../../../src/helpers/skills/skillsIpc");
+  const handlers = new Map();
+  registerSkillsIpc({
+    ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
+    library,
+    shell: {},
+    broadcast: onBroadcast,
+  });
+  const invoke =
+    (channel) =>
+    async (...args) =>
+      handlers.get(channel)({ sender: null }, ...args);
   return {
-    getPendingSkills: async () => {
-      library.scan();
-      return db.getPendingSkills();
-    },
-    getPendingSkillDeletes: async () => db.getPendingSkillDeletes(),
-    exportSkillForCloud: async (name) => library.exportForCloud(name),
-    getSkillForCloudMerge: async (entry) => db.getSkillForCloudMerge(entry),
-    applySkillFromCloud: async (entry) => library.applyFromCloud(entry),
-    markSkillSynced: async (name, cloudId, serverUpdatedAt, expectedHash, expectedEnabled) =>
-      db.markSkillSynced(name, cloudId, serverUpdatedAt, expectedHash, expectedEnabled),
-    hardDeleteSkill: async (name) => db.hardDeleteSkillState(name),
-    clearSkillCloudId: async (name) => db.clearSkillCloudId(name),
-    broadcastSkillsUpdated: async () => onBroadcast("skills-changed"),
+    getPendingSkills: invoke("skills-get-pending"),
+    getPendingSkillDeletes: invoke("skills-get-pending-deletes"),
+    exportSkillForCloud: invoke("skills-export-for-cloud"),
+    getSkillForCloudMerge: invoke("skills-get-for-cloud-merge"),
+    applySkillFromCloud: invoke("skills-apply-from-cloud"),
+    markSkillSynced: invoke("skills-mark-synced"),
+    hardDeleteSkill: invoke("skills-hard-delete"),
+    clearSkillCloudId: invoke("skills-clear-cloud-id"),
+    broadcastSkillsUpdated: invoke("skills-broadcast-updated"),
   };
 }
 

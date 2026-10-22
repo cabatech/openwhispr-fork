@@ -403,3 +403,57 @@ test("a pull that fails sends no skill this computer has never sent", async (t) 
   await ctx.service.syncSkillsNow();
   assert.equal(skillFile(ctx.skillsDir, "recap"), skillText("recap", "Does it.", "Newer.\n"));
 });
+
+test("a skill the library fails to write is held back and tried again", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  silence(t);
+  silence(t, "warn");
+  for (const name of ["first-one", "second-one"]) {
+    seedRemote(ctx, name, "Hi.\n");
+  }
+  const apply = ctx.library.applyFromCloud.bind(ctx.library);
+  let failOnce = true;
+  ctx.library.applyFromCloud = (entry) => {
+    if (entry.name === "first-one" && failOnce) {
+      failOnce = false;
+      throw Object.assign(new Error("EBUSY: resource busy"), { code: "EBUSY" });
+    }
+    return apply(entry);
+  };
+
+  await ctx.service.syncSkillsNow();
+  assert.deepEqual(listDir(ctx.skillsDir), ["second-one"]);
+
+  await ctx.service.syncSkillsNow();
+  assert.deepEqual(listDir(ctx.skillsDir), ["first-one", "second-one"]);
+});
+
+test("a pull that can't read this computer's copy of a skill leaves it as it is", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  silence(t);
+  silence(t, "warn");
+  writeFolder(ctx.skillsDir, "recap", { "SKILL.md": skillText("recap", "Does it.", "Mine.\n") });
+  ctx.library.scan();
+  // Older than the copy here, so the cloud's copy only wins if the lookup is taken for "none".
+  ctx.cloud.setClock(() => new Date(Date.now() - 60_000).toISOString());
+  seedRemote(ctx, "recap", "Theirs.\n");
+  const lookup = ctx.db.getSkillForCloudMerge.bind(ctx.db);
+  let failOnce = true;
+  ctx.db.getSkillForCloudMerge = (entry) => {
+    if (failOnce) {
+      failOnce = false;
+      throw new Error("SQLITE_BUSY: database is locked");
+    }
+    return lookup(entry);
+  };
+
+  await ctx.service.syncSkillsNow();
+  assert.equal(skillFile(ctx.skillsDir, "recap"), skillText("recap", "Does it.", "Mine.\n"));
+  assert.match(cloudByName(ctx.cloud).recap.files[0].content, /Theirs\./, "nothing sent yet");
+
+  await ctx.service.syncSkillsNow();
+  assert.equal(skillFile(ctx.skillsDir, "recap"), skillText("recap", "Does it.", "Mine.\n"));
+  assert.match(cloudByName(ctx.cloud).recap.files[0].content, /Mine\./);
+});

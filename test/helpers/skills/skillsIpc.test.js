@@ -453,3 +453,46 @@ test("the sync channels refuse a malformed name or entry", async () => {
 
   assert.deepEqual(library.calls, []);
 });
+
+// As for the assistant's channels: a sync step that fails answers as one and is logged.
+// SyncService reads the answer and tries that step again next pass.
+test("the sync channels answer and log when the library or database fails", async (t) => {
+  const fail = () => {
+    throw Object.assign(new Error("EBUSY: resource busy, rename '/data/skills/recap'"), {
+      code: "unknown",
+    });
+  };
+  const { call, broadcasts } = setup({
+    scan: fail,
+    exportForCloud: fail,
+    applyFromCloud: fail,
+    database: {
+      getPendingSkills: fail,
+      getPendingSkillDeletes: fail,
+      getSkillForCloudMerge: fail,
+      markSkillSynced: fail,
+      hardDeleteSkillState: fail,
+      clearSkillCloudId: fail,
+    },
+  });
+  const warn = t.mock.method(debugLogger, "warn", () => {});
+  const entry = { id: "c1", name: "meeting-prep", files: [] };
+
+  assert.deepEqual(await call("skills-get-pending"), []);
+  assert.deepEqual(await call("skills-get-pending-deletes"), []);
+  assert.equal(await call("skills-export-for-cloud", "meeting-prep"), null);
+  assert.deepEqual(await call("skills-get-for-cloud-merge", entry), {
+    ok: false,
+    error: "unavailable",
+  });
+  assert.deepEqual(await call("skills-apply-from-cloud", entry), { ok: false, error: "unknown" });
+  for (const answer of [
+    await call("skills-mark-synced", "meeting-prep", "c1", null, "h", true),
+    await call("skills-hard-delete", "meeting-prep"),
+    await call("skills-clear-cloud-id", "meeting-prep"),
+  ]) {
+    assert.deepEqual(answer, { success: false });
+  }
+  assert.equal(warn.mock.callCount(), 8);
+  assert.deepEqual(broadcasts, []);
+});

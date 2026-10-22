@@ -51,6 +51,7 @@ import type {
   SkillSaveResult,
   SkillSummary,
   SkillSyncRow,
+  SkillSyncUnavailable,
   SkillUpdate,
   SkillUploadItem,
   SkillUploadPreview,
@@ -3827,15 +3828,20 @@ declare global {
       getPendingSkills?: () => Promise<SkillSyncRow[]>;
       getPendingSkillDeletes?: () => Promise<SkillSyncRow[]>;
       exportSkillForCloud?: (name: string) => Promise<SkillCloudExport>;
-      getSkillForCloudMerge?: (cloudEntry: CloudSkillMeta) => Promise<SkillSyncRow | null>;
-      applySkillFromCloud?: (cloudEntry: CloudSkillEntry) => Promise<boolean>;
+      getSkillForCloudMerge?: (
+        cloudEntry: CloudSkillMeta
+      ) => Promise<SkillSyncRow | null | SkillSyncUnavailable>;
+      /** False when the entry was skipped for good; a failed write answers why. */
+      applySkillFromCloud?: (
+        cloudEntry: CloudSkillEntry
+      ) => Promise<boolean | { ok: false; error: SkillWriteError }>;
       markSkillSynced?: (
         name: string,
         cloudId: string,
         serverUpdatedAt: string | undefined,
         expectedHash: string,
         expectedEnabled: boolean
-      ) => Promise<{ success: boolean; changes: number }>;
+      ) => Promise<{ success: boolean; changes?: number }>;
       hardDeleteSkill?: (name: string) => Promise<{ success: boolean }>;
       clearSkillCloudId?: (name: string) => Promise<{ success: boolean }>;
       broadcastSkillsUpdated?: () => Promise<void>;
