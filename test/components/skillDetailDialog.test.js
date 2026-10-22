@@ -335,6 +335,9 @@ test("a skill whose files can't be read says so, and its switch is off and disab
     label(dialog(container)),
     /skills\.detail\.problem\{"reason":"skills\.problems\.unreadable"\}/
   );
+  // No empty box where the instructions would be.
+  const markdown = findElement(container, (node) => node.getAttribute("data-markdown") !== null);
+  assert.equal(markdown, null);
 });
 
 // As when the chat's Open skill opens it: the button pressed is gone, so the page had focus.

@@ -238,7 +238,8 @@ export function SkillDetailDialog({
                   </p>
                 </div>
               )}
-              {shown && (
+              {/* A read that found nothing, as for a skill whose files can't be read, has no box. */}
+              {shown?.markdown && (
                 <div className="rounded-lg border border-border/70 dark:border-border-subtle/70 bg-background/60 dark:bg-surface-1/60 px-4 py-3">
                   <MarkdownRenderer
                     hideFrontmatter

@@ -412,6 +412,11 @@ test("an upload whose skill appeared after its preview is reported, not dropped"
     assert.deepEqual(result, { installed: [], failed: [{ fileName, error: "exists" }] });
   }
   assert.match(readSkill(skillsDir, "weekly"), /Made meanwhile\./);
+  // The upload is kept, so choosing Replace sends the same one again.
+  assert.deepEqual(library.commitUploads({ tokens: [copy.token], replace: ["weekly"] }), {
+    installed: ["weekly"],
+    failed: [],
+  });
 });
 
 test("a failed write keeps the upload, so it can be tried again", async (t) => {
@@ -563,6 +568,78 @@ test("a skill uninstalled after its replace left the old copy behind stays gone"
 
   assert.deepEqual(reopened.scan(), []);
   assert.deepEqual(listDir(skillsDir), []);
+});
+
+// The disk as a stop right after the swap leaves it, with Windows still holding a file in the
+// old copy at the next start: that start can't remove it, and nothing may bring it back later.
+test("a replace's old copy that a start can't remove never comes back after an uninstall", async (t) => {
+  const busy = () => {
+    throw Object.assign(new Error("busy"), { code: "EBUSY" });
+  };
+  // At that start the old copy can't be removed, or neither renamed nor removed.
+  for (const held of [["rmSync"], ["rmSync", "renameSync"]]) {
+    const { library, database, userDataDir, skillsDir } = setup(t);
+    await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
+    const oldCopy = ".replaced-00000000-0000-4000-8000-000000000000-keep";
+    fs.cpSync(path.join(skillsDir, "keep"), path.join(skillsDir, oldCopy), { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, "keep", "SKILL.md"), skillText("keep", "New."));
+    for (const method of held) t.mock.method(fs, method, busy);
+    const restarted = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+    t.mock.restoreAll();
+
+    restarted.uninstall("keep");
+    const reopened = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+    assert.deepEqual(reopened.scan(), [], held.join(", "));
+    assert.deepEqual(listDir(skillsDir), [], held.join(", "));
+  }
+});
+
+// Renamed to the trash at that start, it stays gone even if the lock outlasts the uninstall.
+test("a replace's old copy still held when its skill is uninstalled never comes back", async (t) => {
+  const { library, database, userDataDir, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
+  const oldCopy = ".replaced-00000000-0000-4000-8000-000000000000-keep";
+  fs.cpSync(path.join(skillsDir, "keep"), path.join(skillsDir, oldCopy), { recursive: true });
+  fs.writeFileSync(path.join(skillsDir, "keep", "SKILL.md"), skillText("keep", "New."));
+  const busy = () => {
+    throw Object.assign(new Error("busy"), { code: "EBUSY" });
+  };
+  t.mock.method(fs, "rmSync", busy);
+  const restarted = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+  const realRename = fs.renameSync;
+  t.mock.method(fs, "renameSync", (from, to) => {
+    if (path.basename(from).startsWith(".replaced-")) busy();
+    return realRename(from, to);
+  });
+  restarted.uninstall("keep");
+  t.mock.restoreAll();
+
+  const reopened = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(reopened.scan(), []);
+  assert.deepEqual(listDir(skillsDir), []);
+});
+
+test("a replace's old copy that can't be renamed to the trash is removed where it is", async (t) => {
+  const { library, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
+  const newer = markdownUpload("b.md", skillText("keep", "New."));
+  const [preview] = await library.previewUploads([newer]);
+  const realRename = fs.renameSync;
+  t.mock.method(fs, "renameSync", (from, to) => {
+    if (path.basename(to).startsWith(".trash-")) {
+      throw Object.assign(new Error("denied"), { code: "EACCES" });
+    }
+    return realRename(from, to);
+  });
+
+  const result = library.commitUploads({ tokens: [preview.token], replace: ["keep"] });
+  t.mock.restoreAll();
+
+  assert.deepEqual(result, { installed: ["keep"], failed: [] });
+  assert.deepEqual(listDir(skillsDir), ["keep"]);
+  assert.match(readSkill(skillsDir, "keep"), /New\./);
 });
 
 test("an uninstall or a write cut short leaves nothing once the library next opens", async (t) => {
@@ -785,6 +862,11 @@ test("a hand-made skill never takes a starter skill's folder", (t) => {
   assert.deepEqual(made, { name: "decision-log-2" });
   assert.deepEqual(library.addRecommended("decision-log", copy), {
     problems: [{ code: "nameTaken", values: { name: "Decision log" } }],
+  });
+  library.uninstall("decision-log-2");
+  library.create({ ...copy, title: "  decision   LOG ", instructions: "Mine", files: [] });
+  assert.deepEqual(library.addRecommended("decision-log", copy), {
+    problems: [{ code: "nameTaken", values: { name: "decision   LOG" } }],
   });
   const translated = { ...copy, title: "Journal des décisions" };
   assert.deepEqual(library.addRecommended("decision-log", translated), { name: "decision-log" });

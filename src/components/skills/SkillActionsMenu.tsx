@@ -35,6 +35,10 @@ export function SkillActionsMenu({
   const { toast } = useToast();
   const { copyText } = useCopyFeedback("");
   const trigger = useRef<HTMLButtonElement>(null);
+  // The pop-up Uninstall opens returns focus to what had it. The open menu keeps focus inside,
+  // and the item goes away with it, so the pop-up opens once the menu has closed, with focus
+  // on the menu's button.
+  const uninstallPicked = useRef(false);
 
   // Copies SKILL.md exactly as it's stored, so it pastes into another app unchanged.
   const copyMarkdown = async () => {
@@ -69,7 +73,18 @@ export function SkillActionsMenu({
           <MoreHorizontal size={14} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={4} className="min-w-44">
+      <DropdownMenuContent
+        align="end"
+        sideOffset={4}
+        className="min-w-44"
+        onCloseAutoFocus={(event) => {
+          if (!uninstallPicked.current) return;
+          uninstallPicked.current = false;
+          event.preventDefault();
+          trigger.current?.focus();
+          onUninstall?.();
+        }}
+      >
         <DropdownMenuItem onSelect={() => void reveal()} className={ITEM_CLASS}>
           <FolderOpen size={12} className="text-muted-foreground/80" />
           {t(showInFolderLabelKey(getCachedPlatform()))}
@@ -83,10 +98,7 @@ export function SkillActionsMenu({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => {
-                // The pop-up this opens returns focus to what had it, and the item goes away
-                // with the menu, so the menu's button takes focus first.
-                trigger.current?.focus();
-                onUninstall();
+                uninstallPicked.current = true;
               }}
               className="text-xs gap-2 rounded-lg px-2.5 py-1.5 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
             >

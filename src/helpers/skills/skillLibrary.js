@@ -232,7 +232,7 @@ class SkillLibrary {
       const movedAside = MOVED_ASIDE.exec(entry)?.[1];
       if (movedAside && isSkillFolderName(movedAside)) {
         if (this._exists(movedAside)) {
-          this._removeQuietly(leftover);
+          this._discard(leftover);
           continue;
         }
         try {
@@ -372,6 +372,11 @@ class SkillLibrary {
       if (error.code !== "ENOENT") throw writeError(error);
     }
     this._removeQuietly(trash);
+    // Every copy goes: an old one a finished replace couldn't remove would otherwise come back
+    // as this skill when the library next opens.
+    for (const entry of fs.readdirSync(this.skillsDir)) {
+      if (MOVED_ASIDE.exec(entry)?.[1] === name) this._discard(path.join(this.skillsDir, entry));
+    }
     this._removeQuietly(path.join(this.versionsDir, name));
     this.inspected.delete(name);
     this.database.deleteSkillState(name);
@@ -814,16 +819,7 @@ class SkillLibrary {
       debugLogger.error("Failed to write a skill", { name, error: error.message }, "skills");
       throw writeError(error);
     }
-    if (!movedAside) return;
-    // Renamed to trash first, so an old copy that can't be removed now is cleared when the
-    // library next opens, rather than put back as a replace cut short.
-    const trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
-    try {
-      renameWithRetry(movedAside, trash);
-      this._removeQuietly(trash);
-    } catch {
-      this._removeQuietly(movedAside);
-    }
+    if (movedAside) this._discard(movedAside);
   }
 
   // The skill already showing this title, ignoring case, spacing and how accents are encoded.
@@ -857,6 +853,20 @@ class SkillLibrary {
   _takenNames() {
     fs.mkdirSync(this.skillsDir, { recursive: true });
     return new Set(fs.readdirSync(this.skillsDir).map((name) => name.toLowerCase()));
+  }
+
+  // Renamed to trash first, so a folder that can't be removed now is cleared when the library
+  // next opens, and never taken for a replace cut short; one that can't be renamed is removed
+  // where it is.
+  _discard(folder) {
+    const trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
+    try {
+      renameWithRetry(folder, trash);
+    } catch {
+      this._removeQuietly(folder);
+      return;
+    }
+    this._removeQuietly(trash);
   }
 
   _removeQuietly(target) {

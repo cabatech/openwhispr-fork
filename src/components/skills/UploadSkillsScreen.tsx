@@ -54,7 +54,8 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
   const issued = useRef(new Set<string>());
   const closed = useRef(false);
   const hintId = useId();
-  const installed = new Set(skills.map((skill) => skill.name));
+  // In lower case: on macOS and Windows a folder that differs only in case is the same folder.
+  const installed = new Set(skills.map((skill) => skill.name.toLowerCase()));
   const standing = (row: UploadRow): Standing => {
     const { preview } = row;
     if (preview.status === "invalid") return "invalid";
@@ -65,7 +66,7 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
         other.preview.name === preview.name
     );
     if (repeat) return "repeat";
-    return installed.has(preview.name ?? "") ? "installed" : "ready";
+    return installed.has((preview.name ?? "").toLowerCase()) ? "installed" : "ready";
   };
   const willInstall = (row: UploadRow) => {
     const asked = standing(row);
