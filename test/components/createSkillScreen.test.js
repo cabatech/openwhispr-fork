@@ -191,6 +191,63 @@ test("Esc with unsaved text shows the bar, and Esc again dismisses it", async (t
   assert.equal(calls.back, 0);
 });
 
+test("a file that can't be read is refused by name, and the others are added", async (t) => {
+  const { container, toasts } = await renderCreate(t);
+  const moved = {
+    name: "moved-away.md",
+    size: 3,
+    arrayBuffer: async () => {
+      throw new Error("NotReadableError");
+    },
+  };
+
+  await pick(container, [fakeFile("kept.md", [1, 2]), moved]);
+
+  assert.equal(chips(container).length, 1);
+  assert.match(label(chips(container)[0]), /kept\.md/);
+  assert.deepEqual(toasts, [
+    {
+      title: "moved-away.md",
+      description: "skills.problems.unreadableArchive",
+      variant: "destructive",
+    },
+  ]);
+});
+
+test("a file still being read when the draft is discarded doesn't bring it back", async (t) => {
+  let finishRead;
+  const slow = {
+    name: "big.md",
+    size: 3,
+    arrayBuffer: () =>
+      new Promise((resolve) => {
+        finishRead = () => resolve(new Uint8Array([1]).buffer);
+      }),
+  };
+  const { container, store } = await renderCreate(t);
+  await fill(container, { name: "Half done" });
+  await pick(container, [slow]);
+  await click(button(container, "common.cancel"));
+  await click(button(container, "skills.create.discard"));
+
+  await React.act(async () => finishRead());
+  await settle();
+
+  assert.equal(store.useSkillsStore.getState().createDraft, null);
+});
+
+test("an Esc that ends text composition keeps editing", async (t) => {
+  const { container, calls } = await renderCreate(t);
+  await fill(container, { name: "Half done" });
+
+  await React.act(async () =>
+    dispatch(field(container, "name"), "keydown", { key: "Escape", isComposing: true })
+  );
+
+  assert.equal(alert(container), null);
+  assert.equal(calls.back, 0);
+});
+
 test("the draft survives leaving the Integrations page", async (t) => {
   const { container } = await renderCreate(t, {
     draft: {
@@ -211,6 +268,7 @@ test("a problem from the library shows under the field it concerns", async (t) =
   const responses = [
     { ok: false, problems: [{ code: "descriptionAngleBrackets" }] },
     { ok: false, problems: [{ code: "placeholder" }] },
+    { ok: false, problems: [{ code: "nameTaken", values: { name: "Draft" } }] },
   ];
   const { container, calls } = await renderCreate(t, {
     api: { skillsCreate: async () => responses.shift() },
@@ -224,6 +282,10 @@ test("a problem from the library shows under the field it concerns", async (t) =
   await click(createButton(container));
   await settle();
   assert.equal(messageFor(container, "instructions"), "skills.problems.placeholder");
+
+  await click(createButton(container));
+  await settle();
+  assert.equal(messageFor(container, "name"), 'skills.problems.nameTaken{"name":"Draft"}');
   assert.deepEqual(calls.created, []);
 });
 

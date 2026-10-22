@@ -2,7 +2,7 @@ import { Fragment, type ReactElement } from "react";
 import { ChevronRight } from "../icons";
 import { cn } from "../lib/utils";
 
-export interface BreadcrumbItem {
+interface BreadcrumbItem {
   label: string;
   onSelect?: () => void;
 }

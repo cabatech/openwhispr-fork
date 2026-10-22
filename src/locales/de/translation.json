@@ -4733,7 +4733,7 @@
       "more": "Weitere Aktionen für {{name}}",
       "files": "Dateien",
       "copyFile": "{{path}} kopieren",
-      "neverRun": "Wird angezeigt, nie ausgeführt",
+      "neverRun": "OpenWhispr führt Skripte nie aus",
       "uninstall": "Deinstallieren",
       "uninstallConfirm": "{{name}} deinstallieren? Der Skill wird von diesem Computer entfernt.",
       "problem": "Dieser Skill kann erst verwendet werden, wenn er korrigiert ist: {{reason}}",
@@ -4752,6 +4752,7 @@
       "removedFromComputer": "Von diesem Computer entfernt.",
       "copiedMarkdown": "Markdown kopiert",
       "copyFailed": "Kopieren fehlgeschlagen",
+      "revealFailed": "Ordner des Skills wurde nicht gefunden",
       "writeFailed": "Skill konnte nicht gespeichert werden",
       "writeFailedNoSpace": "Deine Festplatte ist voll.",
       "writeFailedPermission": "OpenWhispr kann nicht in seinen Skills-Ordner schreiben.",
@@ -4760,7 +4761,6 @@
     "manage": {
       "title": "Skills verwalten",
       "description": "Schalte Skills ein oder aus oder entferne die, die du nicht nutzt. Jeder wird auf diesem Computer gespeichert.",
-      "personal": "Persönlich",
       "noMatches": "Keine Skills passen zu „{{query}}“.",
       "none": "Noch keine Skills."
     },
@@ -4779,6 +4779,8 @@
       "duplicate": "Du hast diesen Skill schon",
       "replace": "Ersetzen",
       "willReplace": "Ersetzt deinen aktuellen Skill",
+      "willReplaceCopy": "Wird statt der anderen Datei verwendet",
+      "alsoInUpload": "Eine andere Datei in diesem Upload enthält denselben Skill",
       "skipped": "Übersprungen",
       "undo": "Rückgängig",
       "chooseFile": "Wähle eine Datei aus, um fortzufahren.",
@@ -4830,7 +4832,8 @@
       "unreadableArchive": "Diese Datei kann nicht geöffnet werden",
       "nameMismatch": "Der Name in SKILL.md passt nicht zu seinem Ordner",
       "unreadable": "Die Dateien des Skills können nicht gelesen werden",
-      "placeholder": "Ersetze zuerst den Platzhalter [TODO: …]"
+      "placeholder": "Ersetze zuerst den Platzhalter [TODO: …]",
+      "nameTaken": "Du hast schon einen Skill namens {{name}}"
     },
     "warnings": {
       "folderRenamed": "Der Ordner wird passend zum Namen des Skills umbenannt",
@@ -4854,7 +4857,7 @@
       },
       "decision-log": {
         "title": "Entscheidungsprotokoll",
-        "description": "Führt eine fortlaufende Liste der Entscheidungen aus meinen Meetings. Nutzen, wenn ich frage, was wir entschieden haben."
+        "description": "Findet die Entscheidungen in meinen Meeting-Notizen, jeweils mit Datum und Meeting. Nutzen, wenn ich frage, was wir entschieden haben."
       }
     },
     "chat": {

@@ -4563,7 +4563,7 @@
       "more": "{{name}}のその他の操作",
       "files": "ファイル",
       "copyFile": "{{path}}をコピー",
-      "neverRun": "表示のみ、実行されません",
+      "neverRun": "OpenWhisprはスクリプトを実行しません",
       "uninstall": "アンインストール",
       "uninstallConfirm": "{{name}}をアンインストールしますか？このコンピューターから削除されます。",
       "problem": "このスキルは修正するまで使えません: {{reason}}",
@@ -4582,6 +4582,7 @@
       "removedFromComputer": "このコンピューターから削除しました。",
       "copiedMarkdown": "Markdownをコピーしました",
       "copyFailed": "コピーできませんでした",
+      "revealFailed": "スキルのフォルダが見つかりませんでした",
       "writeFailed": "スキルを保存できませんでした",
       "writeFailedNoSpace": "ディスクの空き容量がありません。",
       "writeFailedPermission": "OpenWhisprがスキルフォルダーに書き込めません。",
@@ -4590,7 +4591,6 @@
     "manage": {
       "title": "スキルを管理",
       "description": "スキルのオン/オフを切り替えたり、使わないスキルを削除したりできます。スキルはすべてこのコンピューターに保存されます。",
-      "personal": "個人",
       "noMatches": "「{{query}}」に一致するスキルはありません。",
       "none": "スキルはまだありません。"
     },
@@ -4609,6 +4609,8 @@
       "duplicate": "このスキルはすでにあります",
       "replace": "置き換える",
       "willReplace": "現在のスキルを置き換えます",
+      "willReplaceCopy": "もう一方のファイルの代わりに使われます",
+      "alsoInUpload": "このアップロードの別のファイルに同じスキルがあります",
       "skipped": "スキップ",
       "undo": "元に戻す",
       "chooseFile": "続けるにはファイルを選択してください。",
@@ -4660,7 +4662,8 @@
       "unreadableArchive": "このファイルを開けません",
       "nameMismatch": "SKILL.md内の名前がフォルダー名と一致しません",
       "unreadable": "スキルのファイルを読み取れません",
-      "placeholder": "先に [TODO: …] のプレースホルダーを置き換えてください"
+      "placeholder": "先に [TODO: …] のプレースホルダーを置き換えてください",
+      "nameTaken": "{{name}}という名前のスキルはすでにあります"
     },
     "warnings": {
       "folderRenamed": "フォルダー名はスキル名に合わせて変更されます",
@@ -4684,7 +4687,7 @@
       },
       "decision-log": {
         "title": "決定事項ログ",
-        "description": "会議での決定事項を一覧にまとめ続けます。何を決めたか尋ねたときに使います。"
+        "description": "会議メモから決定事項を探し、それぞれの日付と会議を示します。何を決めたか尋ねたときに使います。"
       }
     },
     "chat": {

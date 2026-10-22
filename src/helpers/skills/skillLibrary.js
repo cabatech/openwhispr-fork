@@ -27,6 +27,8 @@ const MODEL_FILES_MAX_BYTES = 200 * 1024;
 const PROPOSAL_LIMITS = { maxFiles: 20, maxFileBytes: 200 * 1024, maxBytes: 1024 * 1024 };
 // Copies kept per skill for Undo, newest first; older ones are deleted.
 const VERSIONS_KEPT = 5;
+// Where a replace puts the old copy while the new one is swapped in, named for its skill.
+const MOVED_ASIDE = /^\.replaced-[0-9a-f-]{36}-(.+)$/;
 
 // A name the library can address on disk: one path segment that isn't hidden. Wider than
 // SKILL_NAME_PATTERN, so a folder dropped in under any name can still be shown and removed.
@@ -39,6 +41,24 @@ function isSkillFolderName(name) {
   );
 }
 
+// Windows refuses a rename for a moment while antivirus or the search indexer holds a file it
+// just saw written, so a rename there is tried again for about half a second in all.
+const RENAME_RETRY_DELAYS_MS = [50, 100, 150, 200];
+const BUSY_CODES = ["EPERM", "EACCES", "EBUSY"];
+
+function renameWithRetry(from, to) {
+  for (const delay of RENAME_RETRY_DELAYS_MS) {
+    try {
+      return fs.renameSync(from, to);
+    } catch (error) {
+      if (process.platform !== "win32" || !BUSY_CODES.includes(error.code)) throw error;
+      if (fs.existsSync(to)) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
+    }
+  }
+  return fs.renameSync(from, to);
+}
+
 function isInside(base, candidate) {
   const relative = path.relative(base, candidate);
   return (
@@ -47,6 +67,11 @@ function isInside(base, candidate) {
     !relative.startsWith(`..${path.sep}`) &&
     !path.isAbsolute(relative)
   );
+}
+
+// The reason a write failed, as the screens name it.
+function writeErrorCode(error) {
+  return ["noSpace", "permission"].includes(error?.code) ? error.code : "unknown";
 }
 
 function writeError(error) {
@@ -119,6 +144,15 @@ function toSummary(inspected, state) {
   };
 }
 
+function refusedUpload(fileName, problems) {
+  return { fileName, status: "invalid", problems, warnings: [] };
+}
+
+// Two skills never show the same title, so their cards can be told apart.
+function titleTaken(title) {
+  return { code: "nameTaken", values: { name: title } };
+}
+
 function sizeProblem(files) {
   if (files.length > SKILL_LIMITS.maxFiles) return { code: "tooManyFiles" };
   const bytes = files.reduce((total, file) => total + file.data.length, 0);
@@ -178,6 +212,40 @@ class SkillLibrary {
     this.recommendedDir = recommendedDir;
     this.inspected = new Map();
     this.uploads = new Map();
+    this._recoverInterruptedWrites();
+  }
+
+  // A write the app quit or crashed in the middle of leaves hidden folders. A skill moved aside
+  // for a replace whose new copy never arrived goes back; the rest is deleted. This runs before
+  // the first scan, which would otherwise drop the moved skill's record.
+  _recoverInterruptedWrites() {
+    let entries;
+    try {
+      entries = fs.readdirSync(this.skillsDir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const leftover = path.join(this.skillsDir, entry);
+      const movedAside = MOVED_ASIDE.exec(entry)?.[1];
+      if (movedAside && isSkillFolderName(movedAside)) {
+        if (this._exists(movedAside)) {
+          this._removeQuietly(leftover);
+          continue;
+        }
+        try {
+          renameWithRetry(leftover, path.join(this.skillsDir, movedAside));
+        } catch (error) {
+          debugLogger.error(
+            "Could not put back a skill an interrupted write moved aside",
+            { entry, error: error.message },
+            "skills"
+          );
+        }
+      } else if (entry.startsWith(".staging-") || entry.startsWith(".trash-")) {
+        this._removeQuietly(leftover);
+      }
+    }
   }
 
   scan() {
@@ -218,29 +286,37 @@ class SkillLibrary {
   get(name) {
     const summary = this.scan().find((skill) => skill.name === name);
     if (!summary) return null;
+    // As the list shows it, with nothing to read: the pop-up then shows its problem, if any.
+    const unreadable = { ...summary, markdown: "", files: [] };
     const folder = this.skillDir(name);
-    const walked = folder ? walkSkillFolder(folder) : { unreadable: true };
-    if (walked.unreadable) return { ...summary, markdown: "", files: [] };
+    if (!folder) return unreadable;
+    try {
+      const walked = walkSkillFolder(folder);
+      if (walked.unreadable) return unreadable;
 
-    const readAll = !walked.tooMany && walked.bytes <= SKILL_LIMITS.maxBytes;
-    let markdown = "";
-    const files = [];
-    for (const file of walked.files) {
-      if (file.path === "SKILL.md") {
-        if (file.size <= SKILL_LIMITS.maxBytes) {
-          markdown = fs.readFileSync(file.fullPath).toString("utf8");
+      const readAll = !walked.tooMany && walked.bytes <= SKILL_LIMITS.maxBytes;
+      let markdown = "";
+      const files = [];
+      for (const file of walked.files) {
+        if (file.path === "SKILL.md") {
+          if (file.size <= SKILL_LIMITS.maxBytes) {
+            markdown = fs.readFileSync(file.fullPath).toString("utf8");
+          }
+          continue;
         }
-        continue;
+        const data = readAll ? fs.readFileSync(file.fullPath) : null;
+        files.push({
+          path: file.path,
+          size: file.size,
+          text: data ? isTextFile(data) : false,
+          script: isScriptPath(file.path),
+        });
       }
-      const data = readAll ? fs.readFileSync(file.fullPath) : null;
-      files.push({
-        path: file.path,
-        size: file.size,
-        text: data ? isTextFile(data) : false,
-        script: isScriptPath(file.path),
-      });
+      return { ...summary, markdown, files: files.sort(byPath) };
+    } catch (error) {
+      debugLogger.warn("Could not read a skill", { name, error: error.message }, "skills");
+      return unreadable;
     }
-    return { ...summary, markdown, files: files.sort(byPath) };
   }
 
   readFile(name, relPath) {
@@ -270,7 +346,7 @@ class SkillLibrary {
     if (!isSkillFolderName(name)) return;
     const trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
     try {
-      fs.renameSync(path.join(this.skillsDir, name), trash);
+      renameWithRetry(path.join(this.skillsDir, name), trash);
     } catch (error) {
       if (error.code !== "ENOENT") throw writeError(error);
     }
@@ -292,11 +368,22 @@ class SkillLibrary {
     }
   }
 
-  async previewUploads(items) {
+  // `owner` is the window previewing them, so they can be let go when it goes away.
+  async previewUploads(items, owner) {
     const batchNames = new Set();
     const previews = [];
     for (const item of items) {
-      previews.push(await this._previewUpload(item, batchNames));
+      try {
+        previews.push(await this._previewUpload(item, batchNames, owner));
+      } catch (error) {
+        // Refused alone, so one file the reader can't handle doesn't hide the rest of the drop.
+        debugLogger.warn(
+          "Could not preview an upload",
+          { fileName: item.fileName, error: error.message },
+          "skills"
+        );
+        previews.push(refusedUpload(item.fileName, [{ code: "unreadableArchive" }]));
+      }
     }
     return previews;
   }
@@ -311,14 +398,16 @@ class SkillLibrary {
         continue;
       }
       if (this._exists(upload.name) && !replace.includes(upload.name)) {
-        this.uploads.delete(token);
+        // Previewed as new, but a skill by that name arrived since: it isn't replaced unasked.
+        if (!upload.duplicate) failed.push({ fileName: upload.fileName, error: "exists" });
+        else this.uploads.delete(token);
         continue;
       }
       try {
         this._install(upload.name, upload.files);
       } catch (error) {
         // The token stays, so the same upload can be tried again.
-        failed.push({ fileName: upload.fileName, error: error.code });
+        failed.push({ fileName: upload.fileName, error: writeErrorCode(error) });
         continue;
       }
       this.uploads.delete(token);
@@ -328,14 +417,22 @@ class SkillLibrary {
     return { installed, failed };
   }
 
-  // A previewed upload is held until it installs or the screen that previewed it lets go.
+  // A previewed upload is held until it installs, or the screen or window that previewed it
+  // lets go.
   discardUploads(tokens) {
     for (const token of tokens) this.uploads.delete(token);
+  }
+
+  discardUploadsFrom(owner) {
+    for (const [token, upload] of this.uploads) {
+      if (upload.owner === owner) this.uploads.delete(token);
+    }
   }
 
   create({ title, description, instructions, files }) {
     const cleanTitle = title.trim();
     if (!cleanTitle) return { problems: [{ code: "missingName" }] };
+    if (this._skillTitled(cleanTitle)) return { problems: [titleTaken(cleanTitle)] };
     const unsafe = files.find(
       (file) => file.fileName.includes("/") || !isSafeArchivePath(file.fileName)
     );
@@ -348,7 +445,9 @@ class SkillLibrary {
     if (hasClashingPaths(attachments.map((file) => file.path))) {
       return { problems: [{ code: "unsafePath" }] };
     }
-    const name = slugifySkillName(cleanTitle, this._takenNames());
+    // A starter skill's name stays free, so that starter can still be added.
+    const taken = new Set([...this._takenNames(), ...this._recommendedIds()]);
+    const name = slugifySkillName(cleanTitle, taken);
     const skillFiles = [
       {
         path: "SKILL.md",
@@ -376,6 +475,7 @@ class SkillLibrary {
       return null;
     }
     if (this._exists(id)) return { name: id };
+    if (this._skillTitled(title)) return { problems: [titleTaken(title.trim())] };
     const markdown = buildSkillMarkdown({
       name: id,
       title,
@@ -534,8 +634,8 @@ class SkillLibrary {
     return inspected;
   }
 
-  async _previewUpload({ fileName, data }, batchNames) {
-    const refuse = (problems) => ({ fileName, status: "invalid", problems, warnings: [] });
+  async _previewUpload({ fileName, data }, batchNames, owner) {
+    const refuse = (problems) => refusedUpload(fileName, problems);
     if (data.length > SKILL_LIMITS.maxBytes) return refuse([{ code: "tooLarge" }]);
     const extension = path.extname(fileName).toLowerCase();
     let files;
@@ -562,6 +662,8 @@ class SkillLibrary {
       fileName,
       name: result.name,
       files,
+      owner,
+      duplicate,
     });
     return {
       fileName,
@@ -653,9 +755,11 @@ class SkillLibrary {
     );
   }
 
+  // A new skill starts on; one that replaces a skill keeps that skill's switch.
   _install(name, files) {
+    const replacing = this._exists(name);
     this._writeSkillFolder(name, files);
-    this._stamp(name, files, { enabled: true });
+    this._stamp(name, files, replacing ? {} : { enabled: true });
   }
 
   _stamp(name, files, state) {
@@ -675,15 +779,15 @@ class SkillLibrary {
         fs.writeFileSync(destination, file.data);
       }
       if (this._exists(name)) {
-        trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
-        fs.renameSync(target, trash);
+        trash = path.join(this.skillsDir, `.replaced-${crypto.randomUUID()}-${name}`);
+        renameWithRetry(target, trash);
       }
-      fs.renameSync(staging, target);
+      renameWithRetry(staging, target);
     } catch (error) {
       this._removeQuietly(staging);
       if (trash && fs.existsSync(trash) && !this._exists(name)) {
         try {
-          fs.renameSync(trash, target);
+          renameWithRetry(trash, target);
         } catch (restoreError) {
           debugLogger.error(
             "Could not put a skill back after a failed write",
@@ -703,6 +807,14 @@ class SkillLibrary {
     return this.scan().find((skill) => key(skill.displayName) === key(title))?.name ?? null;
   }
 
+  _recommendedIds() {
+    try {
+      return fs.readdirSync(this.recommendedDir);
+    } catch {
+      return [];
+    }
+  }
+
   _exists(name) {
     try {
       fs.lstatSync(path.join(this.skillsDir, name));
@@ -719,7 +831,7 @@ class SkillLibrary {
 
   _removeQuietly(target) {
     try {
-      fs.rmSync(target, { recursive: true, force: true });
+      fs.rmSync(target, { recursive: true, force: true, maxRetries: 3 });
     } catch (error) {
       debugLogger.warn(
         "Could not remove a skill folder",
@@ -730,4 +842,4 @@ class SkillLibrary {
   }
 }
 
-module.exports = { SkillLibrary, isSkillFolderName };
+module.exports = { SkillLibrary, isSkillFolderName, writeErrorCode };

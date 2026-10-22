@@ -24,6 +24,9 @@ async function loadStore(t, electronAPI) {
       addEventListener: (type, listener) => {
         windowListeners[type] = listener;
       },
+      removeEventListener: (type, listener) => {
+        if (windowListeners[type] === listener) delete windowListeners[type];
+      },
     },
   });
   const vite = await createRendererServer(t, { cachePrefix: "openwhispr-skills-store-test-" });
@@ -64,19 +67,34 @@ test("each refresh reads the list again", async (t) => {
   assert.equal(store.useSkillsStore.getState().loaded, true);
 });
 
-test("a skills-changed event and a window focus refresh the list", async (t) => {
-  const api = libraryApi([[], [skill("added")], [skill("added"), skill("edited-outside")]]);
-  const { store, windowListeners } = await loadStore(t, api);
+test("a skills-changed event refreshes the list", async (t) => {
+  const api = libraryApi([[], [skill("added")]]);
+  const { store } = await loadStore(t, api);
   const names = () => store.useSkillsStore.getState().skills.map((entry) => entry.name);
   await store.refreshSkills();
 
   api.changed();
   await settle();
   assert.deepEqual([api.lists, names()], [2, ["added"]]);
+});
 
+// A window focus anywhere in the app would otherwise reread every skill folder.
+test("a window focus rereads the list only while the Skills page asks for it", async (t) => {
+  const api = libraryApi([[], [skill("edited-outside")]]);
+  const { store, windowListeners } = await loadStore(t, api);
+  await store.refreshSkills();
+  assert.equal(windowListeners.focus, undefined);
+
+  const stop = store.refreshSkillsOnFocus();
   windowListeners.focus();
   await settle();
-  assert.deepEqual([api.lists, names()], [3, ["added", "edited-outside"]]);
+  assert.deepEqual(
+    [api.lists, store.useSkillsStore.getState().skills.map((entry) => entry.name)],
+    [2, ["edited-outside"]]
+  );
+
+  stop();
+  assert.equal(windowListeners.focus, undefined);
 });
 
 test("a refresh asked for during a load runs again once it finishes", async (t) => {
@@ -119,6 +137,24 @@ test("a list that can't be read marks the load as failed", async (t) => {
     [store.useSkillsStore.getState().loaded, store.useSkillsStore.getState().loadError],
     [false, true]
   );
+});
+
+test("a switch that fails resolves false and reloads the list", async (t) => {
+  const api = Object.assign(libraryApi([[skill("recap", false)]]), {
+    skillsSetEnabled: async (name) => {
+      if (name === "locked") throw new Error("Error invoking remote method 'skills-set-enabled'");
+      return { ok: false, error: "invalid" };
+    },
+  });
+  const { store } = await loadStore(t, api);
+  await store.refreshSkills();
+
+  assert.equal(await store.setSkillEnabled("locked", true), false);
+  assert.equal(await store.setSkillEnabled("recap", true), false);
+  await settle();
+
+  assert.equal(api.lists, 3);
+  assert.equal(store.useSkillsStore.getState().skills[0].enabled, false);
 });
 
 test("switching on bumps the icon's play count and switching off doesn't", async (t) => {

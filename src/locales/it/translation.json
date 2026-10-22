@@ -4563,7 +4563,7 @@
       "more": "Altre opzioni per {{name}}",
       "files": "File",
       "copyFile": "Copia {{path}}",
-      "neverRun": "Mostrato, mai eseguito",
+      "neverRun": "OpenWhispr non esegue mai script",
       "uninstall": "Disinstalla",
       "uninstallConfirm": "Disinstallare {{name}}? Verrà rimossa da questo computer.",
       "problem": "Questa skill non può essere usata finché non viene corretta: {{reason}}",
@@ -4582,6 +4582,7 @@
       "removedFromComputer": "Rimossa da questo computer.",
       "copiedMarkdown": "Markdown copiato",
       "copyFailed": "Impossibile copiare",
+      "revealFailed": "Impossibile trovare la cartella della skill",
       "writeFailed": "Impossibile salvare la skill",
       "writeFailedNoSpace": "Il disco è pieno.",
       "writeFailedPermission": "OpenWhispr non può scrivere nella sua cartella delle skill.",
@@ -4590,7 +4591,6 @@
     "manage": {
       "title": "Gestisci skill",
       "description": "Attiva o disattiva le skill, oppure rimuovi quelle che non usi. Ognuna è salvata su questo computer.",
-      "personal": "Personale",
       "noMatches": "Nessuna skill corrisponde a \"{{query}}\".",
       "none": "Ancora nessuna skill."
     },
@@ -4609,6 +4609,8 @@
       "duplicate": "Hai già questa skill",
       "replace": "Sostituisci",
       "willReplace": "Sostituirà la tua skill attuale",
+      "willReplaceCopy": "Verrà usato al posto dell'altro file",
+      "alsoInUpload": "Un altro file di questo caricamento contiene la stessa skill",
       "skipped": "Saltata",
       "undo": "Annulla",
       "chooseFile": "Scegli un file per continuare.",
@@ -4660,7 +4662,8 @@
       "unreadableArchive": "Impossibile aprire questo file",
       "nameMismatch": "Il nome in SKILL.md non corrisponde alla sua cartella",
       "unreadable": "Impossibile leggere i file della skill",
-      "placeholder": "Sostituisci prima il segnaposto [TODO: …]"
+      "placeholder": "Sostituisci prima il segnaposto [TODO: …]",
+      "nameTaken": "Hai già una skill chiamata {{name}}"
     },
     "warnings": {
       "folderRenamed": "La cartella viene rinominata in base al nome della skill",
@@ -4684,7 +4687,7 @@
       },
       "decision-log": {
         "title": "Registro delle decisioni",
-        "description": "Tiene un elenco aggiornato delle decisioni prese nelle mie riunioni. Da usare quando chiedo cosa abbiamo deciso."
+        "description": "Trova le decisioni nelle note delle mie riunioni, con la data e la riunione di ciascuna. Da usare quando chiedo cosa abbiamo deciso."
       }
     },
     "chat": {

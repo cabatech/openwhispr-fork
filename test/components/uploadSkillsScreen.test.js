@@ -46,7 +46,16 @@ const invalid = (fileName, code) => ({
 });
 
 // previewQueue answers each preview call in turn, for screens that take several drops.
-async function renderUpload(t, { previews = [], previewQueue = null, commit = null } = {}) {
+async function renderUpload(
+  t,
+  {
+    previews = [],
+    previewQueue = null,
+    commit = null,
+    previewFails = false,
+    previewAnswered = null,
+  } = {}
+) {
   const calls = { previewed: [], committed: [], discarded: [], done: [], back: 0 };
   const mounted = await mountSkillsComponent(t, {
     modulePath: "/components/skills/UploadSkillsScreen.tsx",
@@ -55,6 +64,8 @@ async function renderUpload(t, { previews = [], previewQueue = null, commit = nu
     api: {
       skillsPreviewUpload: async (items) => {
         calls.previewed.push(items);
+        if (previewFails) throw new Error("Error invoking remote method 'skills-preview-upload'");
+        await previewAnswered;
         return { items: previewQueue ? previewQueue.shift() : previews.slice(0, items.length) };
       },
       skillsCommitUpload: async (request) => {
@@ -142,6 +153,16 @@ test("a folder or an unreadable file gets its own row, and the rest still previe
   );
 });
 
+test("a failed preview still lists every dropped file as one that can't be opened", async (t) => {
+  const { container, drop } = await renderUpload(t, { previewFails: true });
+
+  await drop(fakeFile("first.md"), fakeFile("second.zip"));
+
+  const [first, second] = rows(container);
+  assert.match(label(first), /^first\.md\s*skills\.problems\.unreadableArchive$/);
+  assert.match(label(second), /^second\.zip\s*skills\.problems\.unreadableArchive$/);
+});
+
 test("leaving the screen frees the uploads it previewed", async (t) => {
   const { calls, drop, unmount } = await renderUpload(t, {
     previews: [ready("a.md", "a"), duplicate("b.zip", "b")],
@@ -151,6 +172,22 @@ test("leaving the screen frees the uploads it previewed", async (t) => {
   await unmount();
 
   assert.deepEqual(calls.discarded, [["token-a", "token-b"]]);
+});
+
+test("uploads previewed after the screen closed are let go too", async (t) => {
+  let answer;
+  const previewAnswered = new Promise((resolve) => (answer = resolve));
+  const { calls, drop, unmount } = await renderUpload(t, {
+    previews: [ready("late.zip", "late")],
+    previewAnswered,
+  });
+  await drop(fakeFile("late.zip"));
+
+  await unmount();
+  answer();
+  await settle();
+
+  assert.deepEqual(calls.discarded, [[], ["token-late"]]);
 });
 
 test("Upload can't be pressed again once it has saved", async (t) => {
@@ -222,7 +259,7 @@ test("a skill dropped again in a later drop asks Replace or Skip too", async (t)
 
   const [first, second] = rows(container);
   assert.match(label(first), /skills\.upload\.ready/);
-  assert.match(label(second), /skills\.upload\.duplicate/);
+  assert.match(label(second), /skills\.upload\.alsoInUpload/);
   await click(button(second, "skills.upload.replace"));
   await click(submit(container));
   await settle();
@@ -230,6 +267,21 @@ test("a skill dropped again in a later drop asks Replace or Skip too", async (t)
   assert.deepEqual(calls.committed, [
     { tokens: ["token-weekly", "token-weekly-2"], replace: ["weekly"] },
   ]);
+});
+
+test("a skill twice in one upload says so, and Upload counts it once", async (t) => {
+  const { container, drop } = await renderUpload(t, {
+    previews: [ready("v1.md", "weekly"), duplicate("v2.md", "weekly")],
+  });
+  await drop(fakeFile("v1.md"), fakeFile("v2.md"));
+
+  const second = rows(container)[1];
+  assert.match(label(second), /skills\.upload\.alsoInUpload/);
+  assert.doesNotMatch(label(second), /skills\.upload\.duplicate/);
+  await click(button(second, "skills.upload.replace"));
+
+  assert.match(label(rows(container)[1]), /skills\.upload\.willReplaceCopy/);
+  assert.equal(label(submit(container)), 'skills.upload.submitCount{"count":1}');
 });
 
 test("a skipped or undecided duplicate is left out of the upload", async (t) => {
@@ -243,6 +295,29 @@ test("a skipped or undecided duplicate is left out of the upload", async (t) => 
   await settle();
 
   assert.deepEqual(calls.committed, [{ tokens: ["token-ready-one"], replace: [] }]);
+});
+
+test("a row can be removed on its own, letting go of its upload", async (t) => {
+  const { container, calls, drop } = await renderUpload(t, {
+    previews: [
+      ready("a.md", "first"),
+      invalid("notes.md", "frontmatterMissing"),
+      ready("c.md", "third"),
+    ],
+  });
+  await drop(fakeFile("a.md"), fakeFile("notes.md"), fakeFile("c.md"));
+  const removeButton = (path) =>
+    findElement(container, (node) => {
+      return ariaLabel(node) === `skills.create.removeFile{"path":"${path}"}`;
+    });
+
+  await click(removeButton("a.md"));
+  await click(removeButton("notes.md"));
+
+  assert.equal(rows(container).length, 1);
+  assert.match(label(rows(container)[0]), /^c\.md/);
+  assert.deepEqual(calls.discarded, [["token-first"]]);
+  assert.equal(label(submit(container)), 'skills.upload.submitCount{"count":1}');
 });
 
 test("a file over 25 MB is refused before it is read", async (t) => {
@@ -292,6 +367,25 @@ test("a write that fails says why and stays on the screen", async (t) => {
     {
       title: "skills.toasts.writeFailed",
       description: "skills.toasts.writeFailedNoSpace",
+      variant: "destructive",
+    },
+  ]);
+});
+
+test("a skill that appeared before Upload was pressed says so", async (t) => {
+  const { container, toasts, drop } = await renderUpload(t, {
+    previews: [ready("a.md", "weekly")],
+    commit: { installed: [], failed: [{ fileName: "a.md", error: "exists" }] },
+  });
+  await drop(fakeFile("a.md"));
+
+  await click(submit(container));
+  await settle();
+
+  assert.deepEqual(toasts, [
+    {
+      title: "skills.toasts.writeFailed",
+      description: "skills.upload.duplicate",
       variant: "destructive",
     },
   ]);

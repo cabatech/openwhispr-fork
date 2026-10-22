@@ -14,6 +14,8 @@ const {
   listDir,
   readSkill,
 } = require("./libraryFixture");
+// Loaded after the fixture, which stubs Electron first.
+const { SkillLibrary } = require("../../../src/helpers/skills/skillLibrary");
 
 async function upload(library, items, replace = []) {
   const previews = await library.previewUploads(items);
@@ -250,6 +252,42 @@ test("one skill uploaded twice, the second replacing the first, is listed once",
   assert.match(readSkill(skillsDir, "weekly"), /description: Second\./);
 });
 
+test("a window's uploads are let go when it goes away, and no other window's", async (t) => {
+  const { library } = setup(t);
+  const [kept] = await library.previewUploads([markdownUpload("kept.md", skillText("kept"))], 1);
+  const [gone] = await library.previewUploads([markdownUpload("gone.md", skillText("gone"))], 2);
+
+  library.discardUploadsFrom(2);
+  const result = library.commitUploads({ tokens: [kept.token, gone.token], replace: [] });
+
+  assert.deepEqual(result.installed, ["kept"]);
+  assert.equal(result.failed.length, 1);
+});
+
+test("Replace keeps the skill's switch as it was", async (t) => {
+  const { library } = setup(t);
+  await upload(library, [markdownUpload("off.md", skillText("off", "Old."))]);
+  await upload(library, [markdownUpload("on.md", skillText("on", "Old."))]);
+  library.setEnabled("off", false);
+
+  await upload(
+    library,
+    [
+      markdownUpload("off-2.md", skillText("off", "New.")),
+      markdownUpload("on-2.md", skillText("on", "New.")),
+    ],
+    ["off", "on"]
+  );
+
+  assert.deepEqual(
+    library.scan().map((skill) => [skill.name, skill.enabled, skill.description]),
+    [
+      ["on", true, "New."],
+      ["off", false, "New."],
+    ]
+  );
+});
+
 test("an upload stays ready until it is installed or discarded", async (t) => {
   const { library, skillsDir } = setup(t);
   t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 9, 20, 9, 0, 0) });
@@ -296,6 +334,34 @@ test(
   }
 );
 
+test("a file whose preview throws is refused alone, and the rest still preview", async (t) => {
+  const { library } = setup(t);
+  const previewOne = library._previewUpload.bind(library);
+  t.mock.method(library, "_previewUpload", (item, batchNames) => {
+    if (item.fileName === "broken.zip") throw new RangeError("out of range");
+    return previewOne(item, batchNames);
+  });
+
+  const previews = await library.previewUploads([
+    markdownUpload("first.md", skillText("first")),
+    { fileName: "broken.zip", data: Buffer.from("PK") },
+    markdownUpload("last.md", skillText("last")),
+  ]);
+
+  assert.deepEqual(
+    previews.map((preview) => [
+      preview.fileName,
+      preview.status,
+      preview.problems.map((problem) => problem.code),
+    ]),
+    [
+      ["first.md", "ready", []],
+      ["broken.zip", "invalid", ["unreadableArchive"]],
+      ["last.md", "ready", []],
+    ]
+  );
+});
+
 test("a failed write leaves the old skill and no staging folder", async (t) => {
   const { library, skillsDir } = setup(t);
   await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
@@ -315,6 +381,29 @@ test("a failed write leaves the old skill and no staging folder", async (t) => {
   assert.deepEqual(result, { installed: [], failed: [{ fileName: "b.md", error: "noSpace" }] });
   assert.match(readSkill(skillsDir, "keep"), /Old\./);
   assert.deepEqual(listDir(skillsDir), ["keep"]);
+});
+
+test("an upload that fails for a reason the app can't name reports it as unknown", async (t) => {
+  const { library, database } = setup(t);
+  const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("weekly"))]);
+  t.mock.method(database, "upsertSkillState", () => {
+    throw Object.assign(new Error("database or disk is full"), { code: "SQLITE_FULL" });
+  });
+
+  const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+
+  assert.deepEqual(result, { installed: [], failed: [{ fileName: "a.md", error: "unknown" }] });
+});
+
+test("an upload whose skill appeared after its preview is reported, not dropped", async (t) => {
+  const { library, skillsDir } = setup(t);
+  const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("weekly"))]);
+  writeFolder(skillsDir, "weekly", { "SKILL.md": skillText("weekly", "Made meanwhile.") });
+
+  const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+
+  assert.deepEqual(result, { installed: [], failed: [{ fileName: "a.md", error: "exists" }] });
+  assert.match(readSkill(skillsDir, "weekly"), /Made meanwhile\./);
 });
 
 test("a failed write keeps the upload, so it can be tried again", async (t) => {
@@ -339,10 +428,10 @@ test("a failed swap puts the old skill back", async (t) => {
   const newer = markdownUpload("b.md", skillText("keep", "New."));
   const [preview] = await library.previewUploads([newer]);
   const realRename = fs.renameSync;
-  let renames = 0;
   t.mock.method(fs, "renameSync", (from, to) => {
-    renames += 1;
-    if (renames === 2) throw Object.assign(new Error("denied"), { code: "EACCES" });
+    if (path.basename(from).startsWith(".staging-")) {
+      throw Object.assign(new Error("denied"), { code: "EACCES" });
+    }
     return realRename(from, to);
   });
 
@@ -352,6 +441,117 @@ test("a failed swap puts the old skill back", async (t) => {
   assert.deepEqual(result.failed, [{ fileName: "b.md", error: "permission" }]);
   assert.match(readSkill(skillsDir, "keep"), /Old\./);
   assert.deepEqual(listDir(skillsDir), ["keep"]);
+});
+
+// Antivirus and the search indexer can hold a file Windows just saw written for a moment.
+function onPlatform(t, platform) {
+  const original = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { ...original, value: platform });
+  t.after(() => Object.defineProperty(process, "platform", original));
+}
+
+function renamesRefusedTwice(t, code) {
+  const realRename = fs.renameSync;
+  let refused = 0;
+  t.mock.method(fs, "renameSync", (from, to) => {
+    if (refused < 2) {
+      refused += 1;
+      throw Object.assign(new Error("busy"), { code });
+    }
+    return realRename(from, to);
+  });
+}
+
+test("on Windows, a rename refused for a moment is tried again", async (t) => {
+  for (const code of ["EPERM", "EACCES", "EBUSY"]) {
+    const { library, skillsDir } = setup(t);
+    const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("busy"))]);
+    onPlatform(t, "win32");
+    renamesRefusedTwice(t, code);
+
+    const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+    t.mock.restoreAll();
+
+    assert.deepEqual(result, { installed: ["busy"], failed: [] }, code);
+    assert.deepEqual(listDir(skillsDir), ["busy"], code);
+  }
+});
+
+test("elsewhere, a refused rename isn't tried again", async (t) => {
+  const { library } = setup(t);
+  const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("busy"))]);
+  onPlatform(t, "darwin");
+  renamesRefusedTwice(t, "EPERM");
+
+  const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+  t.mock.restoreAll();
+
+  assert.deepEqual(result, { installed: [], failed: [{ fileName: "a.md", error: "permission" }] });
+});
+
+// The app can stop between any two steps of a write, so each test stops it after one.
+test("a replace cut short puts the old skill back when the library next opens", async (t) => {
+  const { library, database, userDataDir, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
+  library.setEnabled("keep", false);
+  const newer = markdownUpload("b.md", skillText("keep", "New."));
+  const [preview] = await library.previewUploads([newer]);
+  const realRename = fs.renameSync;
+  let renames = 0;
+  t.mock.method(fs, "renameSync", (from, to) => {
+    renames += 1;
+    if (renames > 1) throw Object.assign(new Error("stopped"), { code: "EIO" });
+    return realRename(from, to);
+  });
+  library.commitUploads({ tokens: [preview.token], replace: ["keep"] });
+  t.mock.restoreAll();
+  assert.ok(!listDir(skillsDir).includes("keep"));
+
+  const reopened = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(
+    reopened.scan().map((skill) => [skill.name, skill.enabled, skill.description]),
+    [["keep", false, "Old."]]
+  );
+  assert.deepEqual(listDir(skillsDir), ["keep"]);
+});
+
+test("a replace that finished leaves no old copy once the library next opens", async (t) => {
+  const { library, database, userDataDir, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
+  const newer = markdownUpload("b.md", skillText("keep", "New."));
+  const [preview] = await library.previewUploads([newer]);
+  t.mock.method(fs, "rmSync", () => {
+    throw Object.assign(new Error("stopped"), { code: "EIO" });
+  });
+  library.commitUploads({ tokens: [preview.token], replace: ["keep"] });
+  t.mock.restoreAll();
+  assert.equal(listDir(skillsDir).length, 2);
+
+  const reopened = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(listDir(skillsDir), ["keep"]);
+  assert.match(readSkill(skillsDir, "keep"), /New\./);
+  assert.deepEqual(
+    reopened.scan().map((skill) => skill.name),
+    ["keep"]
+  );
+});
+
+test("an uninstall or a write cut short leaves nothing once the library next opens", async (t) => {
+  const { library, database, userDataDir, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("gone.md", skillText("gone"))]);
+  t.mock.method(fs, "rmSync", () => {
+    throw Object.assign(new Error("stopped"), { code: "EIO" });
+  });
+  library.uninstall("gone");
+  t.mock.restoreAll();
+  writeFolder(skillsDir, ".staging-1234", { "SKILL.md": skillText("half") });
+  assert.equal(listDir(skillsDir).length, 2);
+
+  new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(listDir(skillsDir), []);
 });
 
 test("folders starting with a dot, like an interrupted write's, are never listed", (t) => {
@@ -406,6 +606,44 @@ test("a symlinked skill folder or file is never followed", (t) => {
   assert.equal(library.readFile("has-link", "notes.md"), null);
   assert.equal(library.skillDir("linked"), null);
   assert.deepEqual([library.get("linked").markdown, library.get("linked").files], ["", []]);
+});
+
+test("a skill whose files can't be read opens with no instructions instead of failing", (t) => {
+  const { library, skillsDir } = setup(t);
+  writeFolder(skillsDir, "locked", {
+    "SKILL.md": skillText("locked"),
+    "references/a.md": "A",
+  });
+  writeFolder(skillsDir, "racy", { "SKILL.md": skillText("racy"), "references/b.md": "B" });
+  library.scan();
+  const realReaddir = fs.readdirSync;
+  const realReadFile = fs.readFileSync;
+  // The library reads through the folder's real path, so these match its end.
+  t.mock.method(fs, "readdirSync", (dir, options) => {
+    if (dir.endsWith(path.join("locked", "references"))) {
+      throw Object.assign(new Error("denied"), { code: "EACCES" });
+    }
+    return realReaddir(dir, options);
+  });
+  // Gone between listing the folder and reading the file.
+  t.mock.method(fs, "readFileSync", (file, options) => {
+    if (String(file).endsWith(path.join("racy", "references", "b.md"))) {
+      throw Object.assign(new Error("gone"), { code: "ENOENT" });
+    }
+    return realReadFile(file, options);
+  });
+
+  const locked = library.get("locked");
+  const racy = library.get("racy");
+  t.mock.restoreAll();
+
+  assert.deepEqual([locked.valid, locked.problem, locked.markdown, locked.files], [
+    false,
+    { code: "unreadable" },
+    "",
+    [],
+  ]);
+  assert.deepEqual([racy.markdown, racy.files], ["", []]);
 });
 
 test("readFile refuses paths outside the skill and binary files", (t) => {
@@ -471,7 +709,7 @@ test("create names the folder from the title and keeps it unique", (t) => {
     ],
   });
   const second = library.create({
-    title: "Weekly status report",
+    title: "Weekly status report!",
     description: "Another.",
     instructions: "Go",
     files: [],
@@ -489,6 +727,35 @@ test("create names the folder from the title and keeps it unique", (t) => {
   const created = path.join(skillsDir, "weekly-status-report");
   assert.equal(fs.readFileSync(path.join(created, "references", "example.md"), "utf8"), "Example");
   assert.equal(fs.readFileSync(path.join(created, "scripts", "export.sh"), "utf8"), "echo hi");
+});
+
+// Two skills never show the same title, so their cards can be told apart.
+test("create refuses a title one of your skills already shows", (t) => {
+  const { library, skillsDir } = setup(t);
+  const make = (title) =>
+    library.create({ title, description: "Recaps.", instructions: "Go", files: [] });
+  assert.deepEqual(make("Weekly report"), { name: "weekly-report" });
+
+  for (const title of ["Weekly report", "  weekly   REPORT "]) {
+    assert.deepEqual(make(title), {
+      problems: [{ code: "nameTaken", values: { name: title.trim() } }],
+    });
+  }
+  assert.deepEqual(listDir(skillsDir), ["weekly-report"]);
+});
+
+test("a hand-made skill never takes a starter skill's folder", (t) => {
+  const { library } = setup(t);
+  const copy = { title: "Decision log", description: "Finds decisions." };
+
+  const made = library.create({ ...copy, instructions: "Mine", files: [] });
+
+  assert.deepEqual(made, { name: "decision-log-2" });
+  assert.deepEqual(library.addRecommended("decision-log", copy), {
+    problems: [{ code: "nameTaken", values: { name: "Decision log" } }],
+  });
+  const translated = { ...copy, title: "Journal des décisions" };
+  assert.deepEqual(library.addRecommended("decision-log", translated), { name: "decision-log" });
 });
 
 test("create returns the problems instead of writing a skill that can't be used", (t) => {

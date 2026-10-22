@@ -4563,7 +4563,7 @@
       "more": "{{name}} 的更多操作",
       "files": "文件",
       "copyFile": "复制 {{path}}",
-      "neverRun": "仅显示，从不运行",
+      "neverRun": "OpenWhispr 从不运行脚本",
       "uninstall": "卸载",
       "uninstallConfirm": "要卸载 {{name}} 吗？它将从这台电脑中移除。",
       "problem": "此技能修复后才能使用：{{reason}}",
@@ -4582,6 +4582,7 @@
       "removedFromComputer": "已从这台电脑中移除。",
       "copiedMarkdown": "已复制 Markdown",
       "copyFailed": "无法复制",
+      "revealFailed": "无法找到技能的文件夹",
       "writeFailed": "无法保存技能",
       "writeFailedNoSpace": "您的磁盘已满。",
       "writeFailedPermission": "OpenWhispr 无法写入其技能文件夹。",
@@ -4590,7 +4591,6 @@
     "manage": {
       "title": "管理技能",
       "description": "开启或关闭技能，或移除不用的技能。每个技能都保存在这台电脑上。",
-      "personal": "个人",
       "noMatches": "没有与“{{query}}”匹配的技能。",
       "none": "还没有技能。"
     },
@@ -4609,6 +4609,8 @@
       "duplicate": "您已有此技能",
       "replace": "替换",
       "willReplace": "将替换您当前的技能",
+      "willReplaceCopy": "将代替另一个文件使用",
+      "alsoInUpload": "此次上传的另一个文件包含相同的技能",
       "skipped": "已跳过",
       "undo": "撤销",
       "chooseFile": "选择一个文件以继续。",
@@ -4660,7 +4662,8 @@
       "unreadableArchive": "无法打开此文件",
       "nameMismatch": "SKILL.md 中的名称与其文件夹不一致",
       "unreadable": "无法读取该技能的文件",
-      "placeholder": "请先替换 [TODO: …] 占位符"
+      "placeholder": "请先替换 [TODO: …] 占位符",
+      "nameTaken": "您已有名为 {{name}} 的技能"
     },
     "warnings": {
       "folderRenamed": "文件夹将重命名为与技能名称一致",
@@ -4684,7 +4687,7 @@
       },
       "decision-log": {
         "title": "决策记录",
-        "description": "持续整理我会议中的决策清单。当我问我们决定了什么时使用。"
+        "description": "在我的会议笔记中查找决策，并注明每项决策的日期和会议。当我问我们决定了什么时使用。"
       }
     },
     "chat": {

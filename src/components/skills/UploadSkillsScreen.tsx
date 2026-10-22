@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Check, Code2, FileText, Info } from "../icons";
+import { AlertTriangle, Check, Code2, FileText, Info, X } from "../icons";
 import { Button } from "../ui/button";
 import { Breadcrumb } from "../ui/Breadcrumb";
 import { DropZone } from "../ui/DropZone";
@@ -46,8 +46,11 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
   const nextRowId = useRef(0);
   // Every upload this screen previewed; whatever didn't install is let go when it closes.
   const issued = useRef(new Set<string>());
+  const closed = useRef(false);
   const hintId = useId();
   const toInstall = rows.filter(willInstall);
+  // Two files of one skill install as one, so the button counts skills.
+  const skillCount = new Set(toInstall.map((row) => row.preview.name)).size;
 
   const addFiles = async (files: File[]) => {
     // Read one by one, so a file that can't be read doesn't take the others with it.
@@ -65,9 +68,19 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
     const items = read.flatMap((entry) =>
       "data" in entry ? [{ fileName: entry.file.name, data: entry.data }] : []
     );
-    const result = items.length > 0 ? await window.electronAPI?.skillsPreviewUpload?.(items) : null;
+    // A preview that fails leaves every file shown as one that can't be opened.
+    const result =
+      items.length > 0
+        ? await window.electronAPI?.skillsPreviewUpload?.(items)?.catch(() => null)
+        : null;
     const previews = result && "items" in result ? result.items : [];
-    for (const preview of previews) if (preview.token) issued.current.add(preview.token);
+    const tokens = previews.flatMap((preview) => (preview.token ? [preview.token] : []));
+    // Previewed after the screen closed, so nothing here will install or free them.
+    if (closed.current) {
+      void window.electronAPI?.skillsDiscardUploads?.(tokens);
+      return;
+    }
+    for (const token of tokens) issued.current.add(token);
     let next = 0;
     const added = read.map((entry): UploadRow => ({
       id: nextRowId.current++,
@@ -93,9 +106,23 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
   };
 
   useEffect(() => {
+    closed.current = false;
     const held = issued.current;
-    return () => void window.electronAPI?.skillsDiscardUploads?.([...held]);
+    return () => {
+      closed.current = true;
+      void window.electronAPI?.skillsDiscardUploads?.([...held]);
+    };
   }, []);
+
+  // Takes one file out of the upload, and lets go of what was previewed for it.
+  const remove = (row: UploadRow) => {
+    const { token } = row.preview;
+    if (token) {
+      issued.current.delete(token);
+      void window.electronAPI?.skillsDiscardUploads?.([token]);
+    }
+    setRows((current) => current.filter((entry) => entry.id !== row.id));
+  };
 
   const choose = (id: number, choice?: UploadRow["choice"]) =>
     setRows((current) => current.map((row) => (row.id === id ? { ...row, choice } : row)));
@@ -146,13 +173,20 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
         </span>
       );
     }
+    // A skill another file in this upload also holds, rather than one already installed.
+    const repeat = rows.some(
+      (other) =>
+        other.id < row.id &&
+        other.preview.status !== "invalid" &&
+        other.preview.name === preview.name
+    );
     if (row.choice) {
       return (
         <>
           {row.choice === "replace" ? (
             <span className="flex items-center gap-1.5 text-xs text-foreground">
               <Check size={13} className="text-success" />
-              {t("skills.upload.willReplace")}
+              {t(repeat ? "skills.upload.willReplaceCopy" : "skills.upload.willReplace")}
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">{t("skills.upload.skipped")}</span>
@@ -167,7 +201,7 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
       <>
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Info size={13} className="text-info shrink-0" />
-          {t("skills.upload.duplicate")}
+          {t(repeat ? "skills.upload.alsoInUpload" : "skills.upload.duplicate")}
         </span>
         <Button
           variant="outline"
@@ -253,6 +287,14 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">{status(row)}</div>
+                  <button
+                    type="button"
+                    onClick={() => remove(row)}
+                    aria-label={t("skills.create.removeFile", { path: row.preview.fileName })}
+                    className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/70 hover:bg-foreground/8 hover:text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring/30"
+                  >
+                    <X size={12} />
+                  </button>
                   {row.preview.status !== "invalid" &&
                     row.preview.warnings.map((warning) => (
                       <p
@@ -285,7 +327,7 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
         >
           {toInstall.length === 0
             ? t("skills.upload.submit")
-            : t("skills.upload.submitCount", { count: toInstall.length })}
+            : t("skills.upload.submitCount", { count: skillCount })}
         </Button>
       </div>
     </IntegrationsPane>

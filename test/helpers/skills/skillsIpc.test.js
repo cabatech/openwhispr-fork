@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { EventEmitter } = require("node:events");
 
 const { installElectronStub } = require("../harness/electronStub.js");
 
@@ -30,6 +31,7 @@ function fakeLibrary(overrides = {}) {
     previewUploads: record("previewUploads", []),
     commitUploads: record("commitUploads", { installed: ["meeting-prep"], failed: [] }),
     discardUploads: record("discardUploads"),
+    discardUploadsFrom: record("discardUploadsFrom"),
     create: record("create", { name: "weekly-recap" }),
     addRecommended: record("addRecommended", { name: "decision-log" }),
     readForModel: record("readForModel", { name: "meeting-prep", body: "Steps", files: [] }),
@@ -42,6 +44,9 @@ function fakeLibrary(overrides = {}) {
   };
 }
 
+// A window's webContents: an id, and the events Electron sends when it goes away or reloads.
+const fakeSender = (id = 1) => Object.assign(new EventEmitter(), { id });
+
 function setup(libraryOverrides) {
   const handlers = new Map();
   const broadcasts = [];
@@ -53,8 +58,9 @@ function setup(libraryOverrides) {
     shell: { showItemInFolder: (target) => revealed.push(target) },
     broadcast: (channel) => broadcasts.push(channel),
   });
-  const call = (channel, ...args) => handlers.get(channel)({}, ...args);
-  return { call, library, broadcasts, revealed };
+  const callAs = (sender, channel, ...args) => handlers.get(channel)({ sender }, ...args);
+  const call = (channel, ...args) => callAs(fakeSender(), channel, ...args);
+  return { call, callAs, library, broadcasts, revealed };
 }
 
 const upload = (overrides = {}) => ({ fileName: "a.md", data: new Uint8Array([45]), ...overrides });
@@ -95,6 +101,32 @@ test("discarding uploads frees them without telling the windows", async () => {
 
   assert.deepEqual(library.calls, [["discardUploads", ["a", "b"]]]);
   assert.deepEqual(broadcasts, []);
+});
+
+test("a window that closes, crashes or reloads lets go of the uploads it previewed", async () => {
+  const { callAs, library } = setup();
+  const released = () => library.calls.filter(([method]) => method === "discardUploadsFrom");
+  const panel = fakeSender(7);
+
+  await callAs(panel, "skills-preview-upload", [upload()]);
+  await callAs(panel, "skills-preview-upload", [upload()]);
+  panel.emit("did-start-navigation", { isMainFrame: true, isSameDocument: true });
+  panel.emit("did-start-navigation", { isMainFrame: false, isSameDocument: false });
+  assert.deepEqual(released(), []);
+
+  panel.emit("did-start-navigation", { isMainFrame: true, isSameDocument: false });
+  panel.emit("render-process-gone", {}, { reason: "crashed" });
+  panel.emit("destroyed");
+
+  assert.deepEqual(
+    library.calls.filter(([method]) => method === "previewUploads").map((entry) => entry[2]),
+    [7, 7]
+  );
+  assert.deepEqual(released(), [
+    ["discardUploadsFrom", 7],
+    ["discardUploadsFrom", 7],
+    ["discardUploadsFrom", 7],
+  ]);
 });
 
 test("every write broadcasts skills-changed", async () => {
@@ -149,6 +181,20 @@ test("a write that fails reports why", async () => {
     error: "permission",
   });
   assert.deepEqual(await call("skills-create", draft), { ok: false, error: "noSpace" });
+  assert.deepEqual(broadcasts, []);
+});
+
+test("a switch the database can't save is refused with a reason, not thrown", async () => {
+  const { call, broadcasts } = setup({
+    setEnabled: () => {
+      throw Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+    },
+  });
+
+  assert.deepEqual(await call("skills-set-enabled", "meeting-prep", true), {
+    ok: false,
+    error: "unknown",
+  });
   assert.deepEqual(broadcasts, []);
 });
 

@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const path = require("path");
 const yaml = require("js-yaml");
+const { WINDOWS_RESERVED_NAME } = require("../windowsReservedName");
 
 // The Agent Skills format (agentskills.io): a folder holding SKILL.md, whose
 // header block carries a name and a description.
@@ -13,9 +14,6 @@ const SKILL_LIMITS = {
   warnBodyLines: 500,
 };
 const SKILL_NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-// The Windows device names markdownMirror.js also avoids: a file or folder named like this
-// can't be written on Windows, so a skill holding one, or named one, couldn't move there.
-const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\..*)?$/i;
 const ALLOWED_TOP_LEVEL_KEYS = [
   "name",
   "description",
@@ -51,16 +49,14 @@ function normalizeLineEndings(text) {
 
 // Agent Skills header: "---" on the first line, closed by "---" (or "...") on its own line.
 function splitFrontmatter(text) {
-  if (!text.startsWith("---\n")) return { header: null, body: text, headerEnd: 0 };
+  if (!text.startsWith("---\n")) return { header: null, body: text };
   const close = /\n(?:---|\.\.\.)[ \t]*(?:\n|$)/g;
   close.lastIndex = 3;
   const match = close.exec(text);
-  if (!match) return { header: null, body: text, headerEnd: 0 };
-  const headerEnd = match.index + match[0].length;
+  if (!match) return { header: null, body: text };
   return {
     header: text.slice(4, match.index),
-    body: text.slice(headerEnd).replace(/^\n+/, ""),
-    headerEnd,
+    body: text.slice(match.index + match[0].length).replace(/^\n+/, ""),
   };
 }
 
@@ -82,7 +78,7 @@ function fieldProblems(data) {
   if (!trimmedString(name)) problems.push({ code: "missingName" });
   else if (!SKILL_NAME_PATTERN.test(name)) problems.push({ code: "nameFormat" });
   else if (name.length > SKILL_LIMITS.nameMax) problems.push({ code: "nameTooLong" });
-  // The name is the skill's folder name.
+  // The name is the skill's folder name, so a skill named this way couldn't move to Windows.
   else if (WINDOWS_RESERVED_NAME.test(name)) problems.push({ code: "unsafePath" });
 
   const description = trimmedString(data.description);
@@ -162,9 +158,13 @@ function isScriptPath(relPath) {
  */
 function validateSkillFiles(files, { folderName, source }) {
   const skillFile = files.find((entry) => entry.path === "SKILL.md");
-  const parsed = skillFile
-    ? parseSkillMarkdown(skillFile.data.toString("utf8"))
-    : { data: null, problems: [{ code: "noSkillFile" }], warnings: [] };
+  const refused = (code) => ({ data: null, problems: [{ code }], warnings: [] });
+  // Read as UTF-8 and copied back out exactly as stored, so it must be UTF-8 text.
+  const parsed = !skillFile
+    ? refused("noSkillFile")
+    : isTextFile(skillFile.data)
+      ? parseSkillMarkdown(skillFile.data.toString("utf8"))
+      : refused("unreadable");
   const name = typeof parsed.data?.name === "string" ? parsed.data.name : "";
   const problems = [...parsed.problems];
   const warnings = [];
@@ -279,10 +279,6 @@ function contentHash(files) {
 module.exports = {
   SKILL_LIMITS,
   SKILL_NAME_PATTERN,
-  WINDOWS_RESERVED_NAME,
-  ALLOWED_TOP_LEVEL_KEYS,
-  normalizeLineEndings,
-  splitFrontmatter,
   parseSkillMarkdown,
   validateSkillFiles,
   displayNameFor,

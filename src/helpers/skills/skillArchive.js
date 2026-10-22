@@ -1,36 +1,30 @@
+const zlib = require("zlib");
 const unzipper = require("unzipper");
-const { SKILL_LIMITS, WINDOWS_RESERVED_NAME } = require("./skillFormat");
+const { WINDOWS_RESERVED_NAME } = require("../windowsReservedName");
+const { SKILL_LIMITS } = require("./skillFormat");
 
 const SKILL_FILE_NAME = "skill.md";
 const END_RECORD = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
-const ZIP64_LOCATOR = Buffer.from([0x50, 0x4b, 0x06, 0x07]);
-const ZIP64_END_RECORD = Buffer.from([0x50, 0x4b, 0x06, 0x06]);
-// The end record is 22 bytes, followed by a comment of up to 64 KB.
-const MAX_TAIL = 22 + 0xffff;
+const END_RECORD_SIZE = 22;
+// The end record is followed by a comment of up to 64 KB.
+const MAX_TAIL = END_RECORD_SIZE + 0xffff;
 // Folders and macOS metadata are entries too, so the listing may run past the file cap.
 const ENTRIES_PER_FILE = 4;
 
 // Where the end record sits and how many entries it claims, read before the archive is
 // opened: the reader takes a step per claimed entry, so a forged count would exhaust memory.
+// A field at its largest value sends the reader to a zip64 record instead, whose count can
+// be far larger; a skill never needs zip64, so such an archive isn't opened at all.
 function readEndRecord(buffer) {
-  const at = buffer.lastIndexOf(END_RECORD, buffer.length - 22);
+  if (buffer.length < END_RECORD_SIZE) return null;
+  const at = buffer.lastIndexOf(END_RECORD, buffer.length - END_RECORD_SIZE);
   if (at < 0 || buffer.length - at > MAX_TAIL) return null;
-  let entries = buffer.readUInt16LE(at + 10);
-  const locator = at - 20;
-  if (
-    entries === 0xffff &&
-    locator >= 0 &&
-    buffer.subarray(locator, locator + 4).equals(ZIP64_LOCATOR)
-  ) {
-    const record = Number(buffer.readBigUInt64LE(locator + 8));
-    if (
-      record + 56 <= buffer.length &&
-      buffer.subarray(record, record + 4).equals(ZIP64_END_RECORD)
-    ) {
-      entries = Number(buffer.readBigUInt64LE(record + 32));
-    }
-  }
-  return { entries, tailSize: buffer.length - at };
+  const entries = buffer.readUInt16LE(at + 10);
+  const usesZip64 =
+    buffer.readUInt16LE(at + 4) === 0xffff ||
+    entries === 0xffff ||
+    buffer.readUInt32LE(at + 16) === 0xffffffff;
+  return usesZip64 ? null : { entries, tailSize: buffer.length - at };
 }
 
 function isSafeArchivePath(raw) {
@@ -74,7 +68,8 @@ function hasClashingPaths(paths) {
   return [...files].some((key) => folders.has(key));
 }
 
-// The central directory's sizes can lie, so the cap counts the bytes actually read.
+// The central directory's sizes and checksums can lie, so the cap counts the bytes actually
+// read and the checksum is checked against them.
 async function readCapped(entry, budget) {
   const chunks = [];
   let size = 0;
@@ -85,7 +80,9 @@ async function readCapped(entry, budget) {
     chunks.push(chunk);
   }
   budget.remaining -= size;
-  return Buffer.concat(chunks);
+  const data = Buffer.concat(chunks);
+  if (zlib.crc32(data) !== entry.crc32) throw new Error("The entry's checksum doesn't match");
+  return data;
 }
 
 function refuse(code) {
@@ -111,6 +108,10 @@ async function readSkillArchive(buffer, { limits: overrides } = {}) {
   const entries = directory.files.filter(
     (entry) => entry.type !== "Directory" && !isJunk(entry.path)
   );
+  // Each entry is inflated from its own stretch of the file, so entries that point at the
+  // same bytes would inflate them again and again.
+  const compressedBytes = entries.reduce((total, entry) => total + entry.compressedSize, 0);
+  if (compressedBytes > buffer.length) return refuse("unreadableArchive");
   if (entries.some((entry) => !isSafeArchivePath(entry.path))) return refuse("unsafePath");
   if (entries.some(isSymlinkEntry)) return refuse("symlink");
   const paths = entries.map((entry) => entry.path.replace(/^\.\//, ""));

@@ -25,13 +25,20 @@ let subscribed = false;
 let loading: Promise<void> | null = null;
 let reloadRequested = false;
 
-// The library rereads its folder on every list, so an edit made outside the app shows up
-// when the window comes back into focus.
 function subscribe(): void {
   if (subscribed) return;
   subscribed = true;
   window.electronAPI?.onSkillsChanged?.(() => void refreshSkills());
-  window.addEventListener("focus", () => void refreshSkills());
+}
+
+/**
+ * The library rereads its folder on every list, so while the Skills page shows, an edit made
+ * outside the app appears when the window comes back into focus. Returns the way to stop.
+ */
+export function refreshSkillsOnFocus(): () => void {
+  const reread = () => void refreshSkills();
+  window.addEventListener("focus", reread);
+  return () => window.removeEventListener("focus", reread);
 }
 
 /** Reloads the list. A refresh asked for during a load runs once that load finishes. */
@@ -67,10 +74,16 @@ export function playSkillIcon(name: string): void {
   }));
 }
 
-/** Switching a skill on plays its icon; a skill that needs fixing can't be switched on. */
+/**
+ * Switching a skill on plays its icon. A switch that fails, as for a skill that needs fixing,
+ * returns false and reloads the list, which may have changed on disk.
+ */
 export async function setSkillEnabled(name: string, enabled: boolean): Promise<boolean> {
-  const result = await window.electronAPI?.skillsSetEnabled?.(name, enabled);
-  if (!result?.ok) return false;
+  const result = await window.electronAPI?.skillsSetEnabled?.(name, enabled).catch(() => null);
+  if (!result?.ok) {
+    void refreshSkills();
+    return false;
+  }
   useSkillsStore.setState((state) => ({
     skills: state.skills.map((skill) => (skill.name === name ? { ...skill, enabled } : skill)),
   }));

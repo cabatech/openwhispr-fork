@@ -7,6 +7,7 @@ const { createRendererServer, installBrowserGlobals } = require("../lib/renderer
 const {
   ariaLabel,
   click,
+  dispatch,
   label,
   mountSkillsComponent,
   pressEscape,
@@ -123,6 +124,60 @@ test("Uninstall asks in the footer first and then removes the skill", async (t) 
   ]);
 });
 
+test("pressing Uninstall again while it runs uninstalls once", async (t) => {
+  const uninstalled = [];
+  const { container, toasts } = await openDetail(t, {
+    api: {
+      skillsUninstall: async (name) => {
+        uninstalled.push(name);
+        return { ok: true };
+      },
+    },
+  });
+  await click(button(container, "skills.detail.uninstall"));
+  const confirm = button(alert(container), "skills.detail.uninstall");
+
+  await React.act(async () => {
+    dispatch(confirm, "click");
+    dispatch(confirm, "click");
+  });
+  await settle();
+
+  assert.deepEqual(uninstalled, ["meeting-prep"]);
+  assert.equal(toasts.length, 1);
+});
+
+test("Copy markdown copies what the pop-up shows, without reading the skill again", async (t) => {
+  const reads = [];
+  const { container, calls, toasts } = await openDetail(t, {
+    api: {
+      skillsGet: async (name) => {
+        reads.push(name);
+        return { ...skill(name), markdown: MARKDOWN, files: FILES };
+      },
+    },
+  });
+
+  await click(button(container, "skills.menu.copyMarkdown"));
+  await settle();
+
+  assert.deepEqual(reads, ["meeting-prep"]);
+  assert.deepEqual(calls.clipboard, [MARKDOWN]);
+  assert.deepEqual(toasts, [{ title: "skills.toasts.copiedMarkdown", variant: "success" }]);
+});
+
+test("a file that can't be copied says so", async (t) => {
+  const { container, toasts } = await openDetail(t, { api: { skillsReadFile: async () => null } });
+  const copy = findElement(container, (node) =>
+    ariaLabel(node).startsWith("skills.detail.copyFile")
+  );
+
+  await click(copy);
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.copyFailed", variant: "destructive" }]);
+});
+
 test("a failed uninstall keeps the pop-up open and says why", async (t) => {
   const { container, toasts, calls } = await openDetail(t, {
     api: { skillsUninstall: async () => ({ ok: false, error: "permission" }) },
@@ -157,6 +212,25 @@ test("Esc in the confirm cancels it, and Esc again closes the pop-up", async (t)
   assert.equal(dialog(container), null);
 });
 
+// Manage's ⋯ Uninstall opens the pop-up on its confirm: backing out returns to Manage.
+test("Cancel on a confirm opened from Manage's menu closes the pop-up", async (t) => {
+  const { container, calls } = await openDetail(t, { confirm: true });
+
+  await click(button(alert(container), "common.cancel"));
+
+  assert.deepEqual(calls.openChange, [false]);
+  assert.equal(dialog(container), null);
+});
+
+test("Esc on a confirm opened from Manage's menu closes the pop-up", async (t) => {
+  const { container, calls } = await openDetail(t, { confirm: true });
+
+  await pressEscape(button(alert(container), "common.cancel"));
+
+  assert.deepEqual(calls.openChange, [false]);
+  assert.equal(dialog(container), null);
+});
+
 test("opening on its confirm focuses Cancel", async (t) => {
   const { container } = await openDetail(t, { confirm: true });
 
@@ -164,7 +238,7 @@ test("opening on its confirm focuses Cancel", async (t) => {
   assert.equal(container.ownerDocument.activeElement === cancel, true);
 });
 
-test("scripts are labelled Shown, never run and binary files have no Copy button", async (t) => {
+test("scripts say OpenWhispr never runs them and binary files have no Copy button", async (t) => {
   const { container, calls } = await openDetail(t);
   const row = (path) =>
     findElement(
@@ -220,6 +294,17 @@ test("switching a skill on plays its icon once; switching it off doesn't", async
   ]);
   assert.equal(icon() === played, true);
   assert.equal(store.useSkillsStore.getState().iconPlays["meeting-prep"], 1);
+});
+
+test("a switch that can't be saved says so", async (t) => {
+  const { container, toasts } = await openDetail(t, {
+    api: { skillsSetEnabled: async () => ({ ok: false, error: "unknown" }) },
+  });
+
+  await click(toggle(container));
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.writeFailed", variant: "destructive" }]);
 });
 
 test("an invalid skill's switch is off and disabled, and its problem is shown", async (t) => {

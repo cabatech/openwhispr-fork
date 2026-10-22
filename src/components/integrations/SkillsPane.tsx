@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { refreshSkills, useSkillsStore } from "../../stores/skillsStore";
+import { refreshSkills, refreshSkillsOnFocus, useSkillsStore } from "../../stores/skillsStore";
 import { useToast } from "../ui/useToast";
 import { CreateSkillScreen } from "../skills/CreateSkillScreen";
 import { ManageSkillsScreen } from "../skills/ManageSkillsScreen";
@@ -48,7 +48,8 @@ export function SkillsPane({
   const [detail, setDetail] = useState<{ name: string; confirmUninstall: boolean } | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
-  // Opening the pane rereads the folder, so a skill edited outside the app shows up.
+  // Opening the pane rereads the folder, as does a window focus while it shows, so a skill
+  // edited outside the app shows up.
   useEffect(() => {
     if (!active) return;
     void refreshSkills().then(() => {
@@ -56,6 +57,7 @@ export function SkillsPane({
         toast({ title: t("skills.toasts.loadFailed"), variant: "destructive" });
       }
     });
+    return refreshSkillsOnFocus();
   }, [active, t, toast]);
 
   // Open skill from a chat; the request stays set until the parent clears it.
@@ -88,7 +90,8 @@ export function SkillsPane({
     setDetail({ name, confirmUninstall });
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Escape" || screen === "home" || isInsidePopup(event.target)) return;
+    if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+    if (screen === "home" || isInsidePopup(event.target)) return;
     event.preventDefault();
     goHome();
   };

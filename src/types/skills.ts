@@ -21,7 +21,8 @@ export type SkillProblemCode =
   | "unreadableArchive"
   | "nameMismatch"
   | "unreadable"
-  | "placeholder";
+  | "placeholder"
+  | "nameTaken";
 
 export type SkillWarningCode =
   "folderRenamed" | "reservedWord" | "longBody" | "longDescription" | "unknownKeys";
@@ -42,8 +43,8 @@ export interface SkillSummary {
   /** False for a skill that needs fixing; it can't be switched on. */
   valid: boolean;
   problem?: SkillIssue<SkillProblemCode>;
-  addedAt: string;
-  updatedAt: string;
+  addedAt: string | null;
+  updatedAt: string | null;
   lastUsedAt: string | null;
 }
 
@@ -84,7 +85,8 @@ export type SkillInvalidRequest = { ok: false; error: "invalid" };
 
 export interface SkillCommitResult {
   installed: string[];
-  failed: { fileName: string; error: SkillWriteError }[];
+  /** "exists" when the skill arrived from elsewhere after its preview, so it wasn't replaced. */
+  failed: { fileName: string; error: SkillWriteError | "exists" }[];
 }
 
 export interface SkillCreateInput {

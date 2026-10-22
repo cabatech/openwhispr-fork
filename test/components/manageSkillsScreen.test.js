@@ -58,7 +58,7 @@ const button = (root, text) =>
   findElement(root, (node) => node.tagName === "BUTTON" && label(node) === text);
 
 test(
-  "Manage lists every skill with its badge, menu and switch, and a row opens the detail",
+  "Manage lists every skill with its menu and switch, and a row opens the detail",
   async (t) => {
     const skills = [
       ...Array.from({ length: 7 }, (_, index) => skill(`skill-${index + 1}`)),
@@ -75,7 +75,8 @@ test(
 
     assert.equal(rows(container).length, 9);
     for (const row of rows(container)) {
-      assert.match(label(row), /skills\.manage\.personal/);
+      // Every skill here is the user's own, so no row carries a badge saying so.
+      assert.doesNotMatch(label(row), /skills\.manage\.personal/);
       assert.ok(findElement(row, (node) => ariaLabel(node).startsWith("skills.detail.more")));
     }
     const switchOf = (name) =>
@@ -102,6 +103,21 @@ test(
   }
 );
 
+test("a row's switch that can't be saved says so", async (t) => {
+  const { container, toasts } = await renderManage(t, {
+    skills: [skill("paused", { enabled: false })],
+    api: { skillsSetEnabled: async () => ({ ok: false, error: "unknown" }) },
+  });
+  const toggle = findElement(rowFor(container, "paused"), (node) => {
+    return node.getAttribute("role") === "switch";
+  });
+
+  await click(toggle);
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.writeFailed", variant: "destructive" }]);
+});
+
 test("a skill that needs fixing says so on its row, and its switch shows off", async (t) => {
   const skills = [skill("broken", { valid: false, problem: { code: "nameMismatch" } })];
   const { container } = await renderManage(t, { skills });
@@ -122,6 +138,18 @@ test("the menu reveals the folder and copies the markdown exactly", async (t) =>
   assert.deepEqual(calls.revealed, ["recap"]);
   assert.deepEqual(calls.clipboard, [COPIED]);
   assert.deepEqual(toasts, [{ title: "skills.toasts.copiedMarkdown", variant: "success" }]);
+});
+
+test("a folder that can't be shown says so", async (t) => {
+  const { container, toasts } = await renderManage(t, {
+    skills: [skill("recap")],
+    api: { skillsReveal: async () => ({ ok: false }) },
+  });
+
+  await click(button(container, "controlPanel.history.showInFolder"));
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.revealFailed", variant: "destructive" }]);
 });
 
 test("a copy that fails says so", async (t) => {

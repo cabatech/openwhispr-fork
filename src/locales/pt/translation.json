@@ -4563,7 +4563,7 @@
       "more": "Mais opções para {{name}}",
       "files": "Arquivos",
       "copyFile": "Copiar {{path}}",
-      "neverRun": "Exibido, nunca executado",
+      "neverRun": "O OpenWhispr nunca executa scripts",
       "uninstall": "Desinstalar",
       "uninstallConfirm": "Desinstalar {{name}}? Ela será removida deste computador.",
       "problem": "Esta habilidade não pode ser usada até ser corrigida: {{reason}}",
@@ -4582,6 +4582,7 @@
       "removedFromComputer": "Removida deste computador.",
       "copiedMarkdown": "Markdown copiado",
       "copyFailed": "Não foi possível copiar",
+      "revealFailed": "Não foi possível encontrar a pasta da habilidade",
       "writeFailed": "Não foi possível salvar a habilidade",
       "writeFailedNoSpace": "Seu disco está cheio.",
       "writeFailedPermission": "O OpenWhispr não consegue gravar na pasta de habilidades.",
@@ -4590,7 +4591,6 @@
     "manage": {
       "title": "Gerenciar habilidades",
       "description": "Ative ou desative habilidades, ou remova as que você não usa. Cada uma fica salva neste computador.",
-      "personal": "Pessoal",
       "noMatches": "Nenhuma habilidade corresponde a \"{{query}}\".",
       "none": "Nenhuma habilidade ainda."
     },
@@ -4609,6 +4609,8 @@
       "duplicate": "Você já tem esta habilidade",
       "replace": "Substituir",
       "willReplace": "Vai substituir sua habilidade atual",
+      "willReplaceCopy": "Será usado no lugar do outro arquivo",
+      "alsoInUpload": "Outro arquivo deste envio tem a mesma habilidade",
       "skipped": "Ignorada",
       "undo": "Desfazer",
       "chooseFile": "Escolha um arquivo para continuar.",
@@ -4660,7 +4662,8 @@
       "unreadableArchive": "Não é possível abrir este arquivo",
       "nameMismatch": "O nome dentro do SKILL.md não corresponde à pasta",
       "unreadable": "Não é possível ler os arquivos da habilidade",
-      "placeholder": "Substitua primeiro o marcador [TODO: …]"
+      "placeholder": "Substitua primeiro o marcador [TODO: …]",
+      "nameTaken": "Você já tem uma habilidade chamada {{name}}"
     },
     "warnings": {
       "folderRenamed": "A pasta é renomeada para corresponder ao nome da habilidade",
@@ -4684,7 +4687,7 @@
       },
       "decision-log": {
         "title": "Registro de decisões",
-        "description": "Mantém uma lista atualizada das decisões das minhas reuniões. Use quando eu perguntar o que decidimos."
+        "description": "Encontra as decisões nas notas das minhas reuniões, com a data e a reunião de cada uma. Use quando eu perguntar o que decidimos."
       }
     },
     "chat": {
