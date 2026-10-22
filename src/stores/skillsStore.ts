@@ -25,13 +25,20 @@ let subscribed = false;
 let loading: Promise<void> | null = null;
 let reloadRequested = false;
 
-// The library rereads its folder on every list, so an edit made outside the app shows up
-// when the window comes back into focus.
 function subscribe(): void {
   if (subscribed) return;
   subscribed = true;
   window.electronAPI?.onSkillsChanged?.(() => void refreshSkills());
-  window.addEventListener("focus", () => void refreshSkills());
+}
+
+/**
+ * The library rereads its folder on every list, so while the Skills page shows, an edit made
+ * outside the app appears when the window comes back into focus. Returns the way to stop.
+ */
+export function refreshSkillsOnFocus(): () => void {
+  const reread = () => void refreshSkills();
+  window.addEventListener("focus", reread);
+  return () => window.removeEventListener("focus", reread);
 }
 
 /** Reloads the list. A refresh asked for during a load runs once that load finishes. */

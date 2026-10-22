@@ -24,6 +24,9 @@ async function loadStore(t, electronAPI) {
       addEventListener: (type, listener) => {
         windowListeners[type] = listener;
       },
+      removeEventListener: (type, listener) => {
+        if (windowListeners[type] === listener) delete windowListeners[type];
+      },
     },
   });
   const vite = await createRendererServer(t, { cachePrefix: "openwhispr-skills-store-test-" });
@@ -64,19 +67,34 @@ test("each refresh reads the list again", async (t) => {
   assert.equal(store.useSkillsStore.getState().loaded, true);
 });
 
-test("a skills-changed event and a window focus refresh the list", async (t) => {
-  const api = libraryApi([[], [skill("added")], [skill("added"), skill("edited-outside")]]);
-  const { store, windowListeners } = await loadStore(t, api);
+test("a skills-changed event refreshes the list", async (t) => {
+  const api = libraryApi([[], [skill("added")]]);
+  const { store } = await loadStore(t, api);
   const names = () => store.useSkillsStore.getState().skills.map((entry) => entry.name);
   await store.refreshSkills();
 
   api.changed();
   await settle();
   assert.deepEqual([api.lists, names()], [2, ["added"]]);
+});
 
+// A window focus anywhere in the app would otherwise reread every skill folder.
+test("a window focus rereads the list only while the Skills page asks for it", async (t) => {
+  const api = libraryApi([[], [skill("edited-outside")]]);
+  const { store, windowListeners } = await loadStore(t, api);
+  await store.refreshSkills();
+  assert.equal(windowListeners.focus, undefined);
+
+  const stop = store.refreshSkillsOnFocus();
   windowListeners.focus();
   await settle();
-  assert.deepEqual([api.lists, names()], [3, ["added", "edited-outside"]]);
+  assert.deepEqual(
+    [api.lists, store.useSkillsStore.getState().skills.map((entry) => entry.name)],
+    [2, ["edited-outside"]]
+  );
+
+  stop();
+  assert.equal(windowListeners.focus, undefined);
 });
 
 test("a refresh asked for during a load runs again once it finishes", async (t) => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { refreshSkills, useSkillsStore } from "../../stores/skillsStore";
+import { refreshSkills, refreshSkillsOnFocus, useSkillsStore } from "../../stores/skillsStore";
 import { useToast } from "../ui/useToast";
 import { CreateSkillScreen } from "../skills/CreateSkillScreen";
 import { ManageSkillsScreen } from "../skills/ManageSkillsScreen";
@@ -36,7 +36,8 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
   const [detail, setDetail] = useState<{ name: string; confirmUninstall: boolean } | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
-  // Opening the pane rereads the folder, so a skill edited outside the app shows up.
+  // Opening the pane rereads the folder, as does a window focus while it shows, so a skill
+  // edited outside the app shows up.
   useEffect(() => {
     if (!active) return;
     void refreshSkills().then(() => {
@@ -44,6 +45,7 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
         toast({ title: t("skills.toasts.loadFailed"), variant: "destructive" });
       }
     });
+    return refreshSkillsOnFocus();
   }, [active, t, toast]);
 
   // The control that opened a screen is gone with home, so the screen's heading takes focus
