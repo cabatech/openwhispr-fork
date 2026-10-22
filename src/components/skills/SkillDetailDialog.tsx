@@ -82,21 +82,36 @@ export function SkillDetailDialog({
   const uninstallRef = useRef<HTMLButtonElement>(null);
   const uninstalled = useRef(false);
   const opener = useRef<HTMLElement | null>(null);
-  // The dialog keeps the Escape handler it first rendered with, so the handler reads this.
+  // The dialog keeps the Escape handler it first rendered with, so the handler reads this;
+  // the read below closes the pop-up through the latest onOpenChange the same way.
   const confirmingNow = useRef(confirming);
+  const onOpenChangeNow = useRef(onOpenChange);
   useLayoutEffect(() => {
     confirmingNow.current = confirming;
+    onOpenChangeNow.current = onOpenChange;
   });
-  const skill = summary ?? detail;
+  // A read is shown only for the skill it was made for, never for the next one opened.
+  const shown = detail?.name === name ? detail : null;
+  const skill = summary ?? shown;
   const problem = skill && !skill.valid ? skill.problem : undefined;
 
-  // Reread on open, and when the skill changes on disk while it's open.
+  // Reread on open, and when the skill changes on disk while it's open. A skill that is
+  // gone, as when it was removed outside the app, closes the pop-up.
   useEffect(() => {
     if (!open || !name) return;
     let current = true;
-    void window.electronAPI?.skillsGet?.(name).then((result) => {
-      if (current) setDetail(result ?? null);
-    });
+    void window.electronAPI
+      ?.skillsGet?.(name)
+      .then((result) => {
+        if (!current) return;
+        setDetail(result ?? null);
+        if (result) return;
+        setConfirmChoice(null);
+        onOpenChangeNow.current(false);
+      })
+      .catch(() => {
+        if (current) setDetail(null);
+      });
     return () => {
       current = false;
     };
@@ -192,20 +207,20 @@ export function SkillDetailDialog({
                   </p>
                 </div>
               )}
-              {detail && (
+              {shown && (
                 <div className="rounded-lg border border-border/70 dark:border-border-subtle/70 bg-background/60 dark:bg-surface-1/60 px-4 py-3">
                   <MarkdownRenderer
                     hideFrontmatter
-                    content={detail.markdown}
+                    content={shown.markdown}
                     className="text-[13px] leading-relaxed text-foreground [&_p]:text-[13px] [&_li]:text-[13px]"
                   />
                 </div>
               )}
-              {detail && detail.files.length > 0 && (
+              {shown && shown.files.length > 0 && (
                 <div>
                   <SectionLabel>{t("skills.detail.files")}</SectionLabel>
                   <SettingsPanel>
-                    {detail.files.map((file) => (
+                    {shown.files.map((file) => (
                       <SkillFileRow key={file.path} skillName={name} file={file} />
                     ))}
                   </SettingsPanel>

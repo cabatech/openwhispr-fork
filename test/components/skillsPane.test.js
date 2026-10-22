@@ -92,6 +92,63 @@ test("a card on home opens its detail pop-up", async (t) => {
   assert.match(label(dialog(container)), /meeting prep/);
 });
 
+// Reads that answer late, fail, or find the skill gone: each pop-up shows only its own skill.
+async function renderPaneWithReads(t, skills, reads) {
+  return mountSkillsComponent(t, {
+    modulePath: "/components/integrations/SkillsPane.tsx",
+    exportName: "SkillsPane",
+    skills,
+    props: { title: "Skills", active: true },
+    api: { skillsGet: async (name) => reads[name]() },
+  });
+}
+
+const detailOf = (name) => ({
+  ...skill(name),
+  markdown: `${name.toUpperCase()} INSTRUCTIONS`,
+  files: [{ path: `references/${name}.md`, size: 3, text: true, script: false }],
+});
+const card = (container, name) =>
+  find(container, (node) => node.tagName === "BUTTON" && ariaLabel(node).includes(`"${name}"`));
+
+test("a pop-up never shows another skill's instructions or files", async (t) => {
+  const skills = [skill("alpha"), skill("beta"), skill("gamma")];
+  const { container } = await renderPaneWithReads(t, skills, {
+    alpha: async () => detailOf("alpha"),
+    beta: () => new Promise(() => {}),
+    gamma: async () => {
+      throw new Error("Error invoking remote method 'skills-get'");
+    },
+  });
+  await click(card(container, "alpha"));
+  await settle();
+  assert.match(label(dialog(container)), /ALPHA INSTRUCTIONS/);
+  await pressEscape(dialog(container));
+
+  for (const name of ["beta", "gamma"]) {
+    await click(card(container, name));
+    await settle();
+    assert.doesNotMatch(label(dialog(container)), /ALPHA|alpha\.md/, name);
+    await pressEscape(dialog(container));
+  }
+});
+
+test("a skill removed outside the app closes its pop-up", async (t) => {
+  let alpha = detailOf("alpha");
+  const { container, store } = await renderPaneWithReads(t, [skill("alpha"), skill("beta")], {
+    alpha: async () => alpha,
+  });
+  await click(card(container, "alpha"));
+  await settle();
+  assert.ok(dialog(container));
+
+  alpha = null;
+  await React.act(async () => store.useSkillsStore.setState({ skills: [skill("beta")] }));
+  await settle();
+
+  assert.equal(dialog(container), null);
+});
+
 test("Esc in the detail pop-up closes it without leaving Manage", async (t) => {
   const { container } = await renderPane(t, [skill("meeting-prep")]);
   await click(gear(container));
