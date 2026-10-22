@@ -188,13 +188,24 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     }
   });
 
-  ipcMain.handle("skills-read-for-model", (_event, ref) =>
-    isModelRef(ref) ? library.readForModel(ref) : null
-  );
+  // A read or check the library can't finish answers as one that found nothing, so the chat
+  // says the skill couldn't be read or checked rather than showing Electron's error text.
+  ipcMain.handle("skills-read-for-model", (_event, ref) => {
+    if (!isModelRef(ref)) return null;
+    try {
+      return library.readForModel(ref);
+    } catch {
+      return null;
+    }
+  });
 
   ipcMain.handle("skills-check-proposal", (_event, request) => {
     if (!isProposalRequest(request)) return INVALID;
-    return library.checkProposal(request) ?? INVALID;
+    try {
+      return library.checkProposal(request) ?? INVALID;
+    } catch {
+      return INVALID;
+    }
   });
 
   ipcMain.handle("skills-save-proposal", (_event, proposal) => {
@@ -228,9 +239,15 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     return { ok: true };
   });
 
-  // Bookkeeping, not a change to any skill, so the windows aren't told.
+  // Bookkeeping, not a change to any skill, so the windows aren't told. Last use only orders
+  // the skills offered to the assistant, so a stamp that can't be saved is let go.
   ipcMain.handle("skills-mark-used", (_event, name) => {
-    if (isSkillFolderName(name)) library.markUsed(name);
+    if (!isSkillFolderName(name)) return;
+    try {
+      library.markUsed(name);
+    } catch {
+      // Nothing to report: the skill was still used.
+    }
   });
 }
 

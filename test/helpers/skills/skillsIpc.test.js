@@ -301,6 +301,20 @@ test("a saved proposal broadcasts skills-changed; reads, checks and marks don't"
   ]);
 });
 
+// A throw would reach the chat as Electron's error text, folder path and all.
+test("the assistant's reads, checks and marks answer even when the library throws", async () => {
+  const fail = () => {
+    throw Object.assign(new Error("EACCES: permission denied, scandir '/data/skills'"), {
+      code: "EACCES",
+    });
+  };
+  const { call } = setup({ readForModel: fail, checkProposal: fail, markUsed: fail });
+
+  assert.equal(await call("skills-read-for-model", { name: "meeting-prep" }), null);
+  assert.deepEqual(await call("skills-check-proposal", { kind: "create", proposal }), INVALID);
+  assert.equal(await call("skills-mark-used", "meeting-prep"), undefined);
+});
+
 test("a proposal that can't be saved reports why and broadcasts nothing", async () => {
   const problems = [{ code: "placeholder" }];
   const refused = setup({ saveProposal: () => ({ problems }) });
