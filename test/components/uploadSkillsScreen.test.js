@@ -297,6 +297,29 @@ test("a skipped or undecided duplicate is left out of the upload", async (t) => 
   assert.deepEqual(calls.committed, [{ tokens: ["token-ready-one"], replace: [] }]);
 });
 
+test("a row can be removed on its own, letting go of its upload", async (t) => {
+  const { container, calls, drop } = await renderUpload(t, {
+    previews: [
+      ready("a.md", "first"),
+      invalid("notes.md", "frontmatterMissing"),
+      ready("c.md", "third"),
+    ],
+  });
+  await drop(fakeFile("a.md"), fakeFile("notes.md"), fakeFile("c.md"));
+  const removeButton = (path) =>
+    findElement(container, (node) => {
+      return ariaLabel(node) === `skills.create.removeFile{"path":"${path}"}`;
+    });
+
+  await click(removeButton("a.md"));
+  await click(removeButton("notes.md"));
+
+  assert.equal(rows(container).length, 1);
+  assert.match(label(rows(container)[0]), /^c\.md/);
+  assert.deepEqual(calls.discarded, [["token-first"]]);
+  assert.equal(label(submit(container)), 'skills.upload.submitCount{"count":1}');
+});
+
 test("a file over 25 MB is refused before it is read", async (t) => {
   const { container, calls, drop } = await renderUpload(t, {
     previews: [ready("small.md", "small")],

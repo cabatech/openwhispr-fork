@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Check, Code2, FileText, Info } from "../icons";
+import { AlertTriangle, Check, Code2, FileText, Info, X } from "../icons";
 import { Button } from "../ui/button";
 import { Breadcrumb } from "../ui/Breadcrumb";
 import { DropZone } from "../ui/DropZone";
@@ -113,6 +113,16 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
       void window.electronAPI?.skillsDiscardUploads?.([...held]);
     };
   }, []);
+
+  // Takes one file out of the upload, and lets go of what was previewed for it.
+  const remove = (row: UploadRow) => {
+    const { token } = row.preview;
+    if (token) {
+      issued.current.delete(token);
+      void window.electronAPI?.skillsDiscardUploads?.([token]);
+    }
+    setRows((current) => current.filter((entry) => entry.id !== row.id));
+  };
 
   const choose = (id: number, choice?: UploadRow["choice"]) =>
     setRows((current) => current.map((row) => (row.id === id ? { ...row, choice } : row)));
@@ -277,6 +287,14 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">{status(row)}</div>
+                  <button
+                    type="button"
+                    onClick={() => remove(row)}
+                    aria-label={t("skills.create.removeFile", { path: row.preview.fileName })}
+                    className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/70 hover:bg-foreground/8 hover:text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring/30"
+                  >
+                    <X size={12} />
+                  </button>
                   {row.preview.status !== "invalid" &&
                     row.preview.warnings.map((warning) => (
                       <p
