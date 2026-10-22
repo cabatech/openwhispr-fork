@@ -192,7 +192,8 @@ export function SkillDetailDialog({
           event.preventDefault();
           const back = uninstalled.current ? null : opener.current;
           uninstalled.current = false;
-          if (back?.isConnected) back.focus();
+          // The page itself had focus when the button that opened it went away.
+          if (back?.isConnected && back !== document.body) back.focus();
           else focusFallback?.();
         }}
       >

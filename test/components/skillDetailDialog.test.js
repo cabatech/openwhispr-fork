@@ -337,6 +337,36 @@ test("a skill whose files can't be read says so, and its switch is off and disab
   );
 });
 
+// As when the chat's Open skill opens it: the button pressed is gone, so the page had focus.
+test("a pop-up opened while the page had focus hands focus to the fallback when it closes", async (t) => {
+  let fallbacks = 0;
+  const { container } = await mountSkillsComponent(t, {
+    modulePath: "/components/skills/SkillDetailDialog.tsx",
+    exportName: "SkillDetailDialog",
+    skills: [skill("meeting-prep")],
+    api: { skillsGet: async (name) => ({ ...skill(name), markdown: MARKDOWN, files: [] }) },
+    wrap: (SkillDetailDialog) => {
+      const { body } = globalThis.document;
+      body.isConnected = true;
+      globalThis.document.activeElement = body;
+      function Harness() {
+        const [open, setOpen] = React.useState(true);
+        return React.createElement(SkillDetailDialog, {
+          name: "meeting-prep",
+          open,
+          onOpenChange: setOpen,
+          focusFallback: () => fallbacks++,
+        });
+      }
+      return React.createElement(Harness);
+    },
+  });
+
+  await pressEscape(dialog(container));
+
+  assert.equal(fallbacks, 1);
+});
+
 test("the reveal label follows the platform", async (t) => {
   installBrowserGlobals(t);
   const vite = await createRendererServer(t, { cachePrefix: "openwhispr-platform-label-test-" });
