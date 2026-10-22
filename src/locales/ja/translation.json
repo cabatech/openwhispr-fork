@@ -4556,7 +4556,7 @@
       "more": "{{name}}のその他の操作",
       "files": "ファイル",
       "copyFile": "{{path}}をコピー",
-      "neverRun": "表示のみ、実行されません",
+      "neverRun": "OpenWhisprはスクリプトを実行しません",
       "uninstall": "アンインストール",
       "uninstallConfirm": "{{name}}をアンインストールしますか？このコンピューターから削除されます。",
       "problem": "このスキルは修正するまで使えません: {{reason}}"

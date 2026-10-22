@@ -4726,7 +4726,7 @@
       "more": "Plus d'options pour {{name}}",
       "files": "Fichiers",
       "copyFile": "Copier {{path}}",
-      "neverRun": "Affiché, jamais exécuté",
+      "neverRun": "OpenWhispr n'exécute jamais de scripts",
       "uninstall": "Désinstaller",
       "uninstallConfirm": "Désinstaller {{name}} ? Elle sera supprimée de cet ordinateur.",
       "problem": "Cette compétence ne peut pas être utilisée tant qu'elle n'est pas corrigée : {{reason}}"

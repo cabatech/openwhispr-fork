@@ -4556,7 +4556,7 @@
       "more": "Altre opzioni per {{name}}",
       "files": "File",
       "copyFile": "Copia {{path}}",
-      "neverRun": "Mostrato, mai eseguito",
+      "neverRun": "OpenWhispr non esegue mai script",
       "uninstall": "Disinstalla",
       "uninstallConfirm": "Disinstallare {{name}}? Verrà rimossa da questo computer.",
       "problem": "Questa skill non può essere usata finché non viene corretta: {{reason}}"

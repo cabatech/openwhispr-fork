@@ -4726,7 +4726,7 @@
       "more": "Weitere Aktionen für {{name}}",
       "files": "Dateien",
       "copyFile": "{{path}} kopieren",
-      "neverRun": "Wird angezeigt, nie ausgeführt",
+      "neverRun": "OpenWhispr führt Skripte nie aus",
       "uninstall": "Deinstallieren",
       "uninstallConfirm": "{{name}} deinstallieren? Der Skill wird von diesem Computer entfernt.",
       "problem": "Dieser Skill kann erst verwendet werden, wenn er korrigiert ist: {{reason}}"

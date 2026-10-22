@@ -4726,7 +4726,7 @@
       "more": "More for {{name}}",
       "files": "Files",
       "copyFile": "Copy {{path}}",
-      "neverRun": "Shown, never run",
+      "neverRun": "OpenWhispr never runs scripts",
       "uninstall": "Uninstall",
       "uninstallConfirm": "Uninstall {{name}}? It's removed from this computer.",
       "problem": "This skill can't be used until it's fixed: {{reason}}"

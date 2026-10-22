@@ -4556,7 +4556,7 @@
       "more": "Mais opções para {{name}}",
       "files": "Arquivos",
       "copyFile": "Copiar {{path}}",
-      "neverRun": "Exibido, nunca executado",
+      "neverRun": "O OpenWhispr nunca executa scripts",
       "uninstall": "Desinstalar",
       "uninstallConfirm": "Desinstalar {{name}}? Ela será removida deste computador.",
       "problem": "Esta habilidade não pode ser usada até ser corrigida: {{reason}}"

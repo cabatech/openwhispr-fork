@@ -219,7 +219,7 @@ test("opening on its confirm focuses Cancel", async (t) => {
   assert.equal(container.ownerDocument.activeElement === cancel, true);
 });
 
-test("scripts are labelled Shown, never run and binary files have no Copy button", async (t) => {
+test("scripts say OpenWhispr never runs them and binary files have no Copy button", async (t) => {
   const { container, calls } = await openDetail(t);
   const row = (path) =>
     findElement(

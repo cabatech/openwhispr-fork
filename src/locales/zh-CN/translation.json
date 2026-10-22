@@ -4556,7 +4556,7 @@
       "more": "{{name}} 的更多操作",
       "files": "文件",
       "copyFile": "复制 {{path}}",
-      "neverRun": "仅显示，从不运行",
+      "neverRun": "OpenWhispr 从不运行脚本",
       "uninstall": "卸载",
       "uninstallConfirm": "要卸载 {{name}} 吗？它将从这台电脑中移除。",
       "problem": "此技能修复后才能使用：{{reason}}"
