@@ -423,10 +423,15 @@ class SkillLibrary {
     };
   }
 
+  // A new skill starts on; one that replaces a skill keeps that skill's switch.
   _install(name, files) {
+    const replacing = this._exists(name);
     this._writeSkillFolder(name, files);
     this.inspected.delete(name);
-    this.database.upsertSkillState(name, { enabled: true, contentHash: contentHash(files) });
+    this.database.upsertSkillState(name, {
+      ...(replacing ? {} : { enabled: true }),
+      contentHash: contentHash(files),
+    });
   }
 
   // Writes into a staging folder, then swaps it in, so a failure never leaves half a skill.

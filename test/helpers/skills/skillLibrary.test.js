@@ -316,6 +316,30 @@ test("one skill uploaded twice, the second replacing the first, is listed once",
   assert.match(readSkill(skillsDir, "weekly"), /description: Second\./);
 });
 
+test("Replace keeps the skill's switch as it was", async (t) => {
+  const { library } = setup(t);
+  await upload(library, [markdownUpload("off.md", skillText("off", "Old."))]);
+  await upload(library, [markdownUpload("on.md", skillText("on", "Old."))]);
+  library.setEnabled("off", false);
+
+  await upload(
+    library,
+    [
+      markdownUpload("off-2.md", skillText("off", "New.")),
+      markdownUpload("on-2.md", skillText("on", "New.")),
+    ],
+    ["off", "on"]
+  );
+
+  assert.deepEqual(
+    library.scan().map((skill) => [skill.name, skill.enabled, skill.description]),
+    [
+      ["on", true, "New."],
+      ["off", false, "New."],
+    ]
+  );
+});
+
 test("an upload stays ready until it is installed or discarded", async (t) => {
   const { library, skillsDir } = setup(t);
   t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 9, 20, 9, 0, 0) });
