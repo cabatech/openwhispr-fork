@@ -1,16 +1,16 @@
 import { useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge } from "../ui/badge";
 import { Breadcrumb } from "../ui/Breadcrumb";
 import { SettingsPanel } from "../ui/SettingsSection";
 import { Toggle } from "../ui/toggle";
+import { useToast } from "../ui/useToast";
 import { IntegrationsPane } from "../integrations/IntegrationsPane";
 import { setSkillEnabled, useSkillsStore } from "../../stores/skillsStore";
 import { useCloudBackupActive } from "../../hooks/useCloudBackupActive";
 import { SkillActionsMenu } from "./SkillActionsMenu";
 import { NeedsFixLabel, SkillTile } from "./SkillCards";
 import { SkillSearchInput } from "./SkillSearchInput";
-import { problemKey } from "./skillCopy";
+import { problemKey, writeFailedToast } from "./skillCopy";
 
 interface ManageSkillsScreenProps {
   onOpenSkill: (name: string, confirmUninstall: boolean) => void;
@@ -19,6 +19,7 @@ interface ManageSkillsScreenProps {
 
 export function ManageSkillsScreen({ onOpenSkill, onBack }: ManageSkillsScreenProps): ReactElement {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const skills = useSkillsStore((state) => state.skills);
   const backedUp = useCloudBackupActive();
   const [query, setQuery] = useState("");
@@ -26,6 +27,9 @@ export function ManageSkillsScreen({ onOpenSkill, onBack }: ManageSkillsScreenPr
   const shown = skills.filter(
     (skill) => !needle || `${skill.displayName} ${skill.description}`.toLowerCase().includes(needle)
   );
+  const switchSkill = async (name: string, next: boolean) => {
+    if (!(await setSkillEnabled(name, next))) toast(writeFailedToast(t));
+  };
 
   return (
     <IntegrationsPane
@@ -80,13 +84,10 @@ export function ManageSkillsScreen({ onOpenSkill, onBack }: ManageSkillsScreenPr
                     {t("skills.sync.tooLarge")}
                   </span>
                 )}
-                <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
-                  {t("skills.manage.personal")}
-                </Badge>
                 <SkillActionsMenu skill={skill} onUninstall={() => onOpenSkill(skill.name, true)} />
                 <Toggle
                   checked={skill.enabled && skill.valid}
-                  onChange={(next) => void setSkillEnabled(skill.name, next)}
+                  onChange={(next) => void switchSkill(skill.name, next)}
                   disabled={!skill.valid}
                   ariaLabel={
                     skill.problem

@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type KeyboardEvent, type ReactElement } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, FileText, Plus, Sparkles, X } from "../icons";
 import { Button } from "../ui/button";
@@ -25,13 +25,21 @@ const FIELDS: readonly Field[] = ["name", "description", "instructions"];
 const EMPTY_DRAFT: SkillCreateDraft = { title: "", description: "", instructions: "", files: [] };
 
 const currentDraft = () => useSkillsStore.getState().createDraft ?? EMPTY_DRAFT;
+
+const hasContent = (draft: SkillCreateDraft) =>
+  Boolean(
+    draft.title.trim() ||
+    draft.description.trim() ||
+    draft.instructions.trim() ||
+    draft.files.length
+  );
 // As a case-insensitive disk sees a name: two such files would land on one path.
 const fileKey = (fileName: string) => fileName.normalize("NFC").toLowerCase();
 
 // The library names a problem by code. Most belong to one of the fields; the rest concern the
 // attached files, which have no field of their own.
 function fieldFor(code: SkillProblemCode): Field | null {
-  if (code === "missingName") return "name";
+  if (code === "missingName" || code === "nameTaken") return "name";
   if (code.toLowerCase().includes("description")) return "description";
   if (code === "placeholder") return "instructions";
   return null;
@@ -56,6 +64,8 @@ export function CreateSkillScreen({
   const [leaving, setLeaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Counts the drafts discarded or saved, so files still being read for one are dropped.
+  const draftsCleared = useRef(0);
   const controls = {
     name: useRef<HTMLInputElement>(null),
     description: useRef<HTMLTextAreaElement>(null),
@@ -69,12 +79,16 @@ export function CreateSkillScreen({
   const filled = Boolean(
     draft.title.trim() && draft.description.trim() && draft.instructions.trim()
   );
-  const dirty = Boolean(
-    draft.title.trim() ||
-    draft.description.trim() ||
-    draft.instructions.trim() ||
-    draft.files.length
-  );
+  const dirty = hasContent(draft);
+
+  // Leaving an empty draft, by any way out, drops a file still being read for it, so the file
+  // doesn't turn up in the next one.
+  useEffect(() => {
+    const cleared = draftsCleared;
+    return () => {
+      if (!hasContent(currentDraft())) cleared.current += 1;
+    };
+  }, []);
 
   const update = (field: Field, patch: Partial<SkillCreateDraft>) => {
     setCreateDraft({ ...currentDraft(), ...patch });
@@ -107,13 +121,24 @@ export function CreateSkillScreen({
       sizes.set(key, file.size);
       return true;
     });
+    const startedFor = draftsCleared.current;
     const read = await Promise.all(
-      fitting.map(async (file) => ({
-        fileName: file.name,
-        data: new Uint8Array(await file.arrayBuffer()),
-      }))
+      fitting.map(async (file) => {
+        try {
+          return [{ fileName: file.name, data: new Uint8Array(await file.arrayBuffer()) }];
+        } catch {
+          // Moved or changed since it was picked; the others are still added.
+          toast({
+            title: file.name,
+            description: t("skills.problems.unreadableArchive"),
+            variant: "destructive",
+          });
+          return [];
+        }
+      })
     );
-    const added = new Map(read.map((file) => [fileKey(file.fileName), file] as const));
+    if (draftsCleared.current !== startedFor) return;
+    const added = new Map(read.flat().map((file) => [fileKey(file.fileName), file] as const));
     const current = currentDraft();
     setCreateDraft({
       ...current,
@@ -133,6 +158,7 @@ export function CreateSkillScreen({
   const requestLeave = () => (dirty ? setLeaving(true) : onBack());
 
   const discard = () => {
+    draftsCleared.current += 1;
     setCreateDraft(null);
     onBack();
   };
@@ -143,7 +169,7 @@ export function CreateSkillScreen({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Escape" || (!leaving && !dirty)) return;
+    if (event.key !== "Escape" || event.nativeEvent.isComposing || (!leaving && !dirty)) return;
     // Handled here, so the pane doesn't go back as well.
     event.preventDefault();
     event.stopPropagation();
@@ -165,6 +191,7 @@ export function CreateSkillScreen({
     setSaving(false);
     if (result?.ok) {
       syncAfterLocalWrite("syncSkillsNow");
+      draftsCleared.current += 1;
       setCreateDraft(null);
       // Listed before going home, so its card is there to play and take focus.
       await refreshSkills();

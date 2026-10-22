@@ -1,4 +1,5 @@
-const { isSkillFolderName } = require("./skillLibrary");
+const debugLogger = require("../debugLogger");
+const { isSkillFolderName, writeErrorCode } = require("./skillLibrary");
 
 const INVALID = { ok: false, error: "invalid" };
 
@@ -58,10 +59,6 @@ function isProposalRequest(request) {
   return request?.kind === "update" && isUpdate(request.update);
 }
 
-function writeErrorCode(error) {
-  return ["noSpace", "permission"].includes(error?.code) ? error.code : "unknown";
-}
-
 // Every handler checks its arguments before the library runs, and every write tells each
 // window to reload its list.
 function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
@@ -72,6 +69,29 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     if (result.problems) return { ok: false, problems: result.problems };
     changed();
     return { ok: true, ...result };
+  };
+
+  // A window's previewed uploads are let go when it closes, crashes or reloads, since the
+  // screen holding them can't let go then. Each window's count of those tells a preview
+  // still being read that its window went away meanwhile.
+  const releases = new Map();
+  const releaseWhenGone = (sender) => {
+    const { id } = sender;
+    if (releases.has(id)) return;
+    releases.set(id, 0);
+    const release = () => {
+      releases.set(id, releases.get(id) + 1);
+      library.discardUploadsFrom(id);
+    };
+    sender.once("destroyed", () => {
+      releases.delete(id);
+      library.discardUploadsFrom(id);
+    });
+    sender.on("render-process-gone", release);
+    // A main-frame navigation, such as a reload, replaces the renderer that held them.
+    sender.on("did-start-navigation", (details) => {
+      if (details?.isMainFrame && !details.isSameDocument) release();
+    });
   };
 
   ipcMain.handle("skills-list", () => ({ skills: library.scan() }));
@@ -88,7 +108,11 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
 
   ipcMain.handle("skills-set-enabled", (_event, name, enabled) => {
     if (!isSkillFolderName(name) || typeof enabled !== "boolean") return INVALID;
-    if (!library.setEnabled(name, enabled)) return INVALID;
+    try {
+      if (!library.setEnabled(name, enabled)) return INVALID;
+    } catch (error) {
+      return { ok: false, error: writeErrorCode(error) };
+    }
     changed();
     return { ok: true };
   });
@@ -113,9 +137,17 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
 
   // Files cross as bytes and come back as one-time tokens, so what installs is exactly
   // what the user saw previewed.
-  ipcMain.handle("skills-preview-upload", async (_event, items) => {
+  ipcMain.handle("skills-preview-upload", async (event, items) => {
     if (!Array.isArray(items) || !items.every(isUploadItem)) return INVALID;
-    return { items: await library.previewUploads(items) };
+    const { sender } = event;
+    releaseWhenGone(sender);
+    const released = releases.get(sender.id);
+    const previews = await library.previewUploads(items, sender.id);
+    // Its window went away while these were read, so nothing is left to install or free them.
+    if (releases.get(sender.id) !== released) {
+      library.discardUploads(previews.flatMap((preview) => (preview.token ? [preview.token] : [])));
+    }
+    return { items: previews };
   });
 
   ipcMain.handle("skills-discard-uploads", (_event, tokens) => {
@@ -157,13 +189,30 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     }
   });
 
-  ipcMain.handle("skills-read-for-model", (_event, ref) =>
-    isModelRef(ref) ? library.readForModel(ref) : null
-  );
+  // A read or check the library can't finish answers as one that found nothing, so the chat
+  // says the skill couldn't be read or checked rather than showing Electron's error text.
+  ipcMain.handle("skills-read-for-model", (_event, ref) => {
+    if (!isModelRef(ref)) return null;
+    try {
+      return library.readForModel(ref);
+    } catch (error) {
+      debugLogger.warn(
+        "Could not read a skill for the assistant",
+        { error: error.message },
+        "skills"
+      );
+      return null;
+    }
+  });
 
   ipcMain.handle("skills-check-proposal", (_event, request) => {
     if (!isProposalRequest(request)) return INVALID;
-    return library.checkProposal(request) ?? INVALID;
+    try {
+      return library.checkProposal(request) ?? INVALID;
+    } catch (error) {
+      debugLogger.warn("Could not check a skill proposal", { error: error.message }, "skills");
+      return INVALID;
+    }
   });
 
   ipcMain.handle("skills-save-proposal", (_event, proposal) => {
@@ -197,9 +246,15 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     return { ok: true };
   });
 
-  // Bookkeeping, not a change to any skill, so the windows aren't told.
+  // Bookkeeping, not a change to any skill, so the windows aren't told. Last use only orders
+  // the skills offered to the assistant, so a stamp that can't be saved is let go.
   ipcMain.handle("skills-mark-used", (_event, name) => {
-    if (isSkillFolderName(name)) library.markUsed(name);
+    if (!isSkillFolderName(name)) return;
+    try {
+      library.markUsed(name);
+    } catch (error) {
+      debugLogger.warn("Could not stamp a skill's last use", { error: error.message }, "skills");
+    }
   });
 
   // Cloud backup, driven by the renderer's SyncService as for snippets. A pull tells the

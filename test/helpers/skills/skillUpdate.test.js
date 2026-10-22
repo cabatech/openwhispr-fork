@@ -4,7 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { replaceFrontmatterValue } = require("../../../src/helpers/skills/skillFormat");
-const { setup, writeFolder, readSkill, listDir } = require("./libraryFixture");
+const { RECOMMENDED_DIR, setup, writeFolder, readSkill, listDir } = require("./libraryFixture");
+const { SkillLibrary } = require("../../../src/helpers/skills/skillLibrary");
 
 const NAME = "enterprise-call-playbook";
 // A hand-written header: a folded description, a comment, an unknown key, metadata and CRLF.
@@ -101,6 +102,13 @@ test("a missing description key is added before the closing line", () => {
     '---\nname: recap\ndescription: "Says \\"hi\\"."\n---\n\nBody\n'
   );
   assert.throws(() => replaceFrontmatterValue("# No header\n", "description", "x"));
+});
+
+test("a header after a byte-order mark is still found, and the mark is kept", () => {
+  assert.equal(
+    replaceFrontmatterValue("\uFEFF---\ndescription: Before\n---\n", "description", "After"),
+    '\uFEFF---\ndescription: "After"\n---\n'
+  );
 });
 
 test("a quoted description key, or one spaced before its colon, is replaced in place", () => {
@@ -205,6 +213,48 @@ test("uninstall removes the skill's versions", (t) => {
   library.uninstall(NAME);
 
   assert.equal(fs.existsSync(versionsDir), false);
+});
+
+// Kept versions are full copies of the skill's files, so none outlive the skill.
+test("an uninstall cut short leaves none of the skill's versions once the library next opens", (t) => {
+  const { library, database, userDataDir, versionsDir } = playbook(t);
+  library.applyUpdate(SSO);
+  // The app stops once the skill's folder is in the trash, before anything is removed.
+  t.mock.method(fs, "rmSync", () => {
+    throw Object.assign(new Error("stopped"), { code: "EIO" });
+  });
+  library.uninstall(NAME);
+  t.mock.restoreAll();
+  assert.equal(listDir(versionsDir).length, 2);
+
+  new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.equal(fs.existsSync(versionsDir), false);
+});
+
+// A start that can't put a replaced skill back keeps its versions for the start that does.
+test("a skill waiting to be put back keeps its versions until it is back", (t) => {
+  const { library, database, userDataDir, skillsDir, versionsDir } = playbook(t);
+  const { versionId } = library.applyUpdate(SSO);
+  // The app stopped in the middle of a replace, with the skill moved aside.
+  fs.renameSync(
+    path.join(skillsDir, NAME),
+    path.join(skillsDir, `.replaced-00000000-0000-4000-8000-000000000000-${NAME}`)
+  );
+  t.mock.method(fs, "renameSync", () => {
+    throw Object.assign(new Error("busy"), { code: "EPERM" });
+  });
+  new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+  t.mock.restoreAll();
+  assert.equal(fs.existsSync(versionsDir), true);
+
+  const later = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(
+    later.scan().map((skill) => skill.name),
+    [NAME]
+  );
+  assert.equal(later.undo(NAME, versionId), true);
 });
 
 test("a failed update leaves the skill and its versions as they were", (t) => {

@@ -14,14 +14,42 @@ const SKILLS_MOCKS = {
     const t = (key, values) => (values ? key + JSON.stringify(values) : key);
     export const useTranslation = () => ({ t, i18n: { language: "en" } });
   `,
+  // Radix's contract without its portal, items always shown: picking one focuses it and runs
+  // onSelect while the open menu keeps focus inside, then the menu closes, calling the content's
+  // onCloseAutoFocus, and focus goes back to the trigger unless that prevented it.
   "/ui/dropdown-menu": `
-    import { createElement } from "react";
-    const passthrough = (props) => createElement("div", null, props.children);
-    export const DropdownMenu = passthrough;
-    export const DropdownMenuTrigger = passthrough;
-    export const DropdownMenuContent = passthrough;
-    export const DropdownMenuItem = ({ onSelect, children }) =>
-      createElement("button", { type: "button", role: "menuitem", onClick: onSelect }, children);
+    import { createContext, createElement, useContext, useRef } from "react";
+    const Menu = createContext(null);
+    export function DropdownMenu({ children }) {
+      const parts = useRef({ trigger: null, onCloseAutoFocus: null });
+      return createElement(Menu.Provider, { value: parts.current }, children);
+    }
+    export function DropdownMenuTrigger({ children }) {
+      const parts = useContext(Menu);
+      return createElement("div", { ref: (node) => (parts.trigger = node) }, children);
+    }
+    export function DropdownMenuContent({ children, onCloseAutoFocus }) {
+      useContext(Menu).onCloseAutoFocus = onCloseAutoFocus;
+      return createElement("div", null, children);
+    }
+    export function DropdownMenuItem({ onSelect, children }) {
+      const parts = useContext(Menu);
+      const onClick = (event) => {
+        const item = event.currentTarget;
+        const page = item.ownerDocument;
+        item.focus();
+        Object.defineProperty(page, "activeElement", { configurable: true, get: () => item, set() {} });
+        try {
+          onSelect?.(event);
+        } finally {
+          Object.defineProperty(page, "activeElement", { configurable: true, writable: true, value: item });
+        }
+        const closing = { defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+        parts.onCloseAutoFocus?.(closing);
+        if (!closing.defaultPrevented) parts.trigger?.querySelector("button")?.focus();
+      };
+      return createElement("button", { type: "button", role: "menuitem", onClick }, children);
+    }
     export const DropdownMenuSeparator = () => createElement("div", { role: "separator" });
   `,
   "/ui/useToast": `

@@ -16,13 +16,21 @@ import { SkillActionsMenu } from "./SkillActionsMenu";
 import { SkillTile } from "./SkillCards";
 import { problemKey, writeFailedToast } from "./skillCopy";
 
-function SkillFileRow({ skillName, file }: { skillName: string; file: SkillFileInfo }) {
+function SkillFileRow({
+  skillName,
+  file,
+}: {
+  skillName: string;
+  file: SkillFileInfo;
+}): ReactElement {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const { copied, copyText, confirmCopied } = useCopyFeedback("");
 
   const copy = async () => {
     const result = await window.electronAPI?.skillsReadFile?.(skillName, file.path);
     if (result && (await copyText(result.text))) confirmCopied(result.text);
+    else toast({ title: t("skills.toasts.copyFailed"), variant: "destructive" });
   };
 
   const Icon = file.script ? Code2 : FileText;
@@ -84,25 +92,49 @@ export function SkillDetailDialog({
   // Null follows initialConfirmUninstall; reset whenever the pop-up closes.
   const [confirmChoice, setConfirmChoice] = useState<boolean | null>(null);
   const confirming = confirmChoice ?? initialConfirmUninstall;
+  // Opened on its confirm, as Manage's ⋯ Uninstall does: backing out returns to Manage.
+  const openedToUninstall = confirmChoice === null && initialConfirmUninstall;
   const cancelRef = useRef<HTMLButtonElement>(null);
   const uninstallRef = useRef<HTMLButtonElement>(null);
   const uninstalled = useRef(false);
+  const uninstalling = useRef(false);
   const opener = useRef<HTMLElement | null>(null);
-  // The dialog keeps the Escape handler it first rendered with, so the handler reads this.
+  // The dialog keeps the Escape handler it first rendered with, so the handler reads this;
+  // the read below closes the pop-up through the latest onOpenChange the same way.
   const confirmingNow = useRef(confirming);
+  const openedToUninstallNow = useRef(openedToUninstall);
+  const onOpenChangeNow = useRef(onOpenChange);
   useLayoutEffect(() => {
     confirmingNow.current = confirming;
+    openedToUninstallNow.current = openedToUninstall;
+    onOpenChangeNow.current = onOpenChange;
   });
-  const skill = summary ?? detail;
+  // A read is shown only for the skill it was made for, never for the next one opened.
+  const shown = detail?.name === name ? detail : null;
+  // The list's copy stays live, but a read that couldn't get at the files marks it for fixing.
+  const skill =
+    summary && shown && !shown.valid
+      ? { ...summary, valid: false, problem: shown.problem }
+      : (summary ?? shown);
   const problem = skill && !skill.valid ? skill.problem : undefined;
 
-  // Reread on open, and when the skill changes on disk while it's open.
+  // Reread on open, and when the skill changes on disk while it's open. A skill that is
+  // gone, as when it was removed outside the app, closes the pop-up.
   useEffect(() => {
     if (!open || !name) return;
     let current = true;
-    void window.electronAPI?.skillsGet?.(name).then((result) => {
-      if (current) setDetail(result ?? null);
-    });
+    void window.electronAPI
+      ?.skillsGet?.(name)
+      .then((result) => {
+        if (!current) return;
+        setDetail(result ?? null);
+        if (result) return;
+        setConfirmChoice(null);
+        onOpenChangeNow.current(false);
+      })
+      .catch(() => {
+        if (current) setDetail(null);
+      });
     return () => {
       current = false;
     };
@@ -119,22 +151,32 @@ export function SkillDetailDialog({
     onOpenChange(false);
   };
 
+  const switchSkill = async (skillName: string, next: boolean) => {
+    if (!(await setSkillEnabled(skillName, next))) toast(writeFailedToast(t));
+  };
+
+  // A second press while the uninstall runs would uninstall and toast twice.
   const uninstall = async () => {
-    if (!name) return;
-    const result = await window.electronAPI?.skillsUninstall?.(name);
-    if (!result?.ok) {
-      toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
-      return;
+    if (!name || uninstalling.current) return;
+    uninstalling.current = true;
+    try {
+      const result = await window.electronAPI?.skillsUninstall?.(name);
+      if (!result?.ok) {
+        toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
+        return;
+      }
+      uninstalled.current = true;
+      syncAfterLocalWrite("syncSkillsNow");
+      close();
+      toast({
+        title: t("skills.toasts.uninstalled", { name: skill?.displayName }),
+        description: t("skills.toasts.removedFromComputer"),
+        variant: "success",
+      });
+      void refreshSkills();
+    } finally {
+      uninstalling.current = false;
     }
-    uninstalled.current = true;
-    syncAfterLocalWrite("syncSkillsNow");
-    close();
-    toast({
-      title: t("skills.toasts.uninstalled", { name: skill?.displayName }),
-      description: t("skills.toasts.removedFromComputer"),
-      variant: "success",
-    });
-    void refreshSkills();
   };
 
   return (
@@ -149,7 +191,7 @@ export function SkillDetailDialog({
           cancelRef.current?.focus();
         }}
         onEscapeKeyDown={(event) => {
-          if (!confirmingNow.current) return;
+          if (!confirmingNow.current || openedToUninstallNow.current) return;
           event.preventDefault();
           setConfirmChoice(false);
         }}
@@ -157,7 +199,8 @@ export function SkillDetailDialog({
           event.preventDefault();
           const back = uninstalled.current ? null : opener.current;
           uninstalled.current = false;
-          if (back?.isConnected) back.focus();
+          // The page itself had focus when the button that opened it went away.
+          if (back?.isConnected && back !== document.body) back.focus();
           else focusFallback?.();
         }}
       >
@@ -173,11 +216,11 @@ export function SkillDetailDialog({
               <div className="flex-1" />
               <Toggle
                 checked={skill.enabled && skill.valid}
-                onChange={(next) => void setSkillEnabled(name, next)}
+                onChange={(next) => void switchSkill(name, next)}
                 disabled={!skill.valid}
                 ariaLabel={t("skills.detail.toggle", { name: skill.displayName })}
               />
-              <SkillActionsMenu skill={skill} />
+              <SkillActionsMenu skill={skill} markdown={shown?.markdown} />
             </div>
             <div className="flex flex-col space-y-1.5 text-start">
               <DialogTitle>
@@ -199,20 +242,21 @@ export function SkillDetailDialog({
                   </p>
                 </div>
               )}
-              {detail && (
+              {/* A read that found nothing, as for a skill whose files can't be read, has no box. */}
+              {shown?.markdown && (
                 <div className="rounded-lg border border-border/70 dark:border-border-subtle/70 bg-background/60 dark:bg-surface-1/60 px-4 py-3">
                   <MarkdownRenderer
                     hideFrontmatter
-                    content={detail.markdown}
+                    content={shown.markdown}
                     className="text-[13px] leading-relaxed text-foreground [&_p]:text-[13px] [&_li]:text-[13px]"
                   />
                 </div>
               )}
-              {detail && detail.files.length > 0 && (
+              {shown && shown.files.length > 0 && (
                 <div>
                   <SectionLabel>{t("skills.detail.files")}</SectionLabel>
                   <SettingsPanel>
-                    {detail.files.map((file) => (
+                    {shown.files.map((file) => (
                       <SkillFileRow key={file.path} skillName={name} file={file} />
                     ))}
                   </SettingsPanel>
@@ -236,7 +280,7 @@ export function SkillDetailDialog({
                   ref={cancelRef}
                   variant="ghost"
                   size="sm"
-                  onClick={() => setConfirmChoice(false)}
+                  onClick={() => (openedToUninstall ? close() : setConfirmChoice(false))}
                 >
                   {t("common.cancel")}
                 </Button>

@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import { useRef, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, Terminal } from "../icons";
 import { Button } from "../ui/button";
@@ -21,22 +21,30 @@ export function CodeBlockActions({
   const canPaste = paste && !/[\r\n]/.test(code);
   // copyText writes the code exactly; copy() would trim its indentation.
   const { copied, copyText, confirmCopied } = useCopyFeedback(code);
+  const pasting = useRef(false);
 
   const copy = async (): Promise<void> => {
     if (await copyText(code)) confirmCopied(code);
   };
 
-  // The code exactly as shown, and never an Enter, so the user chooses when it runs.
+  // The code exactly as shown, and never an Enter, so the user chooses when it runs. A second
+  // press while it runs would paste the code twice.
   const pasteIntoApp = async (): Promise<void> => {
-    const result = await window.electronAPI?.pasteText?.(code, { raw: true }).catch(() => null);
-    if (result?.success && result.pasted) {
-      toast({ title: t("skills.code.pasted"), variant: "success" });
-      return;
+    if (pasting.current) return;
+    pasting.current = true;
+    try {
+      const result = await window.electronAPI?.pasteText?.(code, { raw: true }).catch(() => null);
+      if (result?.success && result.pasted) {
+        toast({ title: t("skills.code.pasted"), variant: "success" });
+        return;
+      }
+      // A clipboard-only paste and a missing Accessibility permission leave it on the
+      // clipboard already; after any other failure it is put there.
+      if (!result) await copyText(code);
+      toast({ title: t("skills.code.pasteFailed") });
+    } finally {
+      pasting.current = false;
     }
-    // A clipboard-only paste and a missing Accessibility permission leave it on the
-    // clipboard already; after any other failure it is put there.
-    if (!result) await copyText(code);
-    toast({ title: t("skills.code.pasteFailed") });
   };
 
   return (

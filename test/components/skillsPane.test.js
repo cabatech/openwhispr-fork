@@ -65,6 +65,35 @@ test("Esc on a screen goes back, and focus returns to the See link that opened i
   assert.equal(focused(container) === buttonStarting(container, "skills.pane.seeOne"), true);
 });
 
+const searchBox = (container) =>
+  find(container, (node) => node.tagName === "INPUT" && ariaLabel(node) === "skills.pane.search");
+
+test("Esc in Manage's search clears it first, then goes back", async (t) => {
+  const { container } = await renderPane(t, [skill("meeting-prep"), skill("decision-log")]);
+  await click(gear(container));
+  await typeInto(searchBox(container), "decision");
+
+  await pressEscape(searchBox(container));
+  assert.equal(label(heading(container)), "skills.manage.title");
+  assert.equal(searchBox(container).value, "");
+
+  await pressEscape(searchBox(container));
+  assert.equal(label(heading(container)), "Skills");
+});
+
+test("an Esc that ends text composition neither clears the search nor leaves", async (t) => {
+  const { container } = await renderPane(t, [skill("meeting-prep")]);
+  await click(gear(container));
+  await typeInto(searchBox(container), "会議");
+
+  await React.act(async () =>
+    dispatch(searchBox(container), "keydown", { key: "Escape", isComposing: true })
+  );
+
+  assert.equal(searchBox(container).value, "会議");
+  assert.equal(label(heading(container)), "skills.manage.title");
+});
+
 // The control that opened a screen is gone once it opens, so without this the keyboard
 // would be left on the page body, where Esc can't reach the pane.
 test("a screen opens with focus on its heading, so Esc goes back from there", async (t) => {
@@ -90,6 +119,63 @@ test("a card on home opens its detail pop-up", async (t) => {
   await settle();
 
   assert.match(label(dialog(container)), /meeting prep/);
+});
+
+// Reads that answer late, fail, or find the skill gone: each pop-up shows only its own skill.
+async function renderPaneWithReads(t, skills, reads) {
+  return mountSkillsComponent(t, {
+    modulePath: "/components/integrations/SkillsPane.tsx",
+    exportName: "SkillsPane",
+    skills,
+    props: { title: "Skills", active: true },
+    api: { skillsGet: async (name) => reads[name]() },
+  });
+}
+
+const detailOf = (name) => ({
+  ...skill(name),
+  markdown: `${name.toUpperCase()} INSTRUCTIONS`,
+  files: [{ path: `references/${name}.md`, size: 3, text: true, script: false }],
+});
+const card = (container, name) =>
+  find(container, (node) => node.tagName === "BUTTON" && ariaLabel(node).includes(`"${name}"`));
+
+test("a pop-up never shows another skill's instructions or files", async (t) => {
+  const skills = [skill("alpha"), skill("beta"), skill("gamma")];
+  const { container } = await renderPaneWithReads(t, skills, {
+    alpha: async () => detailOf("alpha"),
+    beta: () => new Promise(() => {}),
+    gamma: async () => {
+      throw new Error("Error invoking remote method 'skills-get'");
+    },
+  });
+  await click(card(container, "alpha"));
+  await settle();
+  assert.match(label(dialog(container)), /ALPHA INSTRUCTIONS/);
+  await pressEscape(dialog(container));
+
+  for (const name of ["beta", "gamma"]) {
+    await click(card(container, name));
+    await settle();
+    assert.doesNotMatch(label(dialog(container)), /ALPHA|alpha\.md/, name);
+    await pressEscape(dialog(container));
+  }
+});
+
+test("a skill removed outside the app closes its pop-up", async (t) => {
+  let alpha = detailOf("alpha");
+  const { container, store } = await renderPaneWithReads(t, [skill("alpha"), skill("beta")], {
+    alpha: async () => alpha,
+  });
+  await click(card(container, "alpha"));
+  await settle();
+  assert.ok(dialog(container));
+
+  alpha = null;
+  await React.act(async () => store.useSkillsStore.setState({ skills: [skill("beta")] }));
+  await settle();
+
+  assert.equal(dialog(container), null);
 });
 
 test("Esc in the detail pop-up closes it without leaving Manage", async (t) => {
@@ -201,4 +287,94 @@ test("Create keeps a half-written skill on Esc, and a saved one lands on home", 
   const card = find(container, (node) => ariaLabel(node).startsWith("skills.pane.cardLabel"));
   assert.equal(focused(container) === card, true);
   assert.deepEqual(store.useSkillsStore.getState().iconPlays, { "weekly-recap": 1 });
+});
+
+async function renderPaneWith(t, { skillsList, active = true }) {
+  let setActive;
+  const listeners = new Set();
+  const mounted = await mountSkillsComponent(t, {
+    modulePath: "/components/integrations/SkillsPane.tsx",
+    exportName: "SkillsPane",
+    skills: [],
+    api: { skillsList },
+    wrap: (SkillsPane) => {
+      // The window's focus listeners are kept here, so a test can focus the window.
+      const target = globalThis.window;
+      const { addEventListener, removeEventListener } = target;
+      target.addEventListener = (type, listener, options) =>
+        type === "focus"
+          ? listeners.add(listener)
+          : addEventListener?.call(target, type, listener, options);
+      target.removeEventListener = (type, listener, options) =>
+        type === "focus"
+          ? listeners.delete(listener)
+          : removeEventListener?.call(target, type, listener, options);
+      function Harness() {
+        const [shown, setShown] = React.useState(active);
+        setActive = setShown;
+        return React.createElement(SkillsPane, { title: "Skills", active: shown });
+      }
+      return React.createElement(Harness);
+    },
+  });
+  const focusWindow = async () => {
+    for (const listener of [...listeners]) listener();
+    await settle();
+  };
+  const show = (next) => React.act(async () => setActive(next));
+  return { ...mounted, focusWindow, show, listeners };
+}
+
+// Opening the pane reloads the list; a later failure keeps the last list, so a toast says so.
+test("a first load that fails shows its card alone, and a later one says so in a toast", async (t) => {
+  let fails = true;
+  const { container, toasts, show, store } = await renderPaneWith(t, {
+    active: false,
+    skillsList: async () => {
+      if (fails) throw new Error("Error invoking remote method 'skills-list'");
+      return { skills: [skill("recap")] };
+    },
+  });
+  await React.act(async () => store.useSkillsStore.setState({ skills: [], loaded: false }));
+  const reopen = async () => {
+    await show(false);
+    await show(true);
+    await settle();
+  };
+  await show(true);
+  await settle();
+  assert.match(label(container), /common\.retry/);
+  assert.deepEqual(toasts, []);
+
+  fails = false;
+  await reopen();
+  fails = true;
+  await reopen();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.loadFailed", variant: "destructive" }]);
+  assert.match(label(container), /recap/);
+});
+
+test("a window focus rereads the skills only while the pane shows", async (t) => {
+  let lists = 0;
+  const { focusWindow, show, listeners } = await renderPaneWith(t, {
+    active: false,
+    skillsList: async () => {
+      lists += 1;
+      return { skills: [] };
+    },
+  });
+  await focusWindow();
+  assert.equal(lists, 0);
+
+  await show(true);
+  await settle();
+  const opened = lists;
+  await focusWindow();
+  assert.equal(lists, opened + 1);
+
+  await show(false);
+  await focusWindow();
+  assert.equal(lists, opened + 1);
+  assert.equal(listeners.size, 0);
 });

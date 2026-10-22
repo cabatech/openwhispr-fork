@@ -4550,7 +4550,8 @@
       "addRecommended": "添加 {{name}}",
       "empty": {
         "title": "还没有技能",
-        "description": "和助手一起创建一个，或上传您已有的技能。"
+        "description": "和助手一起创建一个，或上传您已有的技能。",
+        "descriptionNoAssistant": "上传您已有的技能，或自己创建一个。"
       }
     },
     "breadcrumb": {
@@ -4563,7 +4564,7 @@
       "more": "{{name}} 的更多操作",
       "files": "文件",
       "copyFile": "复制 {{path}}",
-      "neverRun": "仅显示，从不运行",
+      "neverRun": "OpenWhispr 从不运行脚本",
       "uninstall": "卸载",
       "uninstallConfirm": "要卸载 {{name}} 吗？它将从这台电脑中移除。",
       "uninstallConfirmSynced": "要卸载 {{name}} 吗？它将从这台电脑和你的其他设备中移除。",
@@ -4583,6 +4584,7 @@
       "removedFromComputer": "已从这台电脑中移除。",
       "copiedMarkdown": "已复制 Markdown",
       "copyFailed": "无法复制",
+      "revealFailed": "无法找到该技能的文件夹",
       "writeFailed": "无法保存技能",
       "writeFailedNoSpace": "您的磁盘已满。",
       "writeFailedPermission": "OpenWhispr 无法写入其技能文件夹。",
@@ -4592,7 +4594,6 @@
       "title": "管理技能",
       "description": "开启或关闭技能，或移除不用的技能。每个技能都保存在这台电脑上。",
       "descriptionBackedUp": "开启或关闭技能，或移除不用的技能。每个技能都保存在这台电脑上，并通过云端备份进行备份。",
-      "personal": "个人",
       "noMatches": "没有与“{{query}}”匹配的技能。",
       "none": "还没有技能。"
     },
@@ -4611,6 +4612,8 @@
       "duplicate": "您已有此技能",
       "replace": "替换",
       "willReplace": "将替换您当前的技能",
+      "willReplaceCopy": "将代替另一个文件使用",
+      "alsoInUpload": "此次上传的另一个文件包含相同的技能",
       "skipped": "已跳过",
       "undo": "撤销",
       "chooseFile": "选择一个文件以继续。",
@@ -4662,7 +4665,9 @@
       "unreadableArchive": "无法打开此文件",
       "nameMismatch": "SKILL.md 中的名称与其文件夹不一致",
       "unreadable": "无法读取该技能的文件",
-      "placeholder": "请先替换 [TODO: …] 占位符"
+      "skillFileNotUtf8": "SKILL.md 必须保存为 UTF-8 文本",
+      "placeholder": "请先替换 [TODO: …] 占位符",
+      "nameTaken": "您已有名为“{{name}}”的技能"
     },
     "warnings": {
       "folderRenamed": "文件夹将重命名为与技能名称一致",
@@ -4674,7 +4679,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "行动项同步到 Linear",
-        "description": "从会议中提取行动项，并起草 Linear 议题供您批准。会议结束后我要行动项时使用。"
+        "description": "从会议中提取行动项，并起草 Linear 议题供我批准。会议结束后我要行动项时使用。"
       },
       "meeting-summary-to-slack": {
         "title": "会议摘要发到 Slack",
@@ -4686,7 +4691,7 @@
       },
       "decision-log": {
         "title": "决策记录",
-        "description": "持续整理我会议中的决策清单。当我问我们决定了什么时使用。"
+        "description": "在我的会议笔记中查找决策，并注明每项决策的日期和会议。当我问我们决定了什么时使用。"
       }
     },
     "chat": {
@@ -4714,6 +4719,7 @@
       "undo": "撤销",
       "undone": "已撤销，技能已恢复原样。",
       "undoStale": "无法撤销，此后技能已被更改。",
+      "undoFailed": "无法撤销，请重试。",
       "failed": "无法保存技能。",
       "notSaved": "未保存任何内容。",
       "updateHeader": "更新技能",

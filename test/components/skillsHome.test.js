@@ -13,6 +13,7 @@ const {
   findAll,
   label,
   mountSkillsComponent,
+  settle,
   skill,
   typeInto,
 } = require("../lib/skillsHarness");
@@ -191,6 +192,81 @@ test(
   }
 );
 
+test("a library that can't be read says so and offers Retry", async (t) => {
+  let lists = 0;
+  const { container, store } = await renderHome(t, {
+    api: {
+      skillsList: async () => {
+        lists += 1;
+        return { skills: [skill("recap")] };
+      },
+    },
+  });
+  await React.act(async () =>
+    store.useSkillsStore.setState({ skills: [], loaded: false, loadError: true })
+  );
+  assert.match(label(container), /skills\.toasts\.loadFailed/);
+  const retry = findElement(
+    container,
+    (node) => node.tagName === "BUTTON" && label(node) === "common.retry"
+  );
+
+  await React.act(async () => dispatch(retry, "click"));
+  await settle();
+
+  assert.equal(lists, 1);
+  assert.deepEqual(cardNames(container), ["recap"]);
+  // The card holding Retry is gone, so the heading takes focus.
+  assert.equal(container.ownerDocument.activeElement?.tagName, "H2");
+});
+
+test("a Retry that fails again says so", async (t) => {
+  const { container, store, toasts } = await renderHome(t, {
+    api: {
+      skillsList: async () => {
+        throw new Error("Error invoking remote method 'skills-list'");
+      },
+    },
+  });
+  await React.act(async () =>
+    store.useSkillsStore.setState({ skills: [], loaded: false, loadError: true })
+  );
+  const retry = findElement(
+    container,
+    (node) => node.tagName === "BUTTON" && label(node) === "common.retry"
+  );
+
+  await React.act(async () => dispatch(retry, "click"));
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.loadFailed", variant: "destructive" }]);
+  assert.match(label(container), /common\.retry/);
+});
+
+test("pressing + again while a skill is being added adds it once", async (t) => {
+  const added = [];
+  const { container, toasts } = await renderHome(t, {
+    api: {
+      skillsAddRecommended: async (id) => {
+        added.push(id);
+        return { ok: true, name: id };
+      },
+    },
+  });
+  const add = findElement(container, (node) =>
+    ariaLabel(node).startsWith("skills.pane.addRecommended")
+  );
+
+  await React.act(async () => {
+    dispatch(add, "click");
+    dispatch(add, "click");
+  });
+  await settle();
+
+  assert.equal(added.length, 1);
+  assert.equal(toasts.length, 1);
+});
+
 test("a failed add says why", async (t) => {
   const { container, toasts } = await renderHome(t, {
     api: { skillsAddRecommended: async () => ({ ok: false, error: "noSpace" }) },
@@ -205,6 +281,26 @@ test("a failed add says why", async (t) => {
     {
       title: "skills.toasts.writeFailed",
       description: "skills.toasts.writeFailedNoSpace",
+      variant: "destructive",
+    },
+  ]);
+});
+
+test("an add refused because a skill already has that title says so", async (t) => {
+  const refusal = { code: "nameTaken", values: { name: "Decision log" } };
+  const { container, toasts } = await renderHome(t, {
+    api: { skillsAddRecommended: async () => ({ ok: false, problems: [refusal] }) },
+  });
+  const add = findElement(container, (node) =>
+    ariaLabel(node).startsWith("skills.pane.addRecommended")
+  );
+
+  await React.act(async () => dispatch(add, "click"));
+
+  assert.deepEqual(toasts, [
+    {
+      title: "skills.toasts.writeFailed",
+      description: 'skills.problems.nameTaken{"name":"Decision log"}',
       variant: "destructive",
     },
   ]);

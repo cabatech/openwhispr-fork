@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { ToastProps } from "../ui/useToast";
 import type {
   SkillIssue,
   SkillProblemCode,
@@ -17,14 +18,15 @@ export const RECOMMENDED_SKILL_IDS = [
   "decision-log",
 ] as const;
 
-const WRITE_ERROR_REASONS: Partial<Record<SkillWriteError, string>> = {
+const WRITE_ERROR_REASONS: Partial<Record<SkillWriteError | "exists", string>> = {
   noSpace: "skills.toasts.writeFailedNoSpace",
   permission: "skills.toasts.writeFailedPermission",
+  exists: "skills.upload.duplicate",
 };
 
 /** The toast for a save that failed, with its reason when there is one. */
-export function writeFailedToast(t: TFunction, error?: string) {
-  const reason = error ? WRITE_ERROR_REASONS[error as SkillWriteError] : undefined;
+export function writeFailedToast(t: TFunction, error?: string): ToastProps {
+  const reason = error ? WRITE_ERROR_REASONS[error as keyof typeof WRITE_ERROR_REASONS] : undefined;
   return {
     title: t("skills.toasts.writeFailed"),
     ...(reason ? { description: t(reason) } : {}),

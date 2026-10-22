@@ -17,14 +17,17 @@ const {
 const COPIED = "\uFEFF---\r\nname: x\r\n---\r\n";
 
 async function renderManage(t, { skills, api = {}, backup = false }) {
-  const calls = { opened: [], back: 0, revealed: [], clipboard: [], switched: [] };
+  const calls = { opened: [], focusedAtOpen: [], back: 0, revealed: [], clipboard: [], switched: [] };
   const mounted = await mountSkillsComponent(t, {
     modulePath: "/components/skills/ManageSkillsScreen.tsx",
     exportName: "ManageSkillsScreen",
     skills,
     mocks: cloudBackup(backup),
     props: {
-      onOpenSkill: (name, confirmUninstall) => calls.opened.push([name, confirmUninstall]),
+      onOpenSkill: (name, confirmUninstall) => {
+        calls.opened.push([name, confirmUninstall]);
+        calls.focusedAtOpen.push(globalThis.document.activeElement);
+      },
       onBack: () => calls.back++,
     },
     api: {
@@ -60,7 +63,7 @@ const button = (root, text) =>
   findElement(root, (node) => node.tagName === "BUTTON" && label(node) === text);
 
 test(
-  "Manage lists every skill with its badge, menu and switch, and a row opens the detail",
+  "Manage lists every skill with its menu and switch, and a row opens the detail",
   async (t) => {
     const skills = [
       ...Array.from({ length: 7 }, (_, index) => skill(`skill-${index + 1}`)),
@@ -77,7 +80,8 @@ test(
 
     assert.equal(rows(container).length, 9);
     for (const row of rows(container)) {
-      assert.match(label(row), /skills\.manage\.personal/);
+      // Every skill here is the user's own, so no row carries a badge saying so.
+      assert.doesNotMatch(label(row), /skills\.manage\.personal/);
       assert.ok(findElement(row, (node) => ariaLabel(node).startsWith("skills.detail.more")));
     }
     const switchOf = (name) =>
@@ -104,6 +108,21 @@ test(
   }
 );
 
+test("a row's switch that can't be saved says so", async (t) => {
+  const { container, toasts } = await renderManage(t, {
+    skills: [skill("paused", { enabled: false })],
+    api: { skillsSetEnabled: async () => ({ ok: false, error: "unknown" }) },
+  });
+  const toggle = findElement(rowFor(container, "paused"), (node) => {
+    return node.getAttribute("role") === "switch";
+  });
+
+  await click(toggle);
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.writeFailed", variant: "destructive" }]);
+});
+
 test("a skill that needs fixing says so on its row, and its switch shows off", async (t) => {
   const skills = [skill("broken", { valid: false, problem: { code: "nameMismatch" } })];
   const { container } = await renderManage(t, { skills });
@@ -126,11 +145,53 @@ test("the menu reveals the folder and copies the markdown exactly", async (t) =>
   assert.deepEqual(toasts, [{ title: "skills.toasts.copiedMarkdown", variant: "success" }]);
 });
 
+test("a folder that can't be shown says so", async (t) => {
+  const { container, toasts } = await renderManage(t, {
+    skills: [skill("recap")],
+    api: { skillsReveal: async () => ({ ok: false }) },
+  });
+
+  await click(button(container, "controlPanel.history.showInFolder"));
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.revealFailed", variant: "destructive" }]);
+});
+
 test("a copy that fails says so", async (t) => {
   const { container, toasts } = await renderManage(t, {
     skills: [skill("recap")],
     api: {
       writeClipboard: async () => ({ success: false }),
+    },
+  });
+
+  await click(button(container, "skills.menu.copyMarkdown"));
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.copyFailed", variant: "destructive" }]);
+});
+
+// The pop-up returns focus to what had it when it opened, and a menu item goes away with its
+// menu, so the row's ⋯ button takes focus first.
+test("Uninstall from a row's menu leaves focus on that row's ⋯ button", async (t) => {
+  const { container, calls } = await renderManage(t, { skills: [skill("recap"), skill("notes")] });
+
+  await click(button(rowFor(container, "notes"), "skills.menu.uninstall"));
+
+  const more = findElement(rowFor(container, "notes"), (node) => {
+    return ariaLabel(node).startsWith("skills.detail.more");
+  });
+  assert.deepEqual(calls.opened, [["notes", true]]);
+  assert.equal(calls.focusedAtOpen[0] === more, true);
+});
+
+test("a copy whose skill can't be read says so", async (t) => {
+  const { container, toasts } = await renderManage(t, {
+    skills: [skill("recap")],
+    api: {
+      skillsGet: async () => {
+        throw new Error("Error invoking remote method 'skills-get'");
+      },
     },
   });
 

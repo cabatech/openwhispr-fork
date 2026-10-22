@@ -99,6 +99,20 @@ test("a file with no header block is refused", () => {
   assert.deepEqual(codes(unclosed.problems), ["frontmatterMissing"]);
 });
 
+// SKILL.md is read as UTF-8 and copied back out exactly as stored, so it must be UTF-8 text.
+test("a SKILL.md that isn't UTF-8 text is refused, saying how to fix it", () => {
+  const text = md("name: resume\ndescription: Résumé helper.");
+  for (const data of [
+    Buffer.from(text, "latin1"),
+    Buffer.from(`\uFEFF${text}`, "utf16le"),
+    Buffer.concat([Buffer.from(text), Buffer.from([0])]),
+  ]) {
+    const r = validateSkillFiles([{ path: "SKILL.md", data }], { source: "upload" });
+    assert.deepEqual(codes(r.problems), ["skillFileNotUtf8"]);
+  }
+  assert.deepEqual(codes(validateSkillFiles(file(text), { source: "upload" }).problems), []);
+});
+
 test("a folder without SKILL.md is refused", () => {
   const r = validateSkillFiles([{ path: "notes.md", data: Buffer.from("x") }], { source: "disk" });
   assert.deepEqual(codes(r.problems), ["noSkillFile"]);

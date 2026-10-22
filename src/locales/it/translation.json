@@ -4550,7 +4550,8 @@
       "addRecommended": "Aggiungi {{name}}",
       "empty": {
         "title": "Ancora nessuna skill",
-        "description": "Creane una con l'assistente o carica una skill che hai già."
+        "description": "Creane una con l'assistente o carica una skill che hai già.",
+        "descriptionNoAssistant": "Carica una skill che hai già o creane una tua."
       }
     },
     "breadcrumb": {
@@ -4563,7 +4564,7 @@
       "more": "Altre opzioni per {{name}}",
       "files": "File",
       "copyFile": "Copia {{path}}",
-      "neverRun": "Mostrato, mai eseguito",
+      "neverRun": "OpenWhispr non esegue mai script",
       "uninstall": "Disinstalla",
       "uninstallConfirm": "Disinstallare {{name}}? Verrà rimossa da questo computer.",
       "uninstallConfirmSynced": "Disinstallare {{name}}? Verrà rimossa da questo computer e dagli altri tuoi dispositivi.",
@@ -4583,6 +4584,7 @@
       "removedFromComputer": "Rimossa da questo computer.",
       "copiedMarkdown": "Markdown copiato",
       "copyFailed": "Impossibile copiare",
+      "revealFailed": "Impossibile trovare la cartella della skill",
       "writeFailed": "Impossibile salvare la skill",
       "writeFailedNoSpace": "Il disco è pieno.",
       "writeFailedPermission": "OpenWhispr non può scrivere nella sua cartella delle skill.",
@@ -4592,7 +4594,6 @@
       "title": "Gestisci skill",
       "description": "Attiva o disattiva le skill, oppure rimuovi quelle che non usi. Ognuna è salvata su questo computer.",
       "descriptionBackedUp": "Attiva o disattiva le skill, oppure rimuovi quelle che non usi. Ognuna è salvata su questo computer e nel Backup cloud.",
-      "personal": "Personale",
       "noMatches": "Nessuna skill corrisponde a \"{{query}}\".",
       "none": "Ancora nessuna skill."
     },
@@ -4611,6 +4612,8 @@
       "duplicate": "Hai già questa skill",
       "replace": "Sostituisci",
       "willReplace": "Sostituirà la tua skill attuale",
+      "willReplaceCopy": "Verrà usato al posto dell'altro file",
+      "alsoInUpload": "Un altro file di questo caricamento contiene la stessa skill",
       "skipped": "Saltata",
       "undo": "Annulla",
       "chooseFile": "Scegli un file per continuare.",
@@ -4662,7 +4665,9 @@
       "unreadableArchive": "Impossibile aprire questo file",
       "nameMismatch": "Il nome in SKILL.md non corrisponde alla sua cartella",
       "unreadable": "Impossibile leggere i file della skill",
-      "placeholder": "Sostituisci prima il segnaposto [TODO: …]"
+      "skillFileNotUtf8": "SKILL.md deve essere salvato come testo UTF-8",
+      "placeholder": "Sostituisci prima il segnaposto [TODO: …]",
+      "nameTaken": "Hai già una skill chiamata {{name}}"
     },
     "warnings": {
       "folderRenamed": "La cartella viene rinominata in base al nome della skill",
@@ -4686,7 +4691,7 @@
       },
       "decision-log": {
         "title": "Registro delle decisioni",
-        "description": "Tiene un elenco aggiornato delle decisioni prese nelle mie riunioni. Da usare quando chiedo cosa abbiamo deciso."
+        "description": "Trova le decisioni nelle note delle mie riunioni, con la data e la riunione di ciascuna. Da usare quando chiedo cosa abbiamo deciso."
       }
     },
     "chat": {
@@ -4714,6 +4719,7 @@
       "undo": "Annulla",
       "undone": "Annullato. La skill è tornata com'era.",
       "undoStale": "Impossibile annullare. La skill è cambiata nel frattempo.",
+      "undoFailed": "Impossibile annullare. Riprova.",
       "failed": "Impossibile salvare la skill.",
       "notSaved": "Non è stato salvato nulla.",
       "updateHeader": "Aggiorna skill",

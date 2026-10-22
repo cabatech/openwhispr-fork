@@ -4720,7 +4720,8 @@
       "addRecommended": "{{name}} hinzufügen",
       "empty": {
         "title": "Noch keine Skills",
-        "description": "Erstelle einen mit dem Assistenten oder lade einen hoch, den du schon hast."
+        "description": "Erstelle einen mit dem Assistenten oder lade einen hoch, den du schon hast.",
+        "descriptionNoAssistant": "Lade einen hoch, den du schon hast, oder erstelle deinen eigenen."
       }
     },
     "breadcrumb": {
@@ -4733,7 +4734,7 @@
       "more": "Weitere Aktionen für {{name}}",
       "files": "Dateien",
       "copyFile": "{{path}} kopieren",
-      "neverRun": "Wird angezeigt, nie ausgeführt",
+      "neverRun": "OpenWhispr führt Skripte nie aus",
       "uninstall": "Deinstallieren",
       "uninstallConfirm": "{{name}} deinstallieren? Der Skill wird von diesem Computer entfernt.",
       "uninstallConfirmSynced": "{{name}} deinstallieren? Der Skill wird von diesem Computer und deinen anderen Geräten entfernt.",
@@ -4753,6 +4754,7 @@
       "removedFromComputer": "Von diesem Computer entfernt.",
       "copiedMarkdown": "Markdown kopiert",
       "copyFailed": "Kopieren fehlgeschlagen",
+      "revealFailed": "Ordner des Skills konnte nicht gefunden werden",
       "writeFailed": "Skill konnte nicht gespeichert werden",
       "writeFailedNoSpace": "Deine Festplatte ist voll.",
       "writeFailedPermission": "OpenWhispr kann nicht in seinen Skills-Ordner schreiben.",
@@ -4762,7 +4764,6 @@
       "title": "Skills verwalten",
       "description": "Schalte Skills ein oder aus oder entferne die, die du nicht nutzt. Jeder wird auf diesem Computer gespeichert.",
       "descriptionBackedUp": "Schalte Skills ein oder aus oder entferne die, die du nicht nutzt. Jeder wird auf diesem Computer gespeichert und per Cloud-Backup gesichert.",
-      "personal": "Persönlich",
       "noMatches": "Keine Skills passen zu „{{query}}“.",
       "none": "Noch keine Skills."
     },
@@ -4781,6 +4782,8 @@
       "duplicate": "Du hast diesen Skill schon",
       "replace": "Ersetzen",
       "willReplace": "Ersetzt deinen aktuellen Skill",
+      "willReplaceCopy": "Wird statt der anderen Datei verwendet",
+      "alsoInUpload": "Eine andere Datei in diesem Upload enthält denselben Skill",
       "skipped": "Übersprungen",
       "undo": "Rückgängig",
       "chooseFile": "Wähle eine Datei aus, um fortzufahren.",
@@ -4832,7 +4835,9 @@
       "unreadableArchive": "Diese Datei kann nicht geöffnet werden",
       "nameMismatch": "Der Name in SKILL.md passt nicht zu seinem Ordner",
       "unreadable": "Die Dateien des Skills können nicht gelesen werden",
-      "placeholder": "Ersetze zuerst den Platzhalter [TODO: …]"
+      "skillFileNotUtf8": "SKILL.md muss als UTF-8-Text gespeichert sein",
+      "placeholder": "Ersetze zuerst den Platzhalter [TODO: …]",
+      "nameTaken": "Du hast schon einen Skill namens {{name}}"
     },
     "warnings": {
       "folderRenamed": "Der Ordner wird passend zum Namen des Skills umbenannt",
@@ -4844,7 +4849,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Aufgaben nach Linear",
-        "description": "Zieht die Aufgaben aus einem Meeting und entwirft Linear-Issues, die du freigibst. Nutzen nach einem Meeting, wenn ich nach den Aufgaben frage."
+        "description": "Zieht die Aufgaben aus einem Meeting und entwirft Linear-Issues, die ich freigebe. Nutzen nach einem Meeting, wenn ich nach den Aufgaben frage."
       },
       "meeting-summary-to-slack": {
         "title": "Meeting-Zusammenfassung nach Slack",
@@ -4856,7 +4861,7 @@
       },
       "decision-log": {
         "title": "Entscheidungsprotokoll",
-        "description": "Führt eine fortlaufende Liste der Entscheidungen aus meinen Meetings. Nutzen, wenn ich frage, was wir entschieden haben."
+        "description": "Findet die Entscheidungen in meinen Meeting-Notizen, jeweils mit Datum und Meeting. Nutzen, wenn ich frage, was wir entschieden haben."
       }
     },
     "chat": {
@@ -4884,6 +4889,7 @@
       "undo": "Rückgängig",
       "undone": "Rückgängig gemacht. Der Skill ist wieder wie vorher.",
       "undoStale": "Rückgängig machen nicht möglich. Der Skill wurde seitdem geändert.",
+      "undoFailed": "Rückgängig machen nicht möglich. Versuche es erneut.",
       "failed": "Der Skill konnte nicht gespeichert werden.",
       "notSaved": "Es wurde nichts gespeichert.",
       "updateHeader": "Skill aktualisieren",

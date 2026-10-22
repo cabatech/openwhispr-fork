@@ -64,6 +64,17 @@ test("the numbers and the text share one fixed-height box", async (t) => {
   assert.ok(classes(gutter).includes("overflow-hidden"));
 });
 
+// The numbers count lines, so no line may wrap onto a second row beside the next number: a
+// long one scrolls sideways, and the gutter leaves room at the bottom for that scrollbar.
+test("a long line scrolls sideways instead of wrapping beside the next number", async (t) => {
+  const { textarea, gutter } = await renderEditor(t, { id: "instructions", value: "" });
+  const classes = (node) => node.getAttribute("class").split(/\s+/);
+
+  assert.equal(textarea.getAttribute("wrap"), "off");
+  assert.ok(classes(textarea).includes("overflow-auto"));
+  assert.ok(classes(gutter).includes("pb-3.5"));
+});
+
 // index.css gives every other field a border, a background and the sans font, which would
 // draw a second box inside the editor and undo font-mono.
 test("the text area opts out of the app's own field style", async (t) => {

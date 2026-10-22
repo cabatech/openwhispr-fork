@@ -4720,7 +4720,8 @@
       "addRecommended": "Ajouter {{name}}",
       "empty": {
         "title": "Aucune compétence pour l'instant",
-        "description": "Créez-en une avec l'assistant, ou importez une compétence que vous avez déjà."
+        "description": "Créez-en une avec l'assistant, ou importez une compétence que vous avez déjà.",
+        "descriptionNoAssistant": "Importez une compétence que vous avez déjà, ou créez la vôtre."
       }
     },
     "breadcrumb": {
@@ -4733,7 +4734,7 @@
       "more": "Plus d'options pour {{name}}",
       "files": "Fichiers",
       "copyFile": "Copier {{path}}",
-      "neverRun": "Affiché, jamais exécuté",
+      "neverRun": "OpenWhispr n'exécute jamais de scripts",
       "uninstall": "Désinstaller",
       "uninstallConfirm": "Désinstaller {{name}} ? Elle sera supprimée de cet ordinateur.",
       "uninstallConfirmSynced": "Désinstaller {{name}} ? Elle sera supprimée de cet ordinateur et de vos autres appareils.",
@@ -4753,6 +4754,7 @@
       "removedFromComputer": "Supprimée de cet ordinateur.",
       "copiedMarkdown": "Markdown copié",
       "copyFailed": "Impossible de copier",
+      "revealFailed": "Impossible de trouver le dossier de la compétence",
       "writeFailed": "Impossible d'enregistrer la compétence",
       "writeFailedNoSpace": "Votre disque est plein.",
       "writeFailedPermission": "OpenWhispr ne peut pas écrire dans son dossier de compétences.",
@@ -4762,7 +4764,6 @@
       "title": "Gérer les compétences",
       "description": "Activez ou désactivez des compétences, ou supprimez celles que vous n'utilisez pas. Chacune est enregistrée sur cet ordinateur.",
       "descriptionBackedUp": "Activez ou désactivez des compétences, ou supprimez celles que vous n'utilisez pas. Chacune est enregistrée sur cet ordinateur et dans votre Sauvegarde cloud.",
-      "personal": "Personnelle",
       "noMatches": "Aucune compétence ne correspond à « {{query}} ».",
       "none": "Aucune compétence pour l'instant."
     },
@@ -4781,6 +4782,8 @@
       "duplicate": "Vous avez déjà cette compétence",
       "replace": "Remplacer",
       "willReplace": "Remplacera votre compétence actuelle",
+      "willReplaceCopy": "Sera utilisé à la place de l'autre fichier",
+      "alsoInUpload": "Un autre fichier de cet import contient la même compétence",
       "skipped": "Ignorée",
       "undo": "Annuler",
       "chooseFile": "Choisissez un fichier pour continuer.",
@@ -4832,7 +4835,9 @@
       "unreadableArchive": "Impossible d'ouvrir ce fichier",
       "nameMismatch": "Le nom dans SKILL.md ne correspond pas à son dossier",
       "unreadable": "Les fichiers de la compétence sont illisibles",
-      "placeholder": "Remplacez d'abord l'espace réservé [TODO: …]"
+      "skillFileNotUtf8": "SKILL.md doit être enregistré en texte UTF-8",
+      "placeholder": "Remplacez d'abord l'espace réservé [TODO: …]",
+      "nameTaken": "Vous avez déjà une compétence nommée {{name}}"
     },
     "warnings": {
       "folderRenamed": "Le dossier est renommé pour correspondre au nom de la compétence",
@@ -4844,7 +4849,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Actions vers Linear",
-        "description": "Extrait les actions d'une réunion et prépare des tickets Linear que vous approuvez. À utiliser après une réunion quand je demande les actions."
+        "description": "Extrait les actions d'une réunion et prépare des tickets Linear soumis à mon approbation. À utiliser après une réunion quand je demande les actions."
       },
       "meeting-summary-to-slack": {
         "title": "Résumé de réunion vers Slack",
@@ -4856,7 +4861,7 @@
       },
       "decision-log": {
         "title": "Journal des décisions",
-        "description": "Tient à jour la liste des décisions prises dans mes réunions. À utiliser quand je demande ce que nous avons décidé."
+        "description": "Retrouve les décisions dans les notes de mes réunions, avec la date et la réunion de chacune. À utiliser quand je demande ce que nous avons décidé."
       }
     },
     "chat": {
@@ -4884,6 +4889,7 @@
       "undo": "Annuler",
       "undone": "Annulé. La compétence est revenue à son état précédent.",
       "undoStale": "Impossible d'annuler. La compétence a changé depuis.",
+      "undoFailed": "Impossible d'annuler. Réessayez.",
       "failed": "Impossible d'enregistrer la compétence.",
       "notSaved": "Rien n'a été enregistré.",
       "updateHeader": "Mettre à jour la compétence",

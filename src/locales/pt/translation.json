@@ -4550,7 +4550,8 @@
       "addRecommended": "Adicionar {{name}}",
       "empty": {
         "title": "Nenhuma habilidade ainda",
-        "description": "Crie uma com o assistente ou envie uma que você já tenha."
+        "description": "Crie uma com o assistente ou envie uma que você já tenha.",
+        "descriptionNoAssistant": "Envie uma que você já tenha ou crie a sua."
       }
     },
     "breadcrumb": {
@@ -4563,7 +4564,7 @@
       "more": "Mais opções para {{name}}",
       "files": "Arquivos",
       "copyFile": "Copiar {{path}}",
-      "neverRun": "Exibido, nunca executado",
+      "neverRun": "O OpenWhispr nunca executa scripts",
       "uninstall": "Desinstalar",
       "uninstallConfirm": "Desinstalar {{name}}? Ela será removida deste computador.",
       "uninstallConfirmSynced": "Desinstalar {{name}}? Ela será removida deste computador e dos seus outros dispositivos.",
@@ -4583,6 +4584,7 @@
       "removedFromComputer": "Removida deste computador.",
       "copiedMarkdown": "Markdown copiado",
       "copyFailed": "Não foi possível copiar",
+      "revealFailed": "Não foi possível encontrar a pasta da habilidade",
       "writeFailed": "Não foi possível salvar a habilidade",
       "writeFailedNoSpace": "Seu disco está cheio.",
       "writeFailedPermission": "O OpenWhispr não consegue gravar na pasta de habilidades.",
@@ -4592,7 +4594,6 @@
       "title": "Gerenciar habilidades",
       "description": "Ative ou desative habilidades, ou remova as que você não usa. Cada uma fica salva neste computador.",
       "descriptionBackedUp": "Ative ou desative habilidades, ou remova as que você não usa. Cada uma fica salva neste computador e no Backup na nuvem.",
-      "personal": "Pessoal",
       "noMatches": "Nenhuma habilidade corresponde a \"{{query}}\".",
       "none": "Nenhuma habilidade ainda."
     },
@@ -4611,6 +4612,8 @@
       "duplicate": "Você já tem esta habilidade",
       "replace": "Substituir",
       "willReplace": "Vai substituir sua habilidade atual",
+      "willReplaceCopy": "Será usado no lugar do outro arquivo",
+      "alsoInUpload": "Outro arquivo deste envio tem a mesma habilidade",
       "skipped": "Ignorada",
       "undo": "Desfazer",
       "chooseFile": "Escolha um arquivo para continuar.",
@@ -4662,7 +4665,9 @@
       "unreadableArchive": "Não é possível abrir este arquivo",
       "nameMismatch": "O nome dentro do SKILL.md não corresponde à pasta",
       "unreadable": "Não é possível ler os arquivos da habilidade",
-      "placeholder": "Substitua primeiro o marcador [TODO: …]"
+      "skillFileNotUtf8": "O SKILL.md precisa ser salvo como texto UTF-8",
+      "placeholder": "Substitua primeiro o marcador [TODO: …]",
+      "nameTaken": "Você já tem uma habilidade chamada {{name}}"
     },
     "warnings": {
       "folderRenamed": "A pasta é renomeada para corresponder ao nome da habilidade",
@@ -4674,7 +4679,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Ações para o Linear",
-        "description": "Extrai as ações de uma reunião e prepara rascunhos de issues do Linear para você aprovar. Use depois de uma reunião quando eu pedir as ações."
+        "description": "Extrai as ações de uma reunião e prepara rascunhos de issues do Linear para eu aprovar. Use depois de uma reunião quando eu pedir as ações."
       },
       "meeting-summary-to-slack": {
         "title": "Resumo da reunião para o Slack",
@@ -4686,7 +4691,7 @@
       },
       "decision-log": {
         "title": "Registro de decisões",
-        "description": "Mantém uma lista atualizada das decisões das minhas reuniões. Use quando eu perguntar o que decidimos."
+        "description": "Encontra as decisões nas notas das minhas reuniões, com a data e a reunião de cada uma. Use quando eu perguntar o que decidimos."
       }
     },
     "chat": {
@@ -4714,6 +4719,7 @@
       "undo": "Desfazer",
       "undone": "Desfeito. A habilidade voltou a ser como era.",
       "undoStale": "Não foi possível desfazer. A habilidade mudou desde então.",
+      "undoFailed": "Não foi possível desfazer. Tente novamente.",
       "failed": "Não foi possível salvar a habilidade.",
       "notSaved": "Nada foi salvo.",
       "updateHeader": "Atualizar habilidade",

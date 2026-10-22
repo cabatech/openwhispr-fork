@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   Pencil,
@@ -24,7 +25,7 @@ import { IntegrationsPane } from "../integrations/IntegrationsPane";
 import { playSkillIcon, refreshSkills, useSkillsStore } from "../../stores/skillsStore";
 import { syncAfterLocalWrite } from "../../services/syncAfterLocalWrite";
 import { InstalledSkillCard, RecommendedSkillCard } from "./SkillCards";
-import { RECOMMENDED_SKILL_IDS, writeFailedToast } from "./skillCopy";
+import { problemKey, RECOMMENDED_SKILL_IDS, writeFailedToast } from "./skillCopy";
 import { SkillSearchInput } from "./SkillSearchInput";
 
 const VISIBLE_INSTALLED = 6;
@@ -59,11 +60,15 @@ export function SkillsHome({
   const { toast } = useToast();
   const skills = useSkillsStore((state) => state.skills);
   const loaded = useSkillsStore((state) => state.loaded);
+  const loadError = useSkillsStore((state) => state.loadError);
   const [query, setQuery] = useState("");
   // Skills that just arrived. Once their cards are on screen the first takes focus and each
   // icon plays: a card mounted after the play count changed would not play.
   const [arrivals, setArrivals] = useState<string[]>(arrived);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
+  // A second press while one add is under way would add and toast twice.
+  const adding = useRef(false);
+  const heading = useRef<HTMLHeadingElement>(null);
   const controlRefs = {
     manage: useRef<HTMLButtonElement>(null),
     seeMore: useRef<HTMLButtonElement>(null),
@@ -100,18 +105,33 @@ export function SkillsHome({
     .filter((entry) => matches(`${entry.title} ${entry.description}`));
 
   const addRecommended = async ({ id, title: name, description }: (typeof recommended)[number]) => {
-    const result = await window.electronAPI?.skillsAddRecommended?.(id, {
-      title: name,
-      description,
-    });
-    if (!result?.ok) {
-      toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
-      return;
+    if (adding.current) return;
+    adding.current = true;
+    try {
+      const result = await window.electronAPI?.skillsAddRecommended?.(id, {
+        title: name,
+        description,
+      });
+      if (result && "problems" in result) {
+        const [problem] = result.problems;
+        toast({
+          title: t("skills.toasts.writeFailed"),
+          description: t(problemKey(problem), problem.values),
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!result?.ok) {
+        toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
+        return;
+      }
+      syncAfterLocalWrite("syncSkillsNow");
+      await refreshSkills();
+      setArrivals([result.name]);
+      toast({ title: t("skills.toasts.added", { name }), variant: "success" });
+    } finally {
+      adding.current = false;
     }
-    syncAfterLocalWrite("syncSkillsNow");
-    await refreshSkills();
-    setArrivals([result.name]);
-    toast({ title: t("skills.toasts.added", { name }), variant: "success" });
   };
 
   const [firstHidden, secondHidden] = hiddenInstalled.map((skill) => skill.displayName);
@@ -125,6 +145,15 @@ export function SkillsHome({
             second: secondHidden,
             count: hiddenInstalled.length - 2,
           });
+
+  // The card holding Retry goes once the list loads, so the heading takes focus; a Retry
+  // that fails again says so.
+  const retry = async () => {
+    await refreshSkills();
+    if (useSkillsStore.getState().loadError) {
+      toast({ title: t("skills.toasts.loadFailed"), variant: "destructive" });
+    } else heading.current?.focus();
+  };
 
   const recommendedSection = recommended.length > 0 && (
     <div className="pt-2">
@@ -173,6 +202,7 @@ export function SkillsHome({
   return (
     <IntegrationsPane
       title={title}
+      headingRef={heading}
       description={t("skills.pane.description")}
       actions={
         skills.length === 0 ? (
@@ -196,13 +226,24 @@ export function SkillsHome({
         )
       }
     >
+      {!loaded && loadError && (
+        <EmptyStateCard icon={AlertTriangle} title={t("skills.toasts.loadFailed")} headingLevel={3}>
+          <Button size="sm" variant="outline" onClick={() => void retry()}>
+            {t("common.retry")}
+          </Button>
+        </EmptyStateCard>
+      )}
       {loaded &&
         (skills.length === 0 ? (
           <>
             <EmptyStateCard
               icon={SkillStack}
               title={t("skills.pane.empty.title")}
-              description={t("skills.pane.empty.description")}
+              description={t(
+                onCreateWithAssistant
+                  ? "skills.pane.empty.description"
+                  : "skills.pane.empty.descriptionNoAssistant"
+              )}
               headingLevel={3}
             >
               {onCreateWithAssistant && (

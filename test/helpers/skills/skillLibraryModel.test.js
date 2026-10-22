@@ -64,6 +64,23 @@ test("a disabled or invalid skill can't be read for the model", (t) => {
   assert.equal(library.readForModel({ name: "broken" }), null);
 });
 
+// The list still shows it as fine, as when a permission changed or Windows holds a file.
+test("a skill whose files can't be read gives the assistant nothing, not an empty skill", (t) => {
+  const { library } = enabledSkill(t, { "references/a.md": "A" });
+  const realReadFile = fs.readFileSync;
+  t.mock.method(fs, "readFileSync", (file, options) => {
+    if (String(file).endsWith(path.join("meeting-prep", "SKILL.md"))) {
+      throw Object.assign(new Error("denied"), { code: "EACCES" });
+    }
+    return realReadFile(file, options);
+  });
+
+  const read = library.readForModel({ name: "meeting-prep" });
+  t.mock.restoreAll();
+
+  assert.equal(read, null);
+});
+
 test("a file is read only if it is a listed text file", (t) => {
   const { library } = enabledSkill(t, {
     "references/objections.md": "Price: anchor high.\n",
@@ -209,6 +226,16 @@ test("two proposals with non-Latin titles become two skills", (t) => {
     "メール返信",
     "会議の準備",
   ]);
+});
+
+test("a new proposal never takes a starter skill's folder", (t) => {
+  const { library } = setup(t);
+
+  const saved = library.saveProposal(proposal({ title: "Decision log" }));
+
+  assert.deepEqual(saved, { name: "decision-log-2" });
+  const copy = { title: "Journal des décisions", description: "Finds decisions." };
+  assert.deepEqual(library.addRecommended("decision-log", copy), { name: "decision-log" });
 });
 
 test("a title shown by one of the user's skills updates that skill", (t) => {
