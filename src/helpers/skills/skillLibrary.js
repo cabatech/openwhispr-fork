@@ -224,29 +224,37 @@ class SkillLibrary {
   get(name) {
     const summary = this.scan().find((skill) => skill.name === name);
     if (!summary) return null;
+    // As the list shows it, with nothing to read: the pop-up then shows its problem, if any.
+    const unreadable = { ...summary, markdown: "", files: [] };
     const folder = this.skillDir(name);
-    const walked = folder ? walkSkillFolder(folder) : { unreadable: true };
-    if (walked.unreadable) return { ...summary, markdown: "", files: [] };
+    if (!folder) return unreadable;
+    try {
+      const walked = walkSkillFolder(folder);
+      if (walked.unreadable) return unreadable;
 
-    const readAll = !walked.tooMany && walked.bytes <= SKILL_LIMITS.maxBytes;
-    let markdown = "";
-    const files = [];
-    for (const file of walked.files) {
-      if (file.path === "SKILL.md") {
-        if (file.size <= SKILL_LIMITS.maxBytes) {
-          markdown = fs.readFileSync(file.fullPath).toString("utf8");
+      const readAll = !walked.tooMany && walked.bytes <= SKILL_LIMITS.maxBytes;
+      let markdown = "";
+      const files = [];
+      for (const file of walked.files) {
+        if (file.path === "SKILL.md") {
+          if (file.size <= SKILL_LIMITS.maxBytes) {
+            markdown = fs.readFileSync(file.fullPath).toString("utf8");
+          }
+          continue;
         }
-        continue;
+        const data = readAll ? fs.readFileSync(file.fullPath) : null;
+        files.push({
+          path: file.path,
+          size: file.size,
+          text: data ? isTextFile(data) : false,
+          script: isScriptPath(file.path),
+        });
       }
-      const data = readAll ? fs.readFileSync(file.fullPath) : null;
-      files.push({
-        path: file.path,
-        size: file.size,
-        text: data ? isTextFile(data) : false,
-        script: isScriptPath(file.path),
-      });
+      return { ...summary, markdown, files: files.sort(byPath) };
+    } catch (error) {
+      debugLogger.warn("Could not read a skill", { name, error: error.message }, "skills");
+      return unreadable;
     }
-    return { ...summary, markdown, files: files.sort(byPath) };
   }
 
   readFile(name, relPath) {

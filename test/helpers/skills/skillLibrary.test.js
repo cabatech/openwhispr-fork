@@ -637,6 +637,44 @@ test("a symlinked skill folder or file is never followed", (t) => {
   assert.deepEqual([library.get("linked").markdown, library.get("linked").files], ["", []]);
 });
 
+test("a skill whose files can't be read opens with no instructions instead of failing", (t) => {
+  const { library, skillsDir } = setup(t);
+  writeFolder(skillsDir, "locked", {
+    "SKILL.md": skillText("locked"),
+    "references/a.md": "A",
+  });
+  writeFolder(skillsDir, "racy", { "SKILL.md": skillText("racy"), "references/b.md": "B" });
+  library.scan();
+  const realReaddir = fs.readdirSync;
+  const realReadFile = fs.readFileSync;
+  // The library reads through the folder's real path, so these match its end.
+  t.mock.method(fs, "readdirSync", (dir, options) => {
+    if (dir.endsWith(path.join("locked", "references"))) {
+      throw Object.assign(new Error("denied"), { code: "EACCES" });
+    }
+    return realReaddir(dir, options);
+  });
+  // Gone between listing the folder and reading the file.
+  t.mock.method(fs, "readFileSync", (file, options) => {
+    if (String(file).endsWith(path.join("racy", "references", "b.md"))) {
+      throw Object.assign(new Error("gone"), { code: "ENOENT" });
+    }
+    return realReadFile(file, options);
+  });
+
+  const locked = library.get("locked");
+  const racy = library.get("racy");
+  t.mock.restoreAll();
+
+  assert.deepEqual([locked.valid, locked.problem, locked.markdown, locked.files], [
+    false,
+    { code: "unreadable" },
+    "",
+    [],
+  ]);
+  assert.deepEqual([racy.markdown, racy.files], ["", []]);
+});
+
 test("readFile refuses paths outside the skill and binary files", (t) => {
   const { library, skillsDir } = setup(t);
   writeFolder(skillsDir, "reader", {
