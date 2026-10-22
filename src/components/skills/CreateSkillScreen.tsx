@@ -136,7 +136,7 @@ export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps)
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Escape" || (!leaving && !dirty)) return;
+    if (event.key !== "Escape" || event.nativeEvent.isComposing || (!leaving && !dirty)) return;
     // Handled here, so the pane doesn't go back as well.
     event.preventDefault();
     event.stopPropagation();

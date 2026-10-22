@@ -21,6 +21,13 @@ export function SkillSearchInput({ value, onChange }: SkillSearchInputProps): Re
         dir="auto"
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        // Esc clears a search first, so it leaves the screen only once the box is empty.
+        onKeyDown={(event) => {
+          if (event.key !== "Escape" || !value || event.nativeEvent.isComposing) return;
+          event.preventDefault();
+          event.stopPropagation();
+          onChange("");
+        }}
         placeholder={t("skills.pane.search")}
         aria-label={t("skills.pane.search")}
         className="h-8 w-44 ps-8 pe-3 text-xs rounded-lg"

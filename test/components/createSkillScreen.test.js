@@ -191,6 +191,18 @@ test("Esc with unsaved text shows the bar, and Esc again dismisses it", async (t
   assert.equal(calls.back, 0);
 });
 
+test("an Esc that ends text composition keeps editing", async (t) => {
+  const { container, calls } = await renderCreate(t);
+  await fill(container, { name: "Half done" });
+
+  await React.act(async () =>
+    dispatch(field(container, "name"), "keydown", { key: "Escape", isComposing: true })
+  );
+
+  assert.equal(alert(container), null);
+  assert.equal(calls.back, 0);
+});
+
 test("the draft survives leaving the Integrations page", async (t) => {
   const { container } = await renderCreate(t, {
     draft: {

@@ -67,6 +67,33 @@ test("Esc on a screen goes back, and focus returns to the See link that opened i
 
 // The control that opened a screen is gone once it opens, so without this the keyboard
 // would be left on the page body, where Esc can't reach the pane.
+const searchBox = (container) =>
+  find(container, (node) => node.tagName === "INPUT" && ariaLabel(node) === "skills.pane.search");
+
+test("Esc in Manage's search clears it first, then goes back", async (t) => {
+  const { container } = await renderPane(t, [skill("meeting-prep"), skill("decision-log")]);
+  await click(gear(container));
+  await typeInto(searchBox(container), "decision");
+
+  await pressEscape(searchBox(container));
+  assert.equal(label(heading(container)), "skills.manage.title");
+  assert.equal(searchBox(container).value, "");
+
+  await pressEscape(searchBox(container));
+  assert.equal(label(heading(container)), "Skills");
+});
+
+test("an Esc that ends text composition doesn't leave the screen", async (t) => {
+  const { container } = await renderPane(t, [skill("meeting-prep")]);
+  await click(gear(container));
+
+  await React.act(async () =>
+    dispatch(searchBox(container), "keydown", { key: "Escape", isComposing: true })
+  );
+
+  assert.equal(label(heading(container)), "skills.manage.title");
+});
+
 test("a screen opens with focus on its heading, so Esc goes back from there", async (t) => {
   const { container } = await renderPane(t, [skill("meeting-prep")]);
   for (const [open, title] of [

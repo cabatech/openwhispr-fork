@@ -68,7 +68,8 @@ export function SkillsPane({ title, active }: SkillsPaneProps): ReactElement {
     setDetail({ name, confirmUninstall });
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Escape" || screen === "home" || isInsidePopup(event.target)) return;
+    if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+    if (screen === "home" || isInsidePopup(event.target)) return;
     event.preventDefault();
     goHome();
   };
