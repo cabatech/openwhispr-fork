@@ -3097,6 +3097,9 @@ export class SyncService {
 
   private async pullSkills(): Promise<SkillPullResult> {
     try {
+      // Listing rescans the skills folder, so an edit made outside the app since it was last
+      // read is a pending change here, which the cloud's copy doesn't replace.
+      await window.electronAPI.skillsList?.();
       const since = localStorage.getItem("lastSyncedAt.skills") ?? undefined;
       const sinceId = localStorage.getItem("lastSyncedAt.skills.id") ?? undefined;
       let changed = false;

@@ -457,3 +457,20 @@ test("a pull that can't read this computer's copy of a skill leaves it as it is"
   assert.equal(skillFile(ctx.skillsDir, "recap"), skillText("recap", "Does it.", "Mine.\n"));
   assert.match(cloudByName(ctx.cloud).recap.files[0].content, /Mine\./);
 });
+
+test("an edit made outside the app since the last read wins over a newer cloud copy", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  const name = create(ctx.library, "Meeting prep");
+  await ctx.service.syncSkillsNow();
+  assert.deepEqual(pendingNames(ctx.db), []);
+  // Edited in another editor, with nothing in the app reading the folder since.
+  writeFolder(ctx.skillsDir, name, { "SKILL.md": skillText(name, "Use it.", "Mine.\n") });
+  ctx.cloud.setClock(() => new Date(Date.now() + 60_000).toISOString());
+  seedRemote(ctx, name, "Theirs.\n");
+
+  await ctx.service.syncSkillsNow();
+
+  assert.equal(skillFile(ctx.skillsDir, name), skillText(name, "Use it.", "Mine.\n"));
+  assert.match(cloudByName(ctx.cloud)[name].files[0].content, /Mine\./);
+});

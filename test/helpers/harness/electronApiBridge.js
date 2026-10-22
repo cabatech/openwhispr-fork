@@ -66,6 +66,7 @@ function skillApi(library, onBroadcast) {
     async (...args) =>
       handlers.get(channel)({ sender: null }, ...args);
   return {
+    skillsList: invoke("skills-list"),
     getPendingSkills: invoke("skills-get-pending"),
     getPendingSkillDeletes: invoke("skills-get-pending-deletes"),
     exportSkillForCloud: invoke("skills-export-for-cloud"),
