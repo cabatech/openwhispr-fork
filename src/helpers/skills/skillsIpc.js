@@ -64,7 +64,11 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
 
   ipcMain.handle("skills-set-enabled", (_event, name, enabled) => {
     if (!isSkillFolderName(name) || typeof enabled !== "boolean") return INVALID;
-    if (!library.setEnabled(name, enabled)) return INVALID;
+    try {
+      if (!library.setEnabled(name, enabled)) return INVALID;
+    } catch (error) {
+      return { ok: false, error: writeErrorCode(error) };
+    }
     changed();
     return { ok: true };
   });

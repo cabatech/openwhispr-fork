@@ -178,6 +178,20 @@ test("a write that fails reports why", async () => {
   assert.deepEqual(broadcasts, []);
 });
 
+test("a switch the database can't save is refused with a reason, not thrown", async () => {
+  const { call, broadcasts } = setup({
+    setEnabled: () => {
+      throw Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+    },
+  });
+
+  assert.deepEqual(await call("skills-set-enabled", "meeting-prep", true), {
+    ok: false,
+    error: "unknown",
+  });
+  assert.deepEqual(broadcasts, []);
+});
+
 test("reveal shows the skill's folder", async () => {
   const { call, revealed } = setup();
 

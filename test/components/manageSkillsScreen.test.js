@@ -102,6 +102,21 @@ test(
   }
 );
 
+test("a row's switch that can't be saved says so", async (t) => {
+  const { container, toasts } = await renderManage(t, {
+    skills: [skill("paused", { enabled: false })],
+    api: { skillsSetEnabled: async () => ({ ok: false, error: "unknown" }) },
+  });
+  const toggle = findElement(rowFor(container, "paused"), (node) => {
+    return node.getAttribute("role") === "switch";
+  });
+
+  await click(toggle);
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.writeFailed", variant: "destructive" }]);
+});
+
 test("a skill that needs fixing says so on its row, and its switch shows off", async (t) => {
   const skills = [skill("broken", { valid: false, problem: { code: "nameMismatch" } })];
   const { container } = await renderManage(t, { skills });

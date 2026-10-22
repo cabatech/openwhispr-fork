@@ -67,10 +67,16 @@ export function playSkillIcon(name: string): void {
   }));
 }
 
-/** Switching a skill on plays its icon; a skill that needs fixing can't be switched on. */
+/**
+ * Switching a skill on plays its icon. A switch that fails, as for a skill that needs fixing,
+ * returns false and reloads the list, which may have changed on disk.
+ */
 export async function setSkillEnabled(name: string, enabled: boolean): Promise<boolean> {
-  const result = await window.electronAPI?.skillsSetEnabled?.(name, enabled);
-  if (!result?.ok) return false;
+  const result = await window.electronAPI?.skillsSetEnabled?.(name, enabled).catch(() => null);
+  if (!result?.ok) {
+    void refreshSkills();
+    return false;
+  }
   useSkillsStore.setState((state) => ({
     skills: state.skills.map((skill) => (skill.name === name ? { ...skill, enabled } : skill)),
   }));

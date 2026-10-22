@@ -128,6 +128,10 @@ export function SkillDetailDialog({
     onOpenChange(false);
   };
 
+  const switchSkill = async (skillName: string, next: boolean) => {
+    if (!(await setSkillEnabled(skillName, next))) toast(writeFailedToast(t));
+  };
+
   const uninstall = async () => {
     if (!name) return;
     const result = await window.electronAPI?.skillsUninstall?.(name);
@@ -181,7 +185,7 @@ export function SkillDetailDialog({
               <div className="flex-1" />
               <Toggle
                 checked={skill.enabled && skill.valid}
-                onChange={(next) => void setSkillEnabled(name, next)}
+                onChange={(next) => void switchSkill(name, next)}
                 disabled={!skill.valid}
                 ariaLabel={t("skills.detail.toggle", { name: skill.displayName })}
               />

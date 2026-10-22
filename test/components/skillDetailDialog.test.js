@@ -222,6 +222,17 @@ test("switching a skill on plays its icon once; switching it off doesn't", async
   assert.equal(store.useSkillsStore.getState().iconPlays["meeting-prep"], 1);
 });
 
+test("a switch that can't be saved says so", async (t) => {
+  const { container, toasts } = await openDetail(t, {
+    api: { skillsSetEnabled: async () => ({ ok: false, error: "unknown" }) },
+  });
+
+  await click(toggle(container));
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.writeFailed", variant: "destructive" }]);
+});
+
 test("an invalid skill's switch is off and disabled, and its problem is shown", async (t) => {
   const { container } = await openDetail(t, {
     summary: skill("broken", { valid: false, problem: { code: "missingDescription" } }),

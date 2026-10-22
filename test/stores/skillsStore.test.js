@@ -121,6 +121,24 @@ test("a list that can't be read marks the load as failed", async (t) => {
   );
 });
 
+test("a switch that fails resolves false and reloads the list", async (t) => {
+  const api = Object.assign(libraryApi([[skill("recap", false)]]), {
+    skillsSetEnabled: async (name) => {
+      if (name === "locked") throw new Error("Error invoking remote method 'skills-set-enabled'");
+      return { ok: false, error: "invalid" };
+    },
+  });
+  const { store } = await loadStore(t, api);
+  await store.refreshSkills();
+
+  assert.equal(await store.setSkillEnabled("locked", true), false);
+  assert.equal(await store.setSkillEnabled("recap", true), false);
+  await settle();
+
+  assert.equal(api.lists, 3);
+  assert.equal(store.useSkillsStore.getState().skills[0].enabled, false);
+});
+
 test("switching on bumps the icon's play count and switching off doesn't", async (t) => {
   const switched = [];
   const api = {
