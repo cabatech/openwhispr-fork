@@ -299,15 +299,16 @@ async function renderPaneWith(t, { skillsList, active = true }) {
     api: { skillsList },
     wrap: (SkillsPane) => {
       // The window's focus listeners are kept here, so a test can focus the window.
-      const { addEventListener, removeEventListener } = window;
-      window.addEventListener = (type, listener, options) =>
+      const target = globalThis.window;
+      const { addEventListener, removeEventListener } = target;
+      target.addEventListener = (type, listener, options) =>
         type === "focus"
           ? listeners.add(listener)
-          : addEventListener?.call(window, type, listener, options);
-      window.removeEventListener = (type, listener, options) =>
+          : addEventListener?.call(target, type, listener, options);
+      target.removeEventListener = (type, listener, options) =>
         type === "focus"
           ? listeners.delete(listener)
-          : removeEventListener?.call(window, type, listener, options);
+          : removeEventListener?.call(target, type, listener, options);
       function Harness() {
         const [shown, setShown] = React.useState(active);
         setActive = setShown;
