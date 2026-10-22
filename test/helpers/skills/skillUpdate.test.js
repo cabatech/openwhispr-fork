@@ -4,7 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { replaceFrontmatterValue } = require("../../../src/helpers/skills/skillFormat");
-const { setup, writeFolder, readSkill, listDir } = require("./libraryFixture");
+const { RECOMMENDED_DIR, setup, writeFolder, readSkill, listDir } = require("./libraryFixture");
+const { SkillLibrary } = require("../../../src/helpers/skills/skillLibrary");
 
 const NAME = "enterprise-call-playbook";
 // A hand-written header: a folded description, a comment, an unknown key, metadata and CRLF.
@@ -210,6 +211,23 @@ test("uninstall removes the skill's versions", (t) => {
   assert.deepEqual(listDir(versionsDir), [versionId, `${versionId}.json`]);
 
   library.uninstall(NAME);
+
+  assert.equal(fs.existsSync(versionsDir), false);
+});
+
+// Kept versions are full copies of the skill's files, so none outlive the skill.
+test("an uninstall cut short leaves none of the skill's versions once the library next opens", (t) => {
+  const { library, database, userDataDir, versionsDir } = playbook(t);
+  library.applyUpdate(SSO);
+  // The app stops once the skill's folder is in the trash, before anything is removed.
+  t.mock.method(fs, "rmSync", () => {
+    throw Object.assign(new Error("stopped"), { code: "EIO" });
+  });
+  library.uninstall(NAME);
+  t.mock.restoreAll();
+  assert.equal(listDir(versionsDir).length, 2);
+
+  new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
 
   assert.equal(fs.existsSync(versionsDir), false);
 });

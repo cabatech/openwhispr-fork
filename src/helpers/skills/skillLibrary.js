@@ -217,8 +217,9 @@ class SkillLibrary {
   }
 
   // A write the app quit or crashed in the middle of leaves hidden folders. A skill moved aside
-  // for a replace whose new copy never arrived goes back; the rest is deleted. This runs before
-  // the first scan, which would otherwise drop the moved skill's record.
+  // for a replace whose new copy never arrived goes back; the rest is deleted, as are versions
+  // kept for a skill that's gone. This runs before the first scan, which would otherwise drop
+  // the moved skill's record.
   _recoverInterruptedWrites() {
     let entries;
     try {
@@ -245,6 +246,18 @@ class SkillLibrary {
         }
       } else if (entry.startsWith(".staging-") || entry.startsWith(".trash-")) {
         this._removeQuietly(leftover);
+      }
+    }
+    // Versions are full copies of a skill's files, so they go with it.
+    let versioned = [];
+    try {
+      versioned = fs.readdirSync(this.versionsDir);
+    } catch {
+      return;
+    }
+    for (const name of versioned) {
+      if (isSkillFolderName(name) && !this._exists(name)) {
+        this._removeQuietly(path.join(this.versionsDir, name));
       }
     }
   }
