@@ -361,6 +361,19 @@ test("a skill you already have asks Replace or Skip, whichever of its files is l
   assert.ok(button(rows(container)[0], "skills.upload.replace"));
 });
 
+// macOS and Windows disks don't tell names apart by case, so there it's the same folder.
+test("a skill whose folder differs only in case asks Replace or Skip", async (t) => {
+  const { container, drop } = await renderUpload(t, {
+    skills: [skill("Meeting-Notes", { valid: false, problem: { code: "nameFormat" } })],
+    previews: [ready("meeting-notes.md", "meeting-notes")],
+  });
+
+  await drop(fakeFile("meeting-notes.md"));
+
+  assert.match(label(rows(container)[0]), /^meeting-notes\.md\s*skills\.upload\.duplicate/);
+  assert.ok(button(rows(container)[0], "skills.upload.replace"));
+});
+
 test("removing a row moves focus to the next row's remove button, then the drop zone", async (t) => {
   const { container, drop } = await renderUpload(t, {
     previews: [ready("a.md", "first"), ready("b.md", "second"), ready("c.md", "third")],
