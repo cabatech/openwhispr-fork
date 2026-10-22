@@ -63,6 +63,7 @@ export function SkillsHome({
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
   // A second press while one add is under way would add and toast twice.
   const adding = useRef(false);
+  const heading = useRef<HTMLHeadingElement>(null);
   const controlRefs = {
     manage: useRef<HTMLButtonElement>(null),
     seeMore: useRef<HTMLButtonElement>(null),
@@ -139,6 +140,15 @@ export function SkillsHome({
             count: hiddenInstalled.length - 2,
           });
 
+  // The card holding Retry goes once the list loads, so the heading takes focus; a Retry
+  // that fails again says so.
+  const retry = async () => {
+    await refreshSkills();
+    if (useSkillsStore.getState().loadError) {
+      toast({ title: t("skills.toasts.loadFailed"), variant: "destructive" });
+    } else heading.current?.focus();
+  };
+
   const recommendedSection = recommended.length > 0 && (
     <div className="pt-2">
       <SectionLabel>{t("skills.pane.recommended")}</SectionLabel>
@@ -180,6 +190,7 @@ export function SkillsHome({
   return (
     <IntegrationsPane
       title={title}
+      headingRef={heading}
       description={t("skills.pane.description")}
       actions={
         skills.length === 0 ? (
@@ -205,7 +216,7 @@ export function SkillsHome({
     >
       {!loaded && loadError && (
         <EmptyStateCard icon={AlertTriangle} title={t("skills.toasts.loadFailed")} headingLevel={3}>
-          <Button size="sm" variant="outline" onClick={() => void refreshSkills()}>
+          <Button size="sm" variant="outline" onClick={() => void retry()}>
             {t("common.retry")}
           </Button>
         </EmptyStateCard>
