@@ -172,6 +172,9 @@ test("a skill from another device appears here, and its delete removes it", asyn
   );
   assert.ok(ctx.api.syncEvents.some((event) => event.name === "skills-changed"));
 
+  // A later millisecond than the create: the delta's keyset skips a row it already pulled at
+  // the same time and id.
+  ctx.cloud.setClock(() => new Date(Date.now() + 1000).toISOString());
   ctx.cloud.deleteSkill(seeded.id);
   await ctx.service.syncSkillsNow();
   assert.deepEqual(listDir(ctx.skillsDir), []);
