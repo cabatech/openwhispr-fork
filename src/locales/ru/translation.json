@@ -4622,6 +4622,7 @@
       "removedFromComputer": "Удалено с этого компьютера.",
       "copiedMarkdown": "Markdown скопирован",
       "copyFailed": "Не удалось скопировать",
+      "revealFailed": "Не удалось найти папку навыка",
       "writeFailed": "Не удалось сохранить навык",
       "writeFailedNoSpace": "Диск заполнен.",
       "writeFailedPermission": "OpenWhispr не может записывать в свою папку навыков.",

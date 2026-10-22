@@ -4574,6 +4574,7 @@
       "removedFromComputer": "已從這台電腦中移除。",
       "copiedMarkdown": "已複製 Markdown",
       "copyFailed": "無法複製",
+      "revealFailed": "無法找到技能的資料夾",
       "writeFailed": "無法儲存技能",
       "writeFailedNoSpace": "您的磁碟已滿。",
       "writeFailedPermission": "OpenWhispr 無法寫入其技能資料夾。",

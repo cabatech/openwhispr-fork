@@ -4744,6 +4744,7 @@
       "removedFromComputer": "Supprimée de cet ordinateur.",
       "copiedMarkdown": "Markdown copié",
       "copyFailed": "Impossible de copier",
+      "revealFailed": "Impossible de trouver le dossier de la compétence",
       "writeFailed": "Impossible d'enregistrer la compétence",
       "writeFailedNoSpace": "Votre disque est plein.",
       "writeFailedPermission": "OpenWhispr ne peut pas écrire dans son dossier de compétences.",

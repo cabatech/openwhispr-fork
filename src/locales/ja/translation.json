@@ -4574,6 +4574,7 @@
       "removedFromComputer": "このコンピューターから削除しました。",
       "copiedMarkdown": "Markdownをコピーしました",
       "copyFailed": "コピーできませんでした",
+      "revealFailed": "スキルのフォルダが見つかりませんでした",
       "writeFailed": "スキルを保存できませんでした",
       "writeFailedNoSpace": "ディスクの空き容量がありません。",
       "writeFailedPermission": "OpenWhisprがスキルフォルダーに書き込めません。",

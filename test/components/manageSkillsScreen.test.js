@@ -139,6 +139,18 @@ test("the menu reveals the folder and copies the markdown exactly", async (t) =>
   assert.deepEqual(toasts, [{ title: "skills.toasts.copiedMarkdown", variant: "success" }]);
 });
 
+test("a folder that can't be shown says so", async (t) => {
+  const { container, toasts } = await renderManage(t, {
+    skills: [skill("recap")],
+    api: { skillsReveal: async () => ({ ok: false }) },
+  });
+
+  await click(button(container, "controlPanel.history.showInFolder"));
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.revealFailed", variant: "destructive" }]);
+});
+
 test("a copy that fails says so", async (t) => {
   const { container, toasts } = await renderManage(t, {
     skills: [skill("recap")],

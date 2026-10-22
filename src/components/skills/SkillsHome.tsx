@@ -61,6 +61,8 @@ export function SkillsHome({
   // icon plays: a card mounted after the play count changed would not play.
   const [arrivals, setArrivals] = useState<string[]>(arrived);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
+  // A second press while one add is under way would add and toast twice.
+  const adding = useRef(false);
   const controlRefs = {
     manage: useRef<HTMLButtonElement>(null),
     seeMore: useRef<HTMLButtonElement>(null),
@@ -97,26 +99,32 @@ export function SkillsHome({
     .filter((entry) => matches(`${entry.title} ${entry.description}`));
 
   const addRecommended = async ({ id, title: name, description }: (typeof recommended)[number]) => {
-    const result = await window.electronAPI?.skillsAddRecommended?.(id, {
-      title: name,
-      description,
-    });
-    if (result && "problems" in result) {
-      const [problem] = result.problems;
-      toast({
-        title: t("skills.toasts.writeFailed"),
-        description: t(problemKey(problem), problem.values),
-        variant: "destructive",
+    if (adding.current) return;
+    adding.current = true;
+    try {
+      const result = await window.electronAPI?.skillsAddRecommended?.(id, {
+        title: name,
+        description,
       });
-      return;
+      if (result && "problems" in result) {
+        const [problem] = result.problems;
+        toast({
+          title: t("skills.toasts.writeFailed"),
+          description: t(problemKey(problem), problem.values),
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!result?.ok) {
+        toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
+        return;
+      }
+      await refreshSkills();
+      setArrivals([result.name]);
+      toast({ title: t("skills.toasts.added", { name }), variant: "success" });
+    } finally {
+      adding.current = false;
     }
-    if (!result?.ok) {
-      toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
-      return;
-    }
-    await refreshSkills();
-    setArrivals([result.name]);
-    toast({ title: t("skills.toasts.added", { name }), variant: "success" });
   };
 
   const [firstHidden, secondHidden] = hiddenInstalled.map((skill) => skill.displayName);

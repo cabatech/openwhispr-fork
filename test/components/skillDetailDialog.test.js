@@ -7,6 +7,7 @@ const { createRendererServer, installBrowserGlobals } = require("../lib/renderer
 const {
   ariaLabel,
   click,
+  dispatch,
   label,
   mountSkillsComponent,
   pressEscape,
@@ -121,6 +122,60 @@ test("Uninstall asks in the footer first and then removes the skill", async (t) 
       variant: "success",
     },
   ]);
+});
+
+test("pressing Uninstall again while it runs uninstalls once", async (t) => {
+  const uninstalled = [];
+  const { container, toasts } = await openDetail(t, {
+    api: {
+      skillsUninstall: async (name) => {
+        uninstalled.push(name);
+        return { ok: true };
+      },
+    },
+  });
+  await click(button(container, "skills.detail.uninstall"));
+  const confirm = button(alert(container), "skills.detail.uninstall");
+
+  await React.act(async () => {
+    dispatch(confirm, "click");
+    dispatch(confirm, "click");
+  });
+  await settle();
+
+  assert.deepEqual(uninstalled, ["meeting-prep"]);
+  assert.equal(toasts.length, 1);
+});
+
+test("Copy markdown copies what the pop-up shows, without reading the skill again", async (t) => {
+  const reads = [];
+  const { container, calls, toasts } = await openDetail(t, {
+    api: {
+      skillsGet: async (name) => {
+        reads.push(name);
+        return { ...skill(name), markdown: MARKDOWN, files: FILES };
+      },
+    },
+  });
+
+  await click(button(container, "skills.menu.copyMarkdown"));
+  await settle();
+
+  assert.deepEqual(reads, ["meeting-prep"]);
+  assert.deepEqual(calls.clipboard, [MARKDOWN]);
+  assert.deepEqual(toasts, [{ title: "skills.toasts.copiedMarkdown", variant: "success" }]);
+});
+
+test("a file that can't be copied says so", async (t) => {
+  const { container, toasts } = await openDetail(t, { api: { skillsReadFile: async () => null } });
+  const copy = findElement(container, (node) =>
+    ariaLabel(node).startsWith("skills.detail.copyFile")
+  );
+
+  await click(copy);
+  await settle();
+
+  assert.deepEqual(toasts, [{ title: "skills.toasts.copyFailed", variant: "destructive" }]);
 });
 
 test("a failed uninstall keeps the pop-up open and says why", async (t) => {

@@ -4744,6 +4744,7 @@
       "removedFromComputer": "Von diesem Computer entfernt.",
       "copiedMarkdown": "Markdown kopiert",
       "copyFailed": "Kopieren fehlgeschlagen",
+      "revealFailed": "Ordner des Skills wurde nicht gefunden",
       "writeFailed": "Skill konnte nicht gespeichert werden",
       "writeFailedNoSpace": "Deine Festplatte ist voll.",
       "writeFailedPermission": "OpenWhispr kann nicht in seinen Skills-Ordner schreiben.",

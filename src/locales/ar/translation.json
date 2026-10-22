@@ -1281,6 +1281,7 @@
       "removedFromComputer": "تمت إزالتها من هذا الكمبيوتر.",
       "copiedMarkdown": "تم نسخ Markdown",
       "copyFailed": "تعذّر النسخ",
+      "revealFailed": "تعذّر العثور على مجلد المهارة",
       "writeFailed": "تعذّر حفظ المهارة",
       "writeFailedNoSpace": "القرص ممتلئ.",
       "writeFailedPermission": "لا يستطيع OpenWhispr الكتابة في مجلد المهارات الخاص به.",

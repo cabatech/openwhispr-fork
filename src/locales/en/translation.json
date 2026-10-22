@@ -4744,6 +4744,7 @@
       "removedFromComputer": "Removed from this computer.",
       "copiedMarkdown": "Copied markdown",
       "copyFailed": "Couldn't copy",
+      "revealFailed": "Couldn't find the skill's folder",
       "writeFailed": "Couldn't save the skill",
       "writeFailedNoSpace": "Your disk is full.",
       "writeFailedPermission": "OpenWhispr can't write to its skills folder.",

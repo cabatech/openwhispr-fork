@@ -218,6 +218,30 @@ test("a library that can't be read says so and offers Retry", async (t) => {
   assert.deepEqual(cardNames(container), ["recap"]);
 });
 
+test("pressing + again while a skill is being added adds it once", async (t) => {
+  const added = [];
+  const { container, toasts } = await renderHome(t, {
+    api: {
+      skillsAddRecommended: async (id) => {
+        added.push(id);
+        return { ok: true, name: id };
+      },
+    },
+  });
+  const add = findElement(container, (node) =>
+    ariaLabel(node).startsWith("skills.pane.addRecommended")
+  );
+
+  await React.act(async () => {
+    dispatch(add, "click");
+    dispatch(add, "click");
+  });
+  await settle();
+
+  assert.equal(added.length, 1);
+  assert.equal(toasts.length, 1);
+});
+
 test("a failed add says why", async (t) => {
   const { container, toasts } = await renderHome(t, {
     api: { skillsAddRecommended: async () => ({ ok: false, error: "noSpace" }) },

@@ -16,11 +16,13 @@ import { problemKey, writeFailedToast } from "./skillCopy";
 
 function SkillFileRow({ skillName, file }: { skillName: string; file: SkillFileInfo }) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const { copied, copyText, confirmCopied } = useCopyFeedback("");
 
   const copy = async () => {
     const result = await window.electronAPI?.skillsReadFile?.(skillName, file.path);
     if (result && (await copyText(result.text))) confirmCopied(result.text);
+    else toast({ title: t("skills.toasts.copyFailed"), variant: "destructive" });
   };
 
   const Icon = file.script ? Code2 : FileText;
@@ -81,6 +83,7 @@ export function SkillDetailDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const uninstallRef = useRef<HTMLButtonElement>(null);
   const uninstalled = useRef(false);
+  const uninstalling = useRef(false);
   const opener = useRef<HTMLElement | null>(null);
   // The dialog keeps the Escape handler it first rendered with, so the handler reads this;
   // the read below closes the pop-up through the latest onOpenChange the same way.
@@ -132,21 +135,27 @@ export function SkillDetailDialog({
     if (!(await setSkillEnabled(skillName, next))) toast(writeFailedToast(t));
   };
 
+  // A second press while the uninstall runs would uninstall and toast twice.
   const uninstall = async () => {
-    if (!name) return;
-    const result = await window.electronAPI?.skillsUninstall?.(name);
-    if (!result?.ok) {
-      toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
-      return;
+    if (!name || uninstalling.current) return;
+    uninstalling.current = true;
+    try {
+      const result = await window.electronAPI?.skillsUninstall?.(name);
+      if (!result?.ok) {
+        toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
+        return;
+      }
+      uninstalled.current = true;
+      close();
+      toast({
+        title: t("skills.toasts.uninstalled", { name: skill?.displayName }),
+        description: t("skills.toasts.removedFromComputer"),
+        variant: "success",
+      });
+      void refreshSkills();
+    } finally {
+      uninstalling.current = false;
     }
-    uninstalled.current = true;
-    close();
-    toast({
-      title: t("skills.toasts.uninstalled", { name: skill?.displayName }),
-      description: t("skills.toasts.removedFromComputer"),
-      variant: "success",
-    });
-    void refreshSkills();
   };
 
   return (
@@ -189,7 +198,7 @@ export function SkillDetailDialog({
                 disabled={!skill.valid}
                 ariaLabel={t("skills.detail.toggle", { name: skill.displayName })}
               />
-              <SkillActionsMenu skill={skill} />
+              <SkillActionsMenu skill={skill} markdown={shown?.markdown} />
             </div>
             <div className="flex flex-col space-y-1.5 text-start">
               <DialogTitle>

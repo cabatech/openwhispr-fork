@@ -4574,6 +4574,7 @@
       "removedFromComputer": "Rimossa da questo computer.",
       "copiedMarkdown": "Markdown copiato",
       "copyFailed": "Impossibile copiare",
+      "revealFailed": "Impossibile trovare la cartella della skill",
       "writeFailed": "Impossibile salvare la skill",
       "writeFailedNoSpace": "Il disco è pieno.",
       "writeFailedPermission": "OpenWhispr non può scrivere nella sua cartella delle skill.",

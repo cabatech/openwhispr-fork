@@ -4574,6 +4574,7 @@
       "removedFromComputer": "Removida deste computador.",
       "copiedMarkdown": "Markdown copiado",
       "copyFailed": "Não foi possível copiar",
+      "revealFailed": "Não foi possível encontrar a pasta da habilidade",
       "writeFailed": "Não foi possível salvar a habilidade",
       "writeFailedNoSpace": "Seu disco está cheio.",
       "writeFailedPermission": "O OpenWhispr não consegue gravar na pasta de habilidades.",
