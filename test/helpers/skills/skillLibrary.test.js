@@ -472,6 +472,71 @@ test("a failed swap puts the old skill back", async (t) => {
   assert.deepEqual(listDir(skillsDir), ["keep"]);
 });
 
+// The app can stop between any two steps of a write, so each test stops it after one.
+test("a replace cut short puts the old skill back when the library next opens", async (t) => {
+  const { library, database, userDataDir, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
+  library.setEnabled("keep", false);
+  const newer = markdownUpload("b.md", skillText("keep", "New."));
+  const [preview] = await library.previewUploads([newer]);
+  const realRename = fs.renameSync;
+  let renames = 0;
+  t.mock.method(fs, "renameSync", (from, to) => {
+    renames += 1;
+    if (renames > 1) throw Object.assign(new Error("stopped"), { code: "EIO" });
+    return realRename(from, to);
+  });
+  library.commitUploads({ tokens: [preview.token], replace: ["keep"] });
+  t.mock.restoreAll();
+  assert.ok(!listDir(skillsDir).includes("keep"));
+
+  const reopened = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(
+    reopened.scan().map((skill) => [skill.name, skill.enabled, skill.description]),
+    [["keep", false, "Old."]]
+  );
+  assert.deepEqual(listDir(skillsDir), ["keep"]);
+});
+
+test("a replace that finished leaves no old copy once the library next opens", async (t) => {
+  const { library, database, userDataDir, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);
+  const newer = markdownUpload("b.md", skillText("keep", "New."));
+  const [preview] = await library.previewUploads([newer]);
+  t.mock.method(fs, "rmSync", () => {
+    throw Object.assign(new Error("stopped"), { code: "EIO" });
+  });
+  library.commitUploads({ tokens: [preview.token], replace: ["keep"] });
+  t.mock.restoreAll();
+  assert.equal(listDir(skillsDir).length, 2);
+
+  const reopened = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(listDir(skillsDir), ["keep"]);
+  assert.match(readSkill(skillsDir, "keep"), /New\./);
+  assert.deepEqual(
+    reopened.scan().map((skill) => skill.name),
+    ["keep"]
+  );
+});
+
+test("an uninstall or a write cut short leaves nothing once the library next opens", async (t) => {
+  const { library, database, userDataDir, skillsDir } = setup(t);
+  await upload(library, [markdownUpload("gone.md", skillText("gone"))]);
+  t.mock.method(fs, "rmSync", () => {
+    throw Object.assign(new Error("stopped"), { code: "EIO" });
+  });
+  library.uninstall("gone");
+  t.mock.restoreAll();
+  writeFolder(skillsDir, ".staging-1234", { "SKILL.md": skillText("half") });
+  assert.equal(listDir(skillsDir).length, 2);
+
+  new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(listDir(skillsDir), []);
+});
+
 test("folders starting with a dot, like an interrupted write's, are never listed", (t) => {
   const { library, skillsDir } = setup(t);
   writeFolder(skillsDir, ".staging-1234", { "SKILL.md": skillText("half") });

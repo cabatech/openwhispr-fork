@@ -17,6 +17,8 @@ const { readSkillArchive, isSafeArchivePath, hasClashingPaths } = require("./ski
 
 const ARCHIVE_EXTENSIONS = new Set([".zip", ".skill"]);
 const FINDER_JUNK = ".DS_Store";
+// Where a replace puts the old copy while the new one is swapped in, named for its skill.
+const MOVED_ASIDE = /^\.replaced-[0-9a-f-]{36}-(.+)$/;
 
 // A name the library can address on disk: one path segment that isn't hidden. Wider than
 // SKILL_NAME_PATTERN, so a folder dropped in under any name can still be shown and removed.
@@ -130,6 +132,40 @@ class SkillLibrary {
     this.recommendedDir = recommendedDir;
     this.inspected = new Map();
     this.uploads = new Map();
+    this._recoverInterruptedWrites();
+  }
+
+  // A write the app quit or crashed in the middle of leaves hidden folders. A skill moved aside
+  // for a replace whose new copy never arrived goes back; the rest is deleted. This runs before
+  // the first scan, which would otherwise drop the moved skill's record.
+  _recoverInterruptedWrites() {
+    let entries;
+    try {
+      entries = fs.readdirSync(this.skillsDir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const leftover = path.join(this.skillsDir, entry);
+      const movedAside = MOVED_ASIDE.exec(entry)?.[1];
+      if (movedAside && isSkillFolderName(movedAside)) {
+        if (this._exists(movedAside)) {
+          this._removeQuietly(leftover);
+          continue;
+        }
+        try {
+          fs.renameSync(leftover, path.join(this.skillsDir, movedAside));
+        } catch (error) {
+          debugLogger.error(
+            "Could not put back a skill an interrupted write moved aside",
+            { entry, error: error.message },
+            "skills"
+          );
+        }
+      } else if (entry.startsWith(".staging-") || entry.startsWith(".trash-")) {
+        this._removeQuietly(leftover);
+      }
+    }
   }
 
   scan() {
@@ -446,7 +482,7 @@ class SkillLibrary {
         fs.writeFileSync(destination, file.data);
       }
       if (this._exists(name)) {
-        trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
+        trash = path.join(this.skillsDir, `.replaced-${crypto.randomUUID()}-${name}`);
         fs.renameSync(target, trash);
       }
       fs.renameSync(staging, target);
