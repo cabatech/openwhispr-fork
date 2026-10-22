@@ -457,10 +457,10 @@ test("a failed swap puts the old skill back", async (t) => {
   const newer = markdownUpload("b.md", skillText("keep", "New."));
   const [preview] = await library.previewUploads([newer]);
   const realRename = fs.renameSync;
-  let renames = 0;
   t.mock.method(fs, "renameSync", (from, to) => {
-    renames += 1;
-    if (renames === 2) throw Object.assign(new Error("denied"), { code: "EACCES" });
+    if (path.basename(from).startsWith(".staging-")) {
+      throw Object.assign(new Error("denied"), { code: "EACCES" });
+    }
     return realRename(from, to);
   });
 
@@ -470,6 +470,52 @@ test("a failed swap puts the old skill back", async (t) => {
   assert.deepEqual(result.failed, [{ fileName: "b.md", error: "permission" }]);
   assert.match(readSkill(skillsDir, "keep"), /Old\./);
   assert.deepEqual(listDir(skillsDir), ["keep"]);
+});
+
+// Antivirus and the search indexer can hold a file Windows just saw written for a moment.
+function onPlatform(t, platform) {
+  const original = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { ...original, value: platform });
+  t.after(() => Object.defineProperty(process, "platform", original));
+}
+
+function renamesRefusedTwice(t, code) {
+  const realRename = fs.renameSync;
+  let refused = 0;
+  t.mock.method(fs, "renameSync", (from, to) => {
+    if (refused < 2) {
+      refused += 1;
+      throw Object.assign(new Error("busy"), { code });
+    }
+    return realRename(from, to);
+  });
+}
+
+test("on Windows, a rename refused for a moment is tried again", async (t) => {
+  for (const code of ["EPERM", "EACCES", "EBUSY"]) {
+    const { library, skillsDir } = setup(t);
+    const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("busy"))]);
+    onPlatform(t, "win32");
+    renamesRefusedTwice(t, code);
+
+    const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+    t.mock.restoreAll();
+
+    assert.deepEqual(result, { installed: ["busy"], failed: [] }, code);
+    assert.deepEqual(listDir(skillsDir), ["busy"], code);
+  }
+});
+
+test("elsewhere, a refused rename isn't tried again", async (t) => {
+  const { library } = setup(t);
+  const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("busy"))]);
+  onPlatform(t, "darwin");
+  renamesRefusedTwice(t, "EPERM");
+
+  const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+  t.mock.restoreAll();
+
+  assert.deepEqual(result, { installed: [], failed: [{ fileName: "a.md", error: "permission" }] });
 });
 
 // The app can stop between any two steps of a write, so each test stops it after one.

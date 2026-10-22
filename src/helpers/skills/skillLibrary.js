@@ -31,6 +31,24 @@ function isSkillFolderName(name) {
   );
 }
 
+// Windows refuses a rename for a moment while antivirus or the search indexer holds a file it
+// just saw written, so a rename there is tried again for about half a second in all.
+const RENAME_RETRY_DELAYS_MS = [50, 100, 150, 200];
+const BUSY_CODES = ["EPERM", "EACCES", "EBUSY"];
+
+function renameWithRetry(from, to) {
+  for (const delay of RENAME_RETRY_DELAYS_MS) {
+    try {
+      return fs.renameSync(from, to);
+    } catch (error) {
+      if (process.platform !== "win32" || !BUSY_CODES.includes(error.code)) throw error;
+      if (fs.existsSync(to)) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
+    }
+  }
+  return fs.renameSync(from, to);
+}
+
 function isInside(base, candidate) {
   const relative = path.relative(base, candidate);
   return (
@@ -154,7 +172,7 @@ class SkillLibrary {
           continue;
         }
         try {
-          fs.renameSync(leftover, path.join(this.skillsDir, movedAside));
+          renameWithRetry(leftover, path.join(this.skillsDir, movedAside));
         } catch (error) {
           debugLogger.error(
             "Could not put back a skill an interrupted write moved aside",
@@ -258,7 +276,7 @@ class SkillLibrary {
     if (!isSkillFolderName(name)) return;
     const trash = path.join(this.skillsDir, `.trash-${crypto.randomUUID()}`);
     try {
-      fs.renameSync(path.join(this.skillsDir, name), trash);
+      renameWithRetry(path.join(this.skillsDir, name), trash);
     } catch (error) {
       if (error.code !== "ENOENT") throw writeError(error);
     }
@@ -483,14 +501,14 @@ class SkillLibrary {
       }
       if (this._exists(name)) {
         trash = path.join(this.skillsDir, `.replaced-${crypto.randomUUID()}-${name}`);
-        fs.renameSync(target, trash);
+        renameWithRetry(target, trash);
       }
-      fs.renameSync(staging, target);
+      renameWithRetry(staging, target);
     } catch (error) {
       this._removeQuietly(staging);
       if (trash && fs.existsSync(trash) && !this._exists(name)) {
         try {
-          fs.renameSync(trash, target);
+          renameWithRetry(trash, target);
         } catch (restoreError) {
           debugLogger.error(
             "Could not put a skill back after a failed write",
@@ -521,7 +539,7 @@ class SkillLibrary {
 
   _removeQuietly(target) {
     try {
-      fs.rmSync(target, { recursive: true, force: true });
+      fs.rmSync(target, { recursive: true, force: true, maxRetries: 3 });
     } catch (error) {
       debugLogger.warn(
         "Could not remove a skill folder",
