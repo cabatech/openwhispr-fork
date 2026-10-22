@@ -160,9 +160,13 @@ function isScriptPath(relPath) {
  */
 function validateSkillFiles(files, { folderName, source }) {
   const skillFile = files.find((entry) => entry.path === "SKILL.md");
-  const parsed = skillFile
-    ? parseSkillMarkdown(skillFile.data.toString("utf8"))
-    : { data: null, problems: [{ code: "noSkillFile" }], warnings: [] };
+  const refused = (code) => ({ data: null, problems: [{ code }], warnings: [] });
+  // Read as UTF-8 and copied back out exactly as stored, so it must be UTF-8 text.
+  const parsed = !skillFile
+    ? refused("noSkillFile")
+    : isTextFile(skillFile.data)
+      ? parseSkillMarkdown(skillFile.data.toString("utf8"))
+      : refused("unreadable");
   const name = typeof parsed.data?.name === "string" ? parsed.data.name : "";
   const problems = [...parsed.problems];
   const warnings = [];
