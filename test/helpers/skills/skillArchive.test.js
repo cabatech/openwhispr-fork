@@ -183,6 +183,8 @@ test("a name this computer can't save is refused", async () => {
     "references/con.md",
     "references/COM1",
     "references/CONIN$",
+    "references/con .md",
+    "nul  .txt",
     "conout$.md",
     "lpt¹.txt",
     "a?.md",
@@ -273,4 +275,5 @@ test("archive paths are checked the way the folder will be written", () => {
   assert.equal(isSafeArchivePath(""), false);
   assert.equal(isSafeArchivePath("references/"), false);
   assert.equal(isSafeArchivePath('say"hi".md'), false);
+  assert.equal(isSafeArchivePath("references/con x.md"), true);
 });
