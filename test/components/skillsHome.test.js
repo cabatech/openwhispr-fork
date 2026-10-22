@@ -13,6 +13,7 @@ const {
   findAll,
   label,
   mountSkillsComponent,
+  settle,
   skill,
   typeInto,
 } = require("../lib/skillsHarness");
@@ -190,6 +191,32 @@ test(
     assert.equal(recommendedIds(container).includes("decision-log"), false);
   }
 );
+
+test("a library that can't be read says so and offers Retry", async (t) => {
+  let lists = 0;
+  const { container, store } = await renderHome(t, {
+    api: {
+      skillsList: async () => {
+        lists += 1;
+        return { skills: [skill("recap")] };
+      },
+    },
+  });
+  await React.act(async () =>
+    store.useSkillsStore.setState({ skills: [], loaded: false, loadError: true })
+  );
+  assert.match(label(container), /skills\.toasts\.loadFailed/);
+  const retry = findElement(
+    container,
+    (node) => node.tagName === "BUTTON" && label(node) === "common.retry"
+  );
+
+  await React.act(async () => dispatch(retry, "click"));
+  await settle();
+
+  assert.equal(lists, 1);
+  assert.deepEqual(cardNames(container), ["recap"]);
+});
 
 test("a failed add says why", async (t) => {
   const { container, toasts } = await renderHome(t, {

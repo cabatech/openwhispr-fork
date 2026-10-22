@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight, Pencil, Plus, Settings, SkillStack, Upload } from "../icons";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Pencil,
+  Plus,
+  Settings,
+  SkillStack,
+  Upload,
+} from "../icons";
 import { Button } from "../ui/button";
 import EmptyStateCard from "../ui/EmptyStateCard";
 import { SectionLabel } from "../ui/SettingsSection";
@@ -46,6 +55,7 @@ export function SkillsHome({
   const { toast } = useToast();
   const skills = useSkillsStore((state) => state.skills);
   const loaded = useSkillsStore((state) => state.loaded);
+  const loadError = useSkillsStore((state) => state.loadError);
   const [query, setQuery] = useState("");
   // Skills that just arrived. Once their cards are on screen the first takes focus and each
   // icon plays: a card mounted after the play count changed would not play.
@@ -185,6 +195,13 @@ export function SkillsHome({
         )
       }
     >
+      {!loaded && loadError && (
+        <EmptyStateCard icon={AlertTriangle} title={t("skills.toasts.loadFailed")} headingLevel={3}>
+          <Button size="sm" variant="outline" onClick={() => void refreshSkills()}>
+            {t("common.retry")}
+          </Button>
+        </EmptyStateCard>
+      )}
       {loaded &&
         (skills.length === 0 ? (
           <>
