@@ -86,6 +86,8 @@ export function SkillDetailDialog({
   // Null follows initialConfirmUninstall; reset whenever the pop-up closes.
   const [confirmChoice, setConfirmChoice] = useState<boolean | null>(null);
   const confirming = confirmChoice ?? initialConfirmUninstall;
+  // Opened on its confirm, as Manage's ⋯ Uninstall does: backing out returns to Manage.
+  const openedToUninstall = confirmChoice === null && initialConfirmUninstall;
   const cancelRef = useRef<HTMLButtonElement>(null);
   const uninstallRef = useRef<HTMLButtonElement>(null);
   const uninstalled = useRef(false);
@@ -94,9 +96,11 @@ export function SkillDetailDialog({
   // The dialog keeps the Escape handler it first rendered with, so the handler reads this;
   // the read below closes the pop-up through the latest onOpenChange the same way.
   const confirmingNow = useRef(confirming);
+  const openedToUninstallNow = useRef(openedToUninstall);
   const onOpenChangeNow = useRef(onOpenChange);
   useLayoutEffect(() => {
     confirmingNow.current = confirming;
+    openedToUninstallNow.current = openedToUninstall;
     onOpenChangeNow.current = onOpenChange;
   });
   // A read is shown only for the skill it was made for, never for the next one opened.
@@ -176,7 +180,7 @@ export function SkillDetailDialog({
           cancelRef.current?.focus();
         }}
         onEscapeKeyDown={(event) => {
-          if (!confirmingNow.current) return;
+          if (!confirmingNow.current || openedToUninstallNow.current) return;
           event.preventDefault();
           setConfirmChoice(false);
         }}
@@ -258,7 +262,7 @@ export function SkillDetailDialog({
                   ref={cancelRef}
                   variant="ghost"
                   size="sm"
-                  onClick={() => setConfirmChoice(false)}
+                  onClick={() => (openedToUninstall ? close() : setConfirmChoice(false))}
                 >
                   {t("common.cancel")}
                 </Button>

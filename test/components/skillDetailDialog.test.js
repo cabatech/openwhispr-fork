@@ -212,6 +212,25 @@ test("Esc in the confirm cancels it, and Esc again closes the pop-up", async (t)
   assert.equal(dialog(container), null);
 });
 
+// Manage's ⋯ Uninstall opens the pop-up on its confirm: backing out returns to Manage.
+test("Cancel on a confirm opened from Manage's menu closes the pop-up", async (t) => {
+  const { container, calls } = await openDetail(t, { confirm: true });
+
+  await click(button(alert(container), "common.cancel"));
+
+  assert.deepEqual(calls.openChange, [false]);
+  assert.equal(dialog(container), null);
+});
+
+test("Esc on a confirm opened from Manage's menu closes the pop-up", async (t) => {
+  const { container, calls } = await openDetail(t, { confirm: true });
+
+  await pressEscape(button(alert(container), "common.cancel"));
+
+  assert.deepEqual(calls.openChange, [false]);
+  assert.equal(dialog(container), null);
+});
+
 test("opening on its confirm focuses Cancel", async (t) => {
   const { container } = await openDetail(t, { confirm: true });
 
