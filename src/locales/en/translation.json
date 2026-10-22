@@ -4837,7 +4837,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Action items to Linear",
-        "description": "Pulls action items from a meeting and drafts Linear issues for you to approve. Use after a meeting when I ask for action items."
+        "description": "Pulls action items from a meeting and drafts Linear issues for me to approve. Use after a meeting when I ask for action items."
       },
       "meeting-summary-to-slack": {
         "title": "Meeting summary to Slack",

@@ -4667,7 +4667,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Ações para o Linear",
-        "description": "Extrai as ações de uma reunião e prepara rascunhos de issues do Linear para você aprovar. Use depois de uma reunião quando eu pedir as ações."
+        "description": "Extrai as ações de uma reunião e prepara rascunhos de issues do Linear para eu aprovar. Use depois de uma reunião quando eu pedir as ações."
       },
       "meeting-summary-to-slack": {
         "title": "Resumo da reunião para o Slack",

@@ -4837,7 +4837,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "Actions vers Linear",
-        "description": "Extrait les actions d'une réunion et prépare des tickets Linear que vous approuvez. À utiliser après une réunion quand je demande les actions."
+        "description": "Extrait les actions d'une réunion et prépare des tickets Linear soumis à mon approbation. À utiliser après une réunion quand je demande les actions."
       },
       "meeting-summary-to-slack": {
         "title": "Résumé de réunion vers Slack",

@@ -4574,7 +4574,7 @@
       "removedFromComputer": "已从这台电脑中移除。",
       "copiedMarkdown": "已复制 Markdown",
       "copyFailed": "无法复制",
-      "revealFailed": "无法找到技能的文件夹",
+      "revealFailed": "无法找到该技能的文件夹",
       "writeFailed": "无法保存技能",
       "writeFailedNoSpace": "您的磁盘已满。",
       "writeFailedPermission": "OpenWhispr 无法写入其技能文件夹。",
@@ -4655,7 +4655,7 @@
       "unreadable": "无法读取该技能的文件",
       "skillFileNotUtf8": "SKILL.md 必须保存为 UTF-8 文本",
       "placeholder": "请先替换 [TODO: …] 占位符",
-      "nameTaken": "您已有名为 {{name}} 的技能"
+      "nameTaken": "您已有名为“{{name}}”的技能"
     },
     "warnings": {
       "folderRenamed": "文件夹将重命名为与技能名称一致",
@@ -4667,7 +4667,7 @@
     "recommended": {
       "action-items-to-linear": {
         "title": "行动项同步到 Linear",
-        "description": "从会议中提取行动项，并起草 Linear 议题供您批准。会议结束后我要行动项时使用。"
+        "description": "从会议中提取行动项，并起草 Linear 议题供我批准。会议结束后我要行动项时使用。"
       },
       "meeting-summary-to-slack": {
         "title": "会议摘要发到 Slack",
