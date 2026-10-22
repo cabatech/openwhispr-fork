@@ -234,8 +234,15 @@ class SkillLibrary {
   get(name) {
     const summary = this.scan().find((skill) => skill.name === name);
     if (!summary) return null;
-    // As the list shows it, with nothing to read: the pop-up then shows its problem, if any.
-    const unreadable = { ...summary, markdown: "", files: [] };
+    // Marked as needing a fix, so nothing takes a skill whose files can't be read for one with
+    // no instructions; the pop-up shows why.
+    const unreadable = {
+      ...summary,
+      valid: false,
+      problem: { code: "unreadable" },
+      markdown: "",
+      files: [],
+    };
     const folder = this.skillDir(name);
     if (!folder) return unreadable;
     try {

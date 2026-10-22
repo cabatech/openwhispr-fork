@@ -320,6 +320,23 @@ test("an invalid skill's switch is off and disabled, and its problem is shown", 
   );
 });
 
+// The list still shows it as fine: its files were readable when the folder was last listed.
+test("a skill whose files can't be read says so, and its switch is off and disabled", async (t) => {
+  const summary = skill("meeting-prep");
+  const unreadable = { valid: false, problem: { code: "unreadable" }, markdown: "", files: [] };
+  const { container } = await openDetail(t, {
+    summary,
+    api: { skillsGet: async () => ({ ...summary, ...unreadable }) },
+  });
+
+  assert.equal(toggle(container).getAttribute("aria-checked"), "false");
+  assert.equal(toggle(container).getAttribute("disabled"), "");
+  assert.match(
+    label(dialog(container)),
+    /skills\.detail\.problem\{"reason":"skills\.problems\.unreadable"\}/
+  );
+});
+
 test("the reveal label follows the platform", async (t) => {
   installBrowserGlobals(t);
   const vite = await createRendererServer(t, { cachePrefix: "openwhispr-platform-label-test-" });

@@ -672,7 +672,7 @@ test("a symlinked skill folder or file is never followed", (t) => {
   assert.deepEqual([library.get("linked").markdown, library.get("linked").files], ["", []]);
 });
 
-test("a skill whose files can't be read opens with no instructions instead of failing", (t) => {
+test("a skill whose files can't be read opens as one that can't be read, not as empty", (t) => {
   const { library, skillsDir } = setup(t);
   writeFolder(skillsDir, "locked", {
     "SKILL.md": skillText("locked"),
@@ -707,7 +707,12 @@ test("a skill whose files can't be read opens with no instructions instead of fa
     "",
     [],
   ]);
-  assert.deepEqual([racy.markdown, racy.files], ["", []]);
+  assert.deepEqual([racy.valid, racy.problem, racy.markdown, racy.files], [
+    false,
+    { code: "unreadable" },
+    "",
+    [],
+  ]);
 });
 
 test("readFile refuses paths outside the skill and binary files", (t) => {
