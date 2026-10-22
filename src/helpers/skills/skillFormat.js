@@ -232,7 +232,7 @@ function buildSkillMarkdown({ name, title, description, instructions }) {
 function headerLines(markdown) {
   const lines = markdown.split(/\r?\n/);
   const close = lines.findIndex((line, i) => i > 0 && /^(---|\.\.\.)\s*$/.test(line));
-  if (lines[0].replace(/^﻿/, "") !== "---" || close < 0) throw new Error("no header");
+  if (lines[0].replace(/^\uFEFF/, "") !== "---" || close < 0) throw new Error("no header");
   return { lines, close };
 }
 

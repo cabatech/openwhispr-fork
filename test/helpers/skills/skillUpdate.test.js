@@ -103,6 +103,13 @@ test("a missing description key is added before the closing line", () => {
   assert.throws(() => replaceFrontmatterValue("# No header\n", "description", "x"));
 });
 
+test("a header after a byte-order mark is still found, and the mark is kept", () => {
+  assert.equal(
+    replaceFrontmatterValue("\uFEFF---\ndescription: Before\n---\n", "description", "After"),
+    '\uFEFF---\ndescription: "After"\n---\n'
+  );
+});
+
 test("a quoted description key, or one spaced before its colon, is replaced in place", () => {
   for (const key of ['"description"', "'description'", "description "]) {
     assert.equal(
