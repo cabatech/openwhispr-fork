@@ -32,16 +32,20 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
   };
 
   // A window's previewed uploads are let go when it closes, crashes or reloads, since the
-  // screen holding them can't let go then.
-  const owners = new Set();
+  // screen holding them can't let go then. Each window's count of those tells a preview
+  // still being read that its window went away meanwhile.
+  const releases = new Map();
   const releaseWhenGone = (sender) => {
     const { id } = sender;
-    if (owners.has(id)) return;
-    owners.add(id);
-    const release = () => library.discardUploadsFrom(id);
+    if (releases.has(id)) return;
+    releases.set(id, 0);
+    const release = () => {
+      releases.set(id, releases.get(id) + 1);
+      library.discardUploadsFrom(id);
+    };
     sender.once("destroyed", () => {
-      owners.delete(id);
-      release();
+      releases.delete(id);
+      library.discardUploadsFrom(id);
     });
     sender.on("render-process-gone", release);
     // A main-frame navigation, such as a reload, replaces the renderer that held them.
@@ -95,8 +99,15 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
   // what the user saw previewed.
   ipcMain.handle("skills-preview-upload", async (event, items) => {
     if (!Array.isArray(items) || !items.every(isUploadItem)) return INVALID;
-    releaseWhenGone(event.sender);
-    return { items: await library.previewUploads(items, event.sender.id) };
+    const { sender } = event;
+    releaseWhenGone(sender);
+    const released = releases.get(sender.id);
+    const previews = await library.previewUploads(items, sender.id);
+    // Its window went away while these were read, so nothing is left to install or free them.
+    if (releases.get(sender.id) !== released) {
+      library.discardUploads(previews.flatMap((preview) => (preview.token ? [preview.token] : [])));
+    }
+    return { items: previews };
   });
 
   ipcMain.handle("skills-discard-uploads", (_event, tokens) => {
