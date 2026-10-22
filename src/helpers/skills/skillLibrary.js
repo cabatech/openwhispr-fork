@@ -59,6 +59,11 @@ function isInside(base, candidate) {
   );
 }
 
+// The reason a write failed, as the screens name it.
+function writeErrorCode(error) {
+  return ["noSpace", "permission"].includes(error?.code) ? error.code : "unknown";
+}
+
 function writeError(error) {
   const code =
     error?.code === "ENOSPC"
@@ -335,14 +340,16 @@ class SkillLibrary {
         continue;
       }
       if (this._exists(upload.name) && !replace.includes(upload.name)) {
-        this.uploads.delete(token);
+        // Previewed as new, but a skill by that name arrived since: it isn't replaced unasked.
+        if (!upload.duplicate) failed.push({ fileName: upload.fileName, error: "exists" });
+        else this.uploads.delete(token);
         continue;
       }
       try {
         this._install(upload.name, upload.files);
       } catch (error) {
         // The token stays, so the same upload can be tried again.
-        failed.push({ fileName: upload.fileName, error: error.code });
+        failed.push({ fileName: upload.fileName, error: writeErrorCode(error) });
         continue;
       }
       this.uploads.delete(token);
@@ -482,6 +489,7 @@ class SkillLibrary {
       name: result.name,
       files,
       owner,
+      duplicate,
     });
     return {
       fileName,
@@ -567,4 +575,4 @@ class SkillLibrary {
   }
 }
 
-module.exports = { SkillLibrary, isSkillFolderName };
+module.exports = { SkillLibrary, isSkillFolderName, writeErrorCode };

@@ -1,4 +1,4 @@
-const { isSkillFolderName } = require("./skillLibrary");
+const { isSkillFolderName, writeErrorCode } = require("./skillLibrary");
 
 const INVALID = { ok: false, error: "invalid" };
 
@@ -17,10 +17,6 @@ function isCreateInput(input) {
     Array.isArray(input.files) &&
     input.files.every(isUploadItem)
   );
-}
-
-function writeErrorCode(error) {
-  return ["noSpace", "permission"].includes(error?.code) ? error.code : "unknown";
 }
 
 // Every handler checks its arguments before the library runs, and every write tells each

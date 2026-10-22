@@ -447,6 +447,29 @@ test("a failed write leaves the old skill and no staging folder", async (t) => {
   assert.deepEqual(listDir(skillsDir), ["keep"]);
 });
 
+test("an upload that fails for a reason the app can't name reports it as unknown", async (t) => {
+  const { library, database } = setup(t);
+  const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("weekly"))]);
+  t.mock.method(database, "upsertSkillState", () => {
+    throw Object.assign(new Error("database or disk is full"), { code: "SQLITE_FULL" });
+  });
+
+  const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+
+  assert.deepEqual(result, { installed: [], failed: [{ fileName: "a.md", error: "unknown" }] });
+});
+
+test("an upload whose skill appeared after its preview is reported, not dropped", async (t) => {
+  const { library, skillsDir } = setup(t);
+  const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("weekly"))]);
+  writeFolder(skillsDir, "weekly", { "SKILL.md": skillText("weekly", "Made meanwhile.") });
+
+  const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+
+  assert.deepEqual(result, { installed: [], failed: [{ fileName: "a.md", error: "exists" }] });
+  assert.match(readSkill(skillsDir, "weekly"), /Made meanwhile\./);
+});
+
 test("a failed write keeps the upload, so it can be tried again", async (t) => {
   const { library, skillsDir } = setup(t);
   const [preview] = await library.previewUploads([markdownUpload("retry.md", skillText("retry"))]);

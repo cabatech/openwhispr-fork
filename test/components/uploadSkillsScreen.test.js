@@ -334,6 +334,25 @@ test("a write that fails says why and stays on the screen", async (t) => {
   ]);
 });
 
+test("a skill that appeared before Upload was pressed says so", async (t) => {
+  const { container, toasts, drop } = await renderUpload(t, {
+    previews: [ready("a.md", "weekly")],
+    commit: { installed: [], failed: [{ fileName: "a.md", error: "exists" }] },
+  });
+  await drop(fakeFile("a.md"));
+
+  await click(submit(container));
+  await settle();
+
+  assert.deepEqual(toasts, [
+    {
+      title: "skills.toasts.writeFailed",
+      description: "skills.upload.duplicate",
+      variant: "destructive",
+    },
+  ]);
+});
+
 test("chosen files are previewed like dropped ones, and the input takes skill files", async (t) => {
   const { container, calls } = await renderUpload(t, { previews: [ready("a.md", "ready-one")] });
   const input = findElement(container, (node) => node.tagName === "INPUT");

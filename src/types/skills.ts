@@ -84,7 +84,8 @@ export type SkillInvalidRequest = { ok: false; error: "invalid" };
 
 export interface SkillCommitResult {
   installed: string[];
-  failed: { fileName: string; error: SkillWriteError }[];
+  /** "exists" when the skill arrived from elsewhere after its preview, so it wasn't replaced. */
+  failed: { fileName: string; error: SkillWriteError | "exists" }[];
 }
 
 export interface SkillCreateInput {
