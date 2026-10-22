@@ -4720,7 +4720,8 @@
       "addRecommended": "Ajouter {{name}}",
       "empty": {
         "title": "Aucune compétence pour l'instant",
-        "description": "Créez-en une avec l'assistant, ou importez une compétence que vous avez déjà."
+        "description": "Créez-en une avec l'assistant, ou importez une compétence que vous avez déjà.",
+        "descriptionNoAssistant": "Importez une compétence que vous avez déjà, ou créez la vôtre."
       }
     },
     "breadcrumb": {

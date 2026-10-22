@@ -4550,7 +4550,8 @@
       "addRecommended": "新增 {{name}}",
       "empty": {
         "title": "尚無技能",
-        "description": "和助理一起建立一個，或上傳您已有的技能。"
+        "description": "和助理一起建立一個，或上傳您已有的技能。",
+        "descriptionNoAssistant": "上傳您已有的技能，或自行建立一個。"
       }
     },
     "breadcrumb": {

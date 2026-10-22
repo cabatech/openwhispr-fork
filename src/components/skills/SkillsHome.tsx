@@ -226,7 +226,11 @@ export function SkillsHome({
             <EmptyStateCard
               icon={SkillStack}
               title={t("skills.pane.empty.title")}
-              description={t("skills.pane.empty.description")}
+              description={t(
+                onCreateWithAssistant
+                  ? "skills.pane.empty.description"
+                  : "skills.pane.empty.descriptionNoAssistant"
+              )}
               headingLevel={3}
             >
               {onCreateWithAssistant && (

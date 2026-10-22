@@ -4550,7 +4550,8 @@
       "addRecommended": "Aggiungi {{name}}",
       "empty": {
         "title": "Ancora nessuna skill",
-        "description": "Creane una con l'assistente o carica una skill che hai già."
+        "description": "Creane una con l'assistente o carica una skill che hai già.",
+        "descriptionNoAssistant": "Carica una skill che hai già o creane una tua."
       }
     },
     "breadcrumb": {

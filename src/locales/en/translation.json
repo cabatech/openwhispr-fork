@@ -4720,7 +4720,8 @@
       "addRecommended": "Add {{name}}",
       "empty": {
         "title": "No skills yet",
-        "description": "Make one with the assistant, or upload one you already have."
+        "description": "Make one with the assistant, or upload one you already have.",
+        "descriptionNoAssistant": "Upload one you already have, or create your own."
       }
     },
     "breadcrumb": {

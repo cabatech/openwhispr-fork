@@ -4550,7 +4550,8 @@
       "addRecommended": "{{name}}を追加",
       "empty": {
         "title": "スキルはまだありません",
-        "description": "アシスタントと一緒に作成するか、お持ちのスキルをアップロードしてください。"
+        "description": "アシスタントと一緒に作成するか、お持ちのスキルをアップロードしてください。",
+        "descriptionNoAssistant": "お持ちのスキルをアップロードするか、自分で作成してください。"
       }
     },
     "breadcrumb": {

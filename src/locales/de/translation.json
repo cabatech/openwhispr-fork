@@ -4720,7 +4720,8 @@
       "addRecommended": "{{name}} hinzufügen",
       "empty": {
         "title": "Noch keine Skills",
-        "description": "Erstelle einen mit dem Assistenten oder lade einen hoch, den du schon hast."
+        "description": "Erstelle einen mit dem Assistenten oder lade einen hoch, den du schon hast.",
+        "descriptionNoAssistant": "Lade einen hoch, den du schon hast, oder erstelle deinen eigenen."
       }
     },
     "breadcrumb": {

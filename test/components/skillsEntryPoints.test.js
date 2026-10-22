@@ -15,6 +15,7 @@ const {
 
 const CREATE_WITH_ASSISTANT = "skills.pane.addMenu.createWithAssistant";
 const MEETING_PREP = skill("meeting-prep", { displayName: "Meeting prep" });
+const EMPTY_WITH_ASSISTANT = /skills\.pane\.empty\.description(?!NoAssistant)/;
 
 // The library starts empty; `install` adds a skill the way the pane's next read sees it.
 async function renderPane(t, { props = {}, wrap } = {}) {
@@ -66,6 +67,7 @@ test("the Add menu, empty state, detail and Create offer the chat entry points",
   const { container, store, buttons } = pane;
 
   assert.equal(menuItems(container)[0], CREATE_WITH_ASSISTANT, "first in the Add menu");
+  assert.match(label(container), EMPTY_WITH_ASSISTANT);
   const emptyState = buttons(CREATE_WITH_ASSISTANT).find(
     (node) => node.getAttribute("role") !== "menuitem"
   );
@@ -102,6 +104,9 @@ test("they are hidden when the assistant isn't allowed by policy", async (t) => 
 
   assert.ok(!menuItems(container).includes(CREATE_WITH_ASSISTANT));
   assert.equal(buttons(CREATE_WITH_ASSISTANT).length, 0);
+  // The empty state doesn't suggest the assistant the user can't use.
+  assert.doesNotMatch(label(container), EMPTY_WITH_ASSISTANT);
+  assert.match(label(container), /skills\.pane\.empty\.descriptionNoAssistant/);
 
   await pane.install(MEETING_PREP);
   await pane.openCard();

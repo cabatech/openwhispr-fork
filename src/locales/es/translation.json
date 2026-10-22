@@ -4602,7 +4602,8 @@
       "addRecommended": "Añadir {{name}}",
       "empty": {
         "title": "Aún no hay habilidades",
-        "description": "Crea una con el asistente o sube una que ya tengas."
+        "description": "Crea una con el asistente o sube una que ya tengas.",
+        "descriptionNoAssistant": "Sube una que ya tengas o crea la tuya."
       }
     },
     "breadcrumb": {

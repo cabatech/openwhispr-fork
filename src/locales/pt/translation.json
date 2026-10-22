@@ -4550,7 +4550,8 @@
       "addRecommended": "Adicionar {{name}}",
       "empty": {
         "title": "Nenhuma habilidade ainda",
-        "description": "Crie uma com o assistente ou envie uma que você já tenha."
+        "description": "Crie uma com o assistente ou envie uma que você já tenha.",
+        "descriptionNoAssistant": "Envie uma que você já tenha ou crie a sua."
       }
     },
     "breadcrumb": {
