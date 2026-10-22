@@ -11,6 +11,7 @@ const {
   label,
   mountSkillsComponent,
   settle,
+  skill,
 } = require("../lib/skillsHarness");
 
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -54,6 +55,8 @@ async function renderUpload(
     commit = null,
     previewFails = false,
     previewAnswered = null,
+    skills = [],
+    api = {},
   } = {}
 ) {
   const calls = { previewed: [], committed: [], discarded: [], done: [], back: 0 };
@@ -61,6 +64,7 @@ async function renderUpload(
     modulePath: "/components/skills/UploadSkillsScreen.tsx",
     exportName: "UploadSkillsScreen",
     props: { onDone: (installed) => calls.done.push(installed), onBack: () => calls.back++ },
+    skills,
     api: {
       skillsPreviewUpload: async (items) => {
         calls.previewed.push(items);
@@ -76,6 +80,7 @@ async function renderUpload(
         calls.discarded.push(tokens);
         return { ok: true };
       },
+      ...api,
     },
   });
   const { container } = mounted;
@@ -95,9 +100,13 @@ const submit = (container) =>
     container,
     (node) => node.tagName === "BUTTON" && label(node).startsWith("skills.upload.submit")
   );
+const removeButton = (container, path) =>
+  findElement(container, (node) => ariaLabel(node) === `skills.create.removeFile{"path":"${path}"}`);
+const second = (preview) => ({ ...preview, token: `${preview.token}-2` });
 
 test("ready, invalid and duplicate files each get their row and reason", async (t) => {
   const { container, calls, drop } = await renderUpload(t, {
+    skills: [skill("follow-up")],
     previews: [
       ready("meeting-prep.skill", "meeting-prep", [{ code: "folderRenamed" }]),
       invalid("notes.md", "frontmatterMissing"),
@@ -206,6 +215,7 @@ test("Upload can't be pressed again once it has saved", async (t) => {
 
 test("Replace and Skip decide what a duplicate does, with Undo", async (t) => {
   const { container, drop } = await renderUpload(t, {
+    skills: [skill("follow-up")],
     previews: [duplicate("follow-up.zip", "follow-up")],
   });
   await drop(fakeFile("follow-up.zip"));
@@ -224,6 +234,7 @@ test("Replace and Skip decide what a duplicate does, with Undo", async (t) => {
 
 test("Upload counts ready skills and replaced ones", async (t) => {
   const { container, calls, toasts, drop } = await renderUpload(t, {
+    skills: [skill("dup-skill")],
     previews: [ready("a.md", "ready-one"), duplicate("b.zip", "dup-skill")],
   });
   assert.equal(label(submit(container)), "skills.upload.submit");
@@ -286,6 +297,7 @@ test("a skill twice in one upload says so, and Upload counts it once", async (t)
 
 test("a skipped or undecided duplicate is left out of the upload", async (t) => {
   const { container, calls, drop } = await renderUpload(t, {
+    skills: [skill("dup-skill")],
     previews: [ready("a.md", "ready-one"), duplicate("b.zip", "dup-skill")],
   });
   await drop(fakeFile("a.md"), fakeFile("b.zip"));
@@ -306,18 +318,82 @@ test("a row can be removed on its own, letting go of its upload", async (t) => {
     ],
   });
   await drop(fakeFile("a.md"), fakeFile("notes.md"), fakeFile("c.md"));
-  const removeButton = (path) =>
-    findElement(container, (node) => {
-      return ariaLabel(node) === `skills.create.removeFile{"path":"${path}"}`;
-    });
 
-  await click(removeButton("a.md"));
-  await click(removeButton("notes.md"));
+  await click(removeButton(container, "a.md"));
+  await click(removeButton(container, "notes.md"));
 
   assert.equal(rows(container).length, 1);
   assert.match(label(rows(container)[0]), /^c\.md/);
   assert.deepEqual(calls.discarded, [["token-first"]]);
   assert.equal(label(submit(container)), 'skills.upload.submitCount{"count":1}');
+});
+
+test("removing one of two files of a new skill leaves the other ready", async (t) => {
+  const { container, calls, drop } = await renderUpload(t, {
+    previews: [ready("v1.md", "weekly"), second(duplicate("v2.md", "weekly"))],
+  });
+  await drop(fakeFile("v1.md"), fakeFile("v2.md"));
+
+  await click(removeButton(container, "v1.md"));
+
+  assert.match(label(rows(container)[0]), /^v2\.md\s*skills\.upload\.ready/);
+  assert.equal(label(submit(container)), 'skills.upload.submitCount{"count":1}');
+  await click(submit(container));
+  await settle();
+  assert.deepEqual(calls.committed, [{ tokens: ["token-weekly-2"], replace: [] }]);
+});
+
+// Replace on a second copy meant "this file, not the other one", so it's asked again once the
+// other one is gone.
+test("a skill you already have asks Replace or Skip, whichever of its files is left", async (t) => {
+  const { container, drop } = await renderUpload(t, {
+    skills: [skill("weekly")],
+    previews: [duplicate("v1.md", "weekly"), second(duplicate("v2.md", "weekly"))],
+  });
+  await drop(fakeFile("v1.md"), fakeFile("v2.md"));
+  assert.match(label(rows(container)[0]), /skills\.upload\.duplicate/);
+  assert.match(label(rows(container)[1]), /skills\.upload\.alsoInUpload/);
+  await click(button(rows(container)[1], "skills.upload.replace"));
+
+  await click(removeButton(container, "v1.md"));
+
+  assert.match(label(rows(container)[0]), /^v2\.md\s*skills\.upload\.duplicate/);
+  assert.ok(button(rows(container)[0], "skills.upload.replace"));
+});
+
+test("removing a row moves focus to the next row's remove button, then the drop zone", async (t) => {
+  const { container, drop } = await renderUpload(t, {
+    previews: [ready("a.md", "first"), ready("b.md", "second"), ready("c.md", "third")],
+  });
+  await drop(fakeFile("a.md"), fakeFile("b.md"), fakeFile("c.md"));
+  const focused = () => container.ownerDocument.activeElement;
+
+  await click(removeButton(container, "b.md"));
+  assert.equal(focused() === removeButton(container, "c.md"), true);
+  await click(removeButton(container, "c.md"));
+  assert.equal(focused() === removeButton(container, "a.md"), true);
+  await click(removeButton(container, "a.md"));
+  assert.equal(focused()?.getAttribute("aria-label"), "skills.upload.drop");
+});
+
+test("files still being read when the screen closes aren't previewed", async (t) => {
+  let finishReading;
+  const reading = new Promise((resolve) => {
+    finishReading = resolve;
+  });
+  const { calls, drop, unmount } = await renderUpload(t, { previews: [ready("a.md", "late")] });
+  const slow = fakeFile("a.md");
+  slow.arrayBuffer = async () => {
+    await reading;
+    return new TextEncoder().encode("---").buffer;
+  };
+
+  await drop(slow);
+  await unmount();
+  finishReading();
+  await settle();
+
+  assert.deepEqual(calls.previewed, []);
 });
 
 test("a file over 25 MB is refused before it is read", async (t) => {
@@ -364,18 +440,39 @@ test("a write that fails says why and stays on the screen", async (t) => {
 
   assert.deepEqual(calls.done, []);
   assert.deepEqual(toasts, [
-    {
-      title: "skills.toasts.writeFailed",
-      description: "skills.toasts.writeFailedNoSpace",
-      variant: "destructive",
-    },
+    { title: "a.md", description: "skills.toasts.writeFailedNoSpace", variant: "destructive" },
   ]);
 });
 
-test("a skill that appeared before Upload was pressed says so", async (t) => {
+test("every file that doesn't install gets its own toast, named", async (t) => {
   const { container, toasts, drop } = await renderUpload(t, {
+    previews: [ready("a.md", "first"), ready("b.md", "second"), ready("c.md", "third")],
+    commit: {
+      installed: [],
+      failed: [
+        { fileName: "a.md", error: "permission" },
+        { fileName: "b.md", error: "unknown" },
+        { fileName: "", error: "unknown" },
+      ],
+    },
+  });
+  await drop(fakeFile("a.md"), fakeFile("b.md"), fakeFile("c.md"));
+
+  await click(submit(container));
+  await settle();
+
+  assert.deepEqual(toasts, [
+    { title: "a.md", description: "skills.toasts.writeFailedPermission", variant: "destructive" },
+    { title: "b.md", description: "skills.toasts.writeFailed", variant: "destructive" },
+    { title: "skills.toasts.writeFailed", variant: "destructive" },
+  ]);
+});
+
+test("a skill that appeared before Upload was pressed says so, then asks Replace or Skip", async (t) => {
+  const { container, calls, toasts, drop } = await renderUpload(t, {
     previews: [ready("a.md", "weekly")],
     commit: { installed: [], failed: [{ fileName: "a.md", error: "exists" }] },
+    api: { skillsList: async () => ({ skills: calls.committed.length ? [skill("weekly")] : [] }) },
   });
   await drop(fakeFile("a.md"));
 
@@ -383,12 +480,10 @@ test("a skill that appeared before Upload was pressed says so", async (t) => {
   await settle();
 
   assert.deepEqual(toasts, [
-    {
-      title: "skills.toasts.writeFailed",
-      description: "skills.upload.duplicate",
-      variant: "destructive",
-    },
+    { title: "a.md", description: "skills.upload.duplicate", variant: "destructive" },
   ]);
+  assert.match(label(rows(container)[0]), /skills\.upload\.duplicate/);
+  assert.equal(submit(container).getAttribute("disabled"), "");
 });
 
 test("chosen files are previewed like dropped ones, and the input takes skill files", async (t) => {

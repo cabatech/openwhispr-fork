@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type ReactElement } from "react";
+import { useState, type KeyboardEvent, type ReactElement, type Ref } from "react";
 import { Upload } from "../icons";
 import { cn } from "../lib/utils";
 
@@ -11,6 +11,7 @@ interface DropZoneProps {
   onFiles: (files: File[]) => void;
   onBrowse: () => void;
   className?: string;
+  ref?: Ref<HTMLDivElement>;
 }
 
 /** A dashed area to drop files on, which also opens the file picker from the keyboard. */
@@ -21,6 +22,7 @@ export function DropZone({
   onFiles,
   onBrowse,
   className,
+  ref,
 }: DropZoneProps): ReactElement {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -33,6 +35,7 @@ export function DropZone({
 
   return (
     <div
+      ref={ref}
       role="button"
       tabIndex={0}
       aria-label={label}

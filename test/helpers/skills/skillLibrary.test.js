@@ -246,17 +246,17 @@ test("a skill folder removed outside the app drops its record", async (t) => {
 });
 
 test(
-  "a duplicate upload offers replace; replace swaps the folder and skip leaves it",
+  "a duplicate upload offers replace; replace swaps the folder, and without it the folder stays",
   async (t) => {
     const { library, skillsDir } = setup(t);
     await upload(library, [markdownUpload("a.md", skillText("dup", "First."))]);
     const second = markdownUpload("b.md", skillText("dup", "Second."));
 
-    const [skipped] = await library.previewUploads([second]);
-    assert.equal(skipped.status, "duplicate");
-    assert.deepEqual(library.commitUploads({ tokens: [skipped.token], replace: [] }), {
+    const [kept] = await library.previewUploads([second]);
+    assert.equal(kept.status, "duplicate");
+    assert.deepEqual(library.commitUploads({ tokens: [kept.token], replace: [] }), {
       installed: [],
-      failed: [],
+      failed: [{ fileName: "b.md", error: "exists" }],
     });
     assert.match(readSkill(skillsDir, "dup"), /First\./);
 
@@ -461,12 +461,20 @@ test("an upload that fails for a reason the app can't name reports it as unknown
 
 test("an upload whose skill appeared after its preview is reported, not dropped", async (t) => {
   const { library, skillsDir } = setup(t);
-  const [preview] = await library.previewUploads([markdownUpload("a.md", skillText("weekly"))]);
+  // The second is previewed as a copy of the first, and is sent alone once that one is removed.
+  const [first, copy] = await library.previewUploads([
+    markdownUpload("a.md", skillText("weekly")),
+    markdownUpload("b.md", skillText("weekly")),
+  ]);
   writeFolder(skillsDir, "weekly", { "SKILL.md": skillText("weekly", "Made meanwhile.") });
 
-  const result = library.commitUploads({ tokens: [preview.token], replace: [] });
-
-  assert.deepEqual(result, { installed: [], failed: [{ fileName: "a.md", error: "exists" }] });
+  for (const [preview, fileName] of [
+    [first, "a.md"],
+    [copy, "b.md"],
+  ]) {
+    const result = library.commitUploads({ tokens: [preview.token], replace: [] });
+    assert.deepEqual(result, { installed: [], failed: [{ fileName, error: "exists" }] });
+  }
   assert.match(readSkill(skillsDir, "weekly"), /Made meanwhile\./);
 });
 

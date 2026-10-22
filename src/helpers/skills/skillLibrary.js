@@ -353,9 +353,9 @@ class SkillLibrary {
         continue;
       }
       if (this._exists(upload.name) && !replace.includes(upload.name)) {
-        // Previewed as new, but a skill by that name arrived since: it isn't replaced unasked.
-        if (!upload.duplicate) failed.push({ fileName: upload.fileName, error: "exists" });
-        else this.uploads.delete(token);
+        // A skill by that name is there, as when one arrived since the preview: it isn't
+        // replaced unasked, and the upload stays so it can be sent again to replace it.
+        failed.push({ fileName: upload.fileName, error: "exists" });
         continue;
       }
       try {
@@ -503,13 +503,7 @@ class SkillLibrary {
     const duplicate = batchNames.has(result.name) || this._exists(result.name);
     batchNames.add(result.name);
     const token = crypto.randomUUID();
-    this.uploads.set(token, {
-      fileName,
-      name: result.name,
-      files,
-      owner,
-      duplicate,
-    });
+    this.uploads.set(token, { fileName, name: result.name, files, owner });
     return {
       fileName,
       status: duplicate ? "duplicate" : "ready",
