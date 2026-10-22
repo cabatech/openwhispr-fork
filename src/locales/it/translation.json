@@ -4601,6 +4601,8 @@
       "duplicate": "Hai già questa skill",
       "replace": "Sostituisci",
       "willReplace": "Sostituirà la tua skill attuale",
+      "willReplaceCopy": "Verrà usato al posto dell'altro file",
+      "alsoInUpload": "Un altro file di questo caricamento contiene la stessa skill",
       "skipped": "Saltata",
       "undo": "Annulla",
       "chooseFile": "Scegli un file per continuare.",

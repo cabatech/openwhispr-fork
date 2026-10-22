@@ -4601,6 +4601,8 @@
       "duplicate": "このスキルはすでにあります",
       "replace": "置き換える",
       "willReplace": "現在のスキルを置き換えます",
+      "willReplaceCopy": "もう一方のファイルの代わりに使われます",
+      "alsoInUpload": "このアップロードの別のファイルに同じスキルがあります",
       "skipped": "スキップ",
       "undo": "元に戻す",
       "chooseFile": "続けるにはファイルを選択してください。",

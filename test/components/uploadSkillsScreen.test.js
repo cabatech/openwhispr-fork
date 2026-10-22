@@ -259,7 +259,7 @@ test("a skill dropped again in a later drop asks Replace or Skip too", async (t)
 
   const [first, second] = rows(container);
   assert.match(label(first), /skills\.upload\.ready/);
-  assert.match(label(second), /skills\.upload\.duplicate/);
+  assert.match(label(second), /skills\.upload\.alsoInUpload/);
   await click(button(second, "skills.upload.replace"));
   await click(submit(container));
   await settle();
@@ -267,6 +267,21 @@ test("a skill dropped again in a later drop asks Replace or Skip too", async (t)
   assert.deepEqual(calls.committed, [
     { tokens: ["token-weekly", "token-weekly-2"], replace: ["weekly"] },
   ]);
+});
+
+test("a skill twice in one upload says so, and Upload counts it once", async (t) => {
+  const { container, drop } = await renderUpload(t, {
+    previews: [ready("v1.md", "weekly"), duplicate("v2.md", "weekly")],
+  });
+  await drop(fakeFile("v1.md"), fakeFile("v2.md"));
+
+  const second = rows(container)[1];
+  assert.match(label(second), /skills\.upload\.alsoInUpload/);
+  assert.doesNotMatch(label(second), /skills\.upload\.duplicate/);
+  await click(button(second, "skills.upload.replace"));
+
+  assert.match(label(rows(container)[1]), /skills\.upload\.willReplaceCopy/);
+  assert.equal(label(submit(container)), 'skills.upload.submitCount{"count":1}');
 });
 
 test("a skipped or undecided duplicate is left out of the upload", async (t) => {

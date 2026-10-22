@@ -4653,6 +4653,8 @@
       "duplicate": "Ya tienes esta habilidad",
       "replace": "Reemplazar",
       "willReplace": "Reemplazará tu habilidad actual",
+      "willReplaceCopy": "Se usará en lugar del otro archivo",
+      "alsoInUpload": "Otro archivo de esta subida tiene la misma habilidad",
       "skipped": "Omitida",
       "undo": "Deshacer",
       "chooseFile": "Elige un archivo para continuar.",

@@ -4601,6 +4601,8 @@
       "duplicate": "您已有此技能",
       "replace": "取代",
       "willReplace": "將取代您目前的技能",
+      "willReplaceCopy": "將代替另一個檔案使用",
+      "alsoInUpload": "此次上傳的另一個檔案包含相同的技能",
       "skipped": "已略過",
       "undo": "復原",
       "chooseFile": "選擇一個檔案以繼續。",

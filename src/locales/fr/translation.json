@@ -4771,6 +4771,8 @@
       "duplicate": "Vous avez déjà cette compétence",
       "replace": "Remplacer",
       "willReplace": "Remplacera votre compétence actuelle",
+      "willReplaceCopy": "Sera utilisé à la place de l'autre fichier",
+      "alsoInUpload": "Un autre fichier de cet import contient la même compétence",
       "skipped": "Ignorée",
       "undo": "Annuler",
       "chooseFile": "Choisissez un fichier pour continuer.",

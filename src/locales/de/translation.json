@@ -4771,6 +4771,8 @@
       "duplicate": "Du hast diesen Skill schon",
       "replace": "Ersetzen",
       "willReplace": "Ersetzt deinen aktuellen Skill",
+      "willReplaceCopy": "Wird statt der anderen Datei verwendet",
+      "alsoInUpload": "Eine andere Datei in diesem Upload enthält denselben Skill",
       "skipped": "Übersprungen",
       "undo": "Rückgängig",
       "chooseFile": "Wähle eine Datei aus, um fortzufahren.",

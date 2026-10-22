@@ -49,6 +49,8 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
   const closed = useRef(false);
   const hintId = useId();
   const toInstall = rows.filter(willInstall);
+  // Two files of one skill install as one, so the button counts skills.
+  const skillCount = new Set(toInstall.map((row) => row.preview.name)).size;
 
   const addFiles = async (files: File[]) => {
     // Read one by one, so a file that can't be read doesn't take the others with it.
@@ -161,13 +163,20 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
         </span>
       );
     }
+    // A skill another file in this upload also holds, rather than one already installed.
+    const repeat = rows.some(
+      (other) =>
+        other.id < row.id &&
+        other.preview.status !== "invalid" &&
+        other.preview.name === preview.name
+    );
     if (row.choice) {
       return (
         <>
           {row.choice === "replace" ? (
             <span className="flex items-center gap-1.5 text-xs text-foreground">
               <Check size={13} className="text-success" />
-              {t("skills.upload.willReplace")}
+              {t(repeat ? "skills.upload.willReplaceCopy" : "skills.upload.willReplace")}
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">{t("skills.upload.skipped")}</span>
@@ -182,7 +191,7 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
       <>
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Info size={13} className="text-info shrink-0" />
-          {t("skills.upload.duplicate")}
+          {t(repeat ? "skills.upload.alsoInUpload" : "skills.upload.duplicate")}
         </span>
         <Button
           variant="outline"
@@ -300,7 +309,7 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
         >
           {toInstall.length === 0
             ? t("skills.upload.submit")
-            : t("skills.upload.submitCount", { count: toInstall.length })}
+            : t("skills.upload.submitCount", { count: skillCount })}
         </Button>
       </div>
     </IntegrationsPane>

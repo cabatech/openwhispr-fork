@@ -4601,6 +4601,8 @@
       "duplicate": "Você já tem esta habilidade",
       "replace": "Substituir",
       "willReplace": "Vai substituir sua habilidade atual",
+      "willReplaceCopy": "Será usado no lugar do outro arquivo",
+      "alsoInUpload": "Outro arquivo deste envio tem a mesma habilidade",
       "skipped": "Ignorada",
       "undo": "Desfazer",
       "chooseFile": "Escolha um arquivo para continuar.",
