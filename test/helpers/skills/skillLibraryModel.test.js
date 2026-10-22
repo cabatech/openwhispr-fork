@@ -211,6 +211,16 @@ test("two proposals with non-Latin titles become two skills", (t) => {
   ]);
 });
 
+test("a new proposal never takes a starter skill's folder", (t) => {
+  const { library } = setup(t);
+
+  const saved = library.saveProposal(proposal({ title: "Decision log" }));
+
+  assert.deepEqual(saved, { name: "decision-log-2" });
+  const copy = { title: "Journal des décisions", description: "Finds decisions." };
+  assert.deepEqual(library.addRecommended("decision-log", copy), { name: "decision-log" });
+});
+
 test("a title shown by one of the user's skills updates that skill", (t) => {
   const { library } = setup(t);
   library.create({ title: "Weekly recap", description: "Recaps.", instructions: "Old", files: [] });

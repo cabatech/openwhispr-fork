@@ -445,9 +445,7 @@ class SkillLibrary {
     if (hasClashingPaths(attachments.map((file) => file.path))) {
       return { problems: [{ code: "unsafePath" }] };
     }
-    // A starter skill's name stays free, so that starter can still be added.
-    const taken = new Set([...this._takenNames(), ...this._recommendedIds()]);
-    const name = slugifySkillName(cleanTitle, taken);
+    const name = this._newSkillName(cleanTitle);
     const skillFiles = [
       {
         path: "SKILL.md",
@@ -681,7 +679,7 @@ class SkillLibrary {
     // A title one of the user's skills shows updates that skill. Any other gets a folder of its
     // own, as Create does: titles with no Latin letters all slug to the same fallback name.
     const existingName = this._skillTitled(cleanTitle);
-    const name = existingName ?? slugifySkillName(cleanTitle, this._takenNames());
+    const name = existingName ?? this._newSkillName(cleanTitle);
     const existing = existingName !== null;
     const refuse = (problem) => ({ name, existing, problems: [problem], files: [] });
     if (!cleanTitle) return refuse({ code: "missingName" });
@@ -805,6 +803,11 @@ class SkillLibrary {
   _skillTitled(title) {
     const key = (text) => text.trim().replace(/\s+/g, " ").normalize("NFC").toLowerCase();
     return this.scan().find((skill) => key(skill.displayName) === key(title))?.name ?? null;
+  }
+
+  // A starter skill's name stays free, so that starter can still be added.
+  _newSkillName(title) {
+    return slugifySkillName(title, new Set([...this._takenNames(), ...this._recommendedIds()]));
   }
 
   _recommendedIds() {
