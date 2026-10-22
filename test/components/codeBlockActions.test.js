@@ -82,6 +82,27 @@ test("a failed paste says the text is on the clipboard", async (t) => {
   assert.deepEqual(calls.clipboard, [CODE], "only the throw needed the code put back");
 });
 
+// The panel still takes a click once focus has moved to the target app, so a double-click
+// would paste the code twice.
+test("a second press while a paste runs pastes once", async (t) => {
+  let finish;
+  const { calls, button, toasts } = await mountActions(t, {
+    paste: true,
+    pasteText: () =>
+      new Promise((resolve) => {
+        finish = () => resolve({ success: true, pasted: true });
+      }),
+  });
+
+  await click(button("skills.code.paste"));
+  await click(button("skills.code.paste"));
+  finish();
+  await settle();
+
+  assert.equal(calls.paste.length, 1);
+  assert.deepEqual(toastTitles(toasts), ["skills.code.pasted"]);
+});
+
 test("the main chat shows Copy only on its code blocks", async (t) => {
   let root = null;
   t.after(async () => {
