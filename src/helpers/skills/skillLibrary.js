@@ -34,8 +34,6 @@ const SYNC_LIMITS = { maxFiles: 100, maxBytes: 1024 * 1024 };
 
 // Where a replace puts the old copy while the new one is swapped in, named for its skill.
 const MOVED_ASIDE = /^\.replaced-[0-9a-f-]{36}-(.+)$/;
-// What a skill folder too big to read is marked with.
-const OVER_LIMITS = ["tooLarge", "tooManyFiles"];
 
 // A name the library can address on disk: one path segment that isn't hidden. Wider than
 // SKILL_NAME_PATTERN, so a folder dropped in under any name can still be shown and removed.
@@ -691,13 +689,12 @@ class SkillLibrary {
     };
     if (!isSkillFolderName(name) || !SKILL_NAME_PATTERN.test(name)) return skip("name");
     // One too large to back up stays as it is here; the cloud never had this copy of it. Nor
-    // does one past this computer's own limits, whose files can't even be read to compare.
+    // does one whose files can't be read to compare: past this computer's own limits, holding
+    // a link, or not readable by the app.
     if (this.skillDir(name)) {
       const here = this._inspect(name);
       if (here.tooLargeToSync) return skip("tooLargeToSync");
-      if (here.problems.some((problem) => OVER_LIMITS.includes(problem.code))) {
-        return skip("overLimits");
-      }
+      if (!here.hash) return skip("unreadable");
     }
     if (entry.deleted_at) {
       this._removeSkill(name);

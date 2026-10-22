@@ -357,3 +357,26 @@ test("a skill waiting to be put back after a replace keeps its state", (t) => {
   assert.deepEqual(ctx.database.getPendingSkillDeletes(), []);
   assert.equal(ctx.database.getSkillForCloudMerge({ name: "recap" }).deleted_at, null);
 });
+
+test("a skill whose files can't be read is never replaced or removed from the cloud", (t) => {
+  const ctx = setup(t);
+  if (!ctx) return;
+  ctx.library.applyFromCloud(cloudSkill("recap", [utf8("SKILL.md", skillText("recap"))]));
+  writeFolder(ctx.skillsDir, "recap", { "notes/mine.md": "Mine.\n" });
+  fs.symlinkSync(os.tmpdir(), path.join(ctx.skillsDir, "recap", "linked"));
+  ctx.library.scan();
+  t.mock.method(debugLogger, "warn", () => {});
+
+  const edited = ctx.library.applyFromCloud(
+    cloudSkill("recap", [utf8("SKILL.md", skillText("recap", "Cloud.", "Cloud.\n"))], {
+      updated_at: "2026-10-22T09:00:00.000Z",
+    })
+  );
+  const deleted = ctx.library.applyFromCloud(
+    cloudSkill("recap", [], { deleted_at: "2026-10-22T10:00:00.000Z" })
+  );
+
+  assert.deepEqual([edited, deleted], [false, false]);
+  assert.deepEqual(listDir(path.join(ctx.skillsDir, "recap", "notes")), ["mine.md"]);
+  assert.ok(fs.lstatSync(path.join(ctx.skillsDir, "recap", "linked")).isSymbolicLink());
+});
