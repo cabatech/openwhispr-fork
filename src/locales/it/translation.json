@@ -4651,7 +4651,8 @@
       "unreadableArchive": "Impossibile aprire questo file",
       "nameMismatch": "Il nome in SKILL.md non corrisponde alla sua cartella",
       "unreadable": "Impossibile leggere i file della skill",
-      "placeholder": "Sostituisci prima il segnaposto [TODO: …]"
+      "placeholder": "Sostituisci prima il segnaposto [TODO: …]",
+      "nameTaken": "Hai già una skill chiamata {{name}}"
     },
     "warnings": {
       "folderRenamed": "La cartella viene rinominata in base al nome della skill",

@@ -4821,7 +4821,8 @@
       "unreadableArchive": "This file can't be opened",
       "nameMismatch": "The name inside SKILL.md doesn't match its folder",
       "unreadable": "The skill's files can't be read",
-      "placeholder": "Replace the [TODO: …] placeholder first"
+      "placeholder": "Replace the [TODO: …] placeholder first",
+      "nameTaken": "You already have a skill called {{name}}"
     },
     "warnings": {
       "folderRenamed": "The folder is renamed to match the skill's name",

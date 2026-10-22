@@ -14,7 +14,7 @@ import { useToast } from "../ui/useToast";
 import { IntegrationsPane } from "../integrations/IntegrationsPane";
 import { playSkillIcon, refreshSkills, useSkillsStore } from "../../stores/skillsStore";
 import { InstalledSkillCard, RecommendedSkillCard } from "./SkillCards";
-import { RECOMMENDED_SKILL_IDS, writeFailedToast } from "./skillCopy";
+import { problemKey, RECOMMENDED_SKILL_IDS, writeFailedToast } from "./skillCopy";
 import { SkillSearchInput } from "./SkillSearchInput";
 
 const VISIBLE_INSTALLED = 6;
@@ -91,6 +91,15 @@ export function SkillsHome({
       title: name,
       description,
     });
+    if (result && "problems" in result) {
+      const [problem] = result.problems;
+      toast({
+        title: t("skills.toasts.writeFailed"),
+        description: t(problemKey(problem), problem.values),
+        variant: "destructive",
+      });
+      return;
+    }
     if (!result?.ok) {
       toast(writeFailedToast(t, result && "error" in result ? result.error : undefined));
       return;

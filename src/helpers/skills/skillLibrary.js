@@ -138,6 +138,11 @@ function refusedUpload(fileName, problems) {
   return { fileName, status: "invalid", problems, warnings: [] };
 }
 
+// Two skills never show the same title, so their cards can be told apart.
+function titleTaken(title) {
+  return { code: "nameTaken", values: { name: title } };
+}
+
 function sizeProblem(files) {
   if (files.length > SKILL_LIMITS.maxFiles) return { code: "tooManyFiles" };
   const bytes = files.reduce((total, file) => total + file.data.length, 0);
@@ -374,6 +379,7 @@ class SkillLibrary {
   create({ title, description, instructions, files }) {
     const cleanTitle = title.trim();
     if (!cleanTitle) return { problems: [{ code: "missingName" }] };
+    if (this._skillTitled(cleanTitle)) return { problems: [titleTaken(cleanTitle)] };
     const unsafe = files.find(
       (file) => file.fileName.includes("/") || !isSafeArchivePath(file.fileName)
     );
@@ -386,7 +392,9 @@ class SkillLibrary {
     if (hasClashingPaths(attachments.map((file) => file.path))) {
       return { problems: [{ code: "unsafePath" }] };
     }
-    const name = slugifySkillName(cleanTitle, this._takenNames());
+    // A starter skill's name stays free, so that starter can still be added.
+    const taken = new Set([...this._takenNames(), ...this._recommendedIds()]);
+    const name = slugifySkillName(cleanTitle, taken);
     const skillFiles = [
       {
         path: "SKILL.md",
@@ -414,6 +422,7 @@ class SkillLibrary {
       return null;
     }
     if (this._exists(id)) return { name: id };
+    if (this._skillTitled(title)) return { problems: [titleTaken(title.trim())] };
     const markdown = buildSkillMarkdown({
       name: id,
       title,
@@ -546,6 +555,19 @@ class SkillLibrary {
       throw writeError(error);
     }
     if (trash) this._removeQuietly(trash);
+  }
+
+  _skillTitled(title) {
+    const key = (text) => text.trim().replace(/\s+/g, " ").normalize("NFC").toLowerCase();
+    return this.scan().find((skill) => key(skill.displayName) === key(title))?.name ?? null;
+  }
+
+  _recommendedIds() {
+    try {
+      return fs.readdirSync(this.recommendedDir);
+    } catch {
+      return [];
+    }
   }
 
   _exists(name) {

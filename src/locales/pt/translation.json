@@ -4651,7 +4651,8 @@
       "unreadableArchive": "Não é possível abrir este arquivo",
       "nameMismatch": "O nome dentro do SKILL.md não corresponde à pasta",
       "unreadable": "Não é possível ler os arquivos da habilidade",
-      "placeholder": "Substitua primeiro o marcador [TODO: …]"
+      "placeholder": "Substitua primeiro o marcador [TODO: …]",
+      "nameTaken": "Você já tem uma habilidade chamada {{name}}"
     },
     "warnings": {
       "folderRenamed": "A pasta é renomeada para corresponder ao nome da habilidade",

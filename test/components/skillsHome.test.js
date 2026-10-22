@@ -210,6 +210,26 @@ test("a failed add says why", async (t) => {
   ]);
 });
 
+test("an add refused because a skill already has that title says so", async (t) => {
+  const refusal = { code: "nameTaken", values: { name: "Decision log" } };
+  const { container, toasts } = await renderHome(t, {
+    api: { skillsAddRecommended: async () => ({ ok: false, problems: [refusal] }) },
+  });
+  const add = findElement(container, (node) =>
+    ariaLabel(node).startsWith("skills.pane.addRecommended")
+  );
+
+  await React.act(async () => dispatch(add, "click"));
+
+  assert.deepEqual(toasts, [
+    {
+      title: "skills.toasts.writeFailed",
+      description: 'skills.problems.nameTaken{"name":"Decision log"}',
+      variant: "destructive",
+    },
+  ]);
+});
+
 test("a skill that needs fixing says so on its card", async (t) => {
   const { container } = await renderHome(t, {
     skills: [

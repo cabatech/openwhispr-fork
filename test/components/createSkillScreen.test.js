@@ -211,6 +211,7 @@ test("a problem from the library shows under the field it concerns", async (t) =
   const responses = [
     { ok: false, problems: [{ code: "descriptionAngleBrackets" }] },
     { ok: false, problems: [{ code: "placeholder" }] },
+    { ok: false, problems: [{ code: "nameTaken", values: { name: "Draft" } }] },
   ];
   const { container, calls } = await renderCreate(t, {
     api: { skillsCreate: async () => responses.shift() },
@@ -224,6 +225,10 @@ test("a problem from the library shows under the field it concerns", async (t) =
   await click(createButton(container));
   await settle();
   assert.equal(messageFor(container, "instructions"), "skills.problems.placeholder");
+
+  await click(createButton(container));
+  await settle();
+  assert.equal(messageFor(container, "name"), 'skills.problems.nameTaken{"name":"Draft"}');
   assert.deepEqual(calls.created, []);
 });
 

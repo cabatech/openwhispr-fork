@@ -21,7 +21,8 @@ export type SkillProblemCode =
   | "unreadableArchive"
   | "nameMismatch"
   | "unreadable"
-  | "placeholder";
+  | "placeholder"
+  | "nameTaken";
 
 export type SkillWarningCode =
   "folderRenamed" | "reservedWord" | "longBody" | "longDescription" | "unknownKeys";

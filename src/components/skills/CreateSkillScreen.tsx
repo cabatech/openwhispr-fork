@@ -30,7 +30,7 @@ const fileKey = (fileName: string) => fileName.normalize("NFC").toLowerCase();
 // The library names a problem by code. Most belong to one of the fields; the rest concern the
 // attached files, which have no field of their own.
 function fieldFor(code: SkillProblemCode): Field | null {
-  if (code === "missingName") return "name";
+  if (code === "missingName" || code === "nameTaken") return "name";
   if (code.toLowerCase().includes("description")) return "description";
   if (code === "placeholder") return "instructions";
   return null;

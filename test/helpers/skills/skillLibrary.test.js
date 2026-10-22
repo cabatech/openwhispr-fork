@@ -773,7 +773,7 @@ test("create names the folder from the title and keeps it unique", (t) => {
     ],
   });
   const second = library.create({
-    title: "Weekly status report",
+    title: "Weekly status report!",
     description: "Another.",
     instructions: "Go",
     files: [],
@@ -791,6 +791,35 @@ test("create names the folder from the title and keeps it unique", (t) => {
   const created = path.join(skillsDir, "weekly-status-report");
   assert.equal(fs.readFileSync(path.join(created, "references", "example.md"), "utf8"), "Example");
   assert.equal(fs.readFileSync(path.join(created, "scripts", "export.sh"), "utf8"), "echo hi");
+});
+
+// Two skills never show the same title, so their cards can be told apart.
+test("create refuses a title one of your skills already shows", (t) => {
+  const { library, skillsDir } = setup(t);
+  const make = (title) =>
+    library.create({ title, description: "Recaps.", instructions: "Go", files: [] });
+  assert.deepEqual(make("Weekly report"), { name: "weekly-report" });
+
+  for (const title of ["Weekly report", "  weekly   REPORT "]) {
+    assert.deepEqual(make(title), {
+      problems: [{ code: "nameTaken", values: { name: title.trim() } }],
+    });
+  }
+  assert.deepEqual(listDir(skillsDir), ["weekly-report"]);
+});
+
+test("a hand-made skill never takes a starter skill's folder", (t) => {
+  const { library } = setup(t);
+  const copy = { title: "Decision log", description: "Finds decisions." };
+
+  const made = library.create({ ...copy, instructions: "Mine", files: [] });
+
+  assert.deepEqual(made, { name: "decision-log-2" });
+  assert.deepEqual(library.addRecommended("decision-log", copy), {
+    problems: [{ code: "nameTaken", values: { name: "Decision log" } }],
+  });
+  const translated = { ...copy, title: "Journal des décisions" };
+  assert.deepEqual(library.addRecommended("decision-log", translated), { name: "decision-log" });
 });
 
 test("create returns the problems instead of writing a skill that can't be used", (t) => {

@@ -4821,7 +4821,8 @@
       "unreadableArchive": "Diese Datei kann nicht geöffnet werden",
       "nameMismatch": "Der Name in SKILL.md passt nicht zu seinem Ordner",
       "unreadable": "Die Dateien des Skills können nicht gelesen werden",
-      "placeholder": "Ersetze zuerst den Platzhalter [TODO: …]"
+      "placeholder": "Ersetze zuerst den Platzhalter [TODO: …]",
+      "nameTaken": "Du hast schon einen Skill namens {{name}}"
     },
     "warnings": {
       "folderRenamed": "Der Ordner wird passend zum Namen des Skills umbenannt",

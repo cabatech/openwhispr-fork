@@ -1366,7 +1366,8 @@
       "unreadableArchive": "يتعذر فتح هذا الملف",
       "nameMismatch": "الاسم داخل SKILL.md لا يطابق اسم مجلده",
       "unreadable": "تتعذر قراءة ملفات المهارة",
-      "placeholder": "استبدل العنصر النائب [TODO: …‎] أولًا"
+      "placeholder": "استبدل العنصر النائب [TODO: …‎] أولًا",
+      "nameTaken": "لديك بالفعل مهارة باسم {{name}}"
     },
     "warnings": {
       "folderRenamed": "ستتم إعادة تسمية المجلد ليطابق اسم المهارة",
