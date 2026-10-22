@@ -6,6 +6,7 @@ const { installElectronStub } = require("../harness/electronStub.js");
 
 installElectronStub();
 const { registerSkillsIpc } = require("../../../src/helpers/skills/skillsIpc");
+const debugLogger = require("../../../src/helpers/debugLogger");
 
 const INVALID = { ok: false, error: "invalid" };
 const SUMMARY = { name: "meeting-prep", enabled: true, valid: true };
@@ -302,17 +303,20 @@ test("a saved proposal broadcasts skills-changed; reads, checks and marks don't"
 });
 
 // A throw would reach the chat as Electron's error text, folder path and all.
-test("the assistant's reads, checks and marks answer even when the library throws", async () => {
+test("the assistant's reads, checks and marks answer even when the library throws", async (t) => {
   const fail = () => {
     throw Object.assign(new Error("EACCES: permission denied, scandir '/data/skills'"), {
       code: "EACCES",
     });
   };
   const { call } = setup({ readForModel: fail, checkProposal: fail, markUsed: fail });
+  const warn = t.mock.method(debugLogger, "warn", () => {});
 
   assert.equal(await call("skills-read-for-model", { name: "meeting-prep" }), null);
   assert.deepEqual(await call("skills-check-proposal", { kind: "create", proposal }), INVALID);
   assert.equal(await call("skills-mark-used", "meeting-prep"), undefined);
+  // Each is logged, so a folder that can't be read still shows up in the logs.
+  assert.equal(warn.mock.callCount(), 3);
 });
 
 test("a proposal that can't be saved reports why and broadcasts nothing", async () => {

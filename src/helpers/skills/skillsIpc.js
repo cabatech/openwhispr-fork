@@ -1,3 +1,4 @@
+const debugLogger = require("../debugLogger");
 const { isSkillFolderName, writeErrorCode } = require("./skillLibrary");
 
 const INVALID = { ok: false, error: "invalid" };
@@ -194,7 +195,12 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     if (!isModelRef(ref)) return null;
     try {
       return library.readForModel(ref);
-    } catch {
+    } catch (error) {
+      debugLogger.warn(
+        "Could not read a skill for the assistant",
+        { error: error.message },
+        "skills"
+      );
       return null;
     }
   });
@@ -203,7 +209,8 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     if (!isProposalRequest(request)) return INVALID;
     try {
       return library.checkProposal(request) ?? INVALID;
-    } catch {
+    } catch (error) {
+      debugLogger.warn("Could not check a skill proposal", { error: error.message }, "skills");
       return INVALID;
     }
   });
@@ -245,8 +252,8 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     if (!isSkillFolderName(name)) return;
     try {
       library.markUsed(name);
-    } catch {
-      // Nothing to report: the skill was still used.
+    } catch (error) {
+      debugLogger.warn("Could not stamp a skill's last use", { error: error.message }, "skills");
     }
   });
 }
