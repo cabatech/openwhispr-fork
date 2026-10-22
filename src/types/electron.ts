@@ -3841,9 +3841,9 @@ declare global {
         serverUpdatedAt: string | undefined,
         expectedHash: string,
         expectedEnabled: boolean
-      ) => Promise<{ success: boolean; changes?: number }>;
-      hardDeleteSkill?: (name: string) => Promise<{ success: boolean }>;
-      clearSkillCloudId?: (name: string) => Promise<{ success: boolean }>;
+      ) => Promise<{ success: boolean; changes: number } | null>;
+      hardDeleteSkill?: (name: string) => Promise<{ success: boolean } | null>;
+      clearSkillCloudId?: (name: string) => Promise<{ success: boolean } | null>;
       broadcastSkillsUpdated?: () => Promise<void>;
     };
 

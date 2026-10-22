@@ -311,7 +311,8 @@ function registerSkillsIpc({ ipcMain, library, shell, broadcast }) {
     "skills-mark-synced",
     (_event, name, cloudId, serverUpdatedAt, expectedHash, expectedEnabled) => {
       if (!isSkillFolderName(name) || typeof cloudId !== "string") return null;
-      return answering("Could not mark a skill backed up", NOT_SAVED, () =>
+      // Nothing marked, so the push checks whether the skill is still here, as for an edit.
+      return answering("Could not mark a skill backed up", { ...NOT_SAVED, changes: 0 }, () =>
         database.markSkillSynced(name, cloudId, serverUpdatedAt, expectedHash, expectedEnabled)
       );
     }

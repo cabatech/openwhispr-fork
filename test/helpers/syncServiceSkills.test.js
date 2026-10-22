@@ -474,3 +474,26 @@ test("an edit made outside the app since the last read wins over a newer cloud c
   assert.equal(skillFile(ctx.skillsDir, name), skillText(name, "Use it.", "Mine.\n"));
   assert.match(cloudByName(ctx.cloud)[name].files[0].content, /Mine\./);
 });
+
+test("an uninstall mid-push whose mark fails doesn't bring the skill back", async (t) => {
+  const ctx = await setup(t);
+  if (!ctx) return;
+  silence(t, "warn");
+  const name = create(ctx.library, "Meeting prep");
+  whileSending(ctx, "POST /api/skills/batch-create", () => ctx.library.uninstall(name));
+  const mark = ctx.db.markSkillSynced.bind(ctx.db);
+  let failOnce = true;
+  ctx.db.markSkillSynced = (...args) => {
+    if (failOnce) {
+      failOnce = false;
+      throw new Error("SQLITE_BUSY: database is locked");
+    }
+    return mark(...args);
+  };
+
+  await ctx.service.syncSkillsNow();
+  await ctx.service.syncSkillsNow();
+
+  assert.deepEqual(listDir(ctx.skillsDir), []);
+  assert.ok(cloudByName(ctx.cloud)[name].deleted_at, "the copy that got through is deleted");
+});

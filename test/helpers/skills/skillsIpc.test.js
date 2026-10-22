@@ -486,8 +486,12 @@ test("the sync channels answer and log when the library or database fails", asyn
     error: "unavailable",
   });
   assert.deepEqual(await call("skills-apply-from-cloud", entry), { ok: false, error: "unknown" });
-  for (const answer of [
+  assert.deepEqual(
     await call("skills-mark-synced", "meeting-prep", "c1", null, "h", true),
+    { success: false, changes: 0 },
+    "nothing marked"
+  );
+  for (const answer of [
     await call("skills-hard-delete", "meeting-prep"),
     await call("skills-clear-cloud-id", "meeting-prep"),
   ]) {

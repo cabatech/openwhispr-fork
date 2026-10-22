@@ -3064,7 +3064,7 @@ export class SyncService {
           // Edited meanwhile, it is sent again next pass. Uninstalled meanwhile, the copy
           // that got through must go too, or the next pull would bring it back.
           const row = await window.electronAPI.getSkillForCloudMerge?.(server);
-          // A lookup that failed leaves the copy for a later pass to compare.
+          // A lookup that failed can't tell, so the copy is left as it is.
           if (isSkillLookupFailed(row)) continue;
           if (!row || row.deleted_at) {
             await SkillsService.delete(server.id).catch((deleteErr) =>
