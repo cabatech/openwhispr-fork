@@ -247,6 +247,8 @@ export async function undoSkillApproval(key: string): Promise<void> {
   const entry = entryFor(key);
   if (!entry || entry.state !== "saved" || !entry.versionId || undoing.has(key)) return;
   undoing.add(key);
+  // Cleared while it runs, so a failure that repeats is shown and announced again.
+  patchEntry(key, { undoFailed: false });
   try {
     const result = await window.electronAPI
       ?.skillsUndo?.(entry.name, entry.versionId)

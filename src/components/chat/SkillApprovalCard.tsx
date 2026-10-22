@@ -29,7 +29,7 @@ import { formatShortDate, normalizeDbDate } from "../../utils/dateFormatting";
 
 const FIELD_CLASS = "w-full rounded-md border border-border/70 bg-background px-2 py-1";
 const INLINE_LINK_CLASS = "h-auto px-1.5 py-0";
-const EDITOR_CLASS = "min-h-24 font-mono text-[11px] leading-relaxed";
+const EDITOR_CLASS = "h-56 font-mono text-[11px] leading-relaxed";
 const PREVIEW_CLASS =
   "mt-1.5 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-border/70 bg-background px-2.5 py-2 font-mono text-[11px] leading-relaxed text-foreground/85";
 
@@ -262,6 +262,7 @@ function UpdateSkillBody({
               aria-label="SKILL.md"
               className={cn(FIELD_CLASS, EDITOR_CLASS)}
               dir="auto"
+              spellCheck={false}
               value={draft.instructions}
               onChange={(event) =>
                 updateSkillDraft(entry.key, { instructions: event.target.value })
@@ -275,6 +276,7 @@ function UpdateSkillBody({
               aria-label={file.path}
               className={cn(FIELD_CLASS, EDITOR_CLASS)}
               dir="auto"
+              spellCheck={false}
               value={file.content}
               onChange={(event) => setFile(file.path, event.target.value)}
             />

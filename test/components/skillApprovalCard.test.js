@@ -449,5 +449,35 @@ test("the update card's editors wrap their lines", async (t) => {
   for (const field of ["SKILL.md", OBJECTIONS]) {
     assert.equal(fieldLabelled(field).tagName, "TEXTAREA", field);
     assert.notEqual(fieldLabelled(field).getAttribute("wrap"), "off", field);
+    // Instructions and code, not prose to correct. React writes the attribute as spellCheck,
+    // which a real DOM folds to lowercase.
+    assert.equal(fieldLabelled(field).getAttribute("spellCheck"), "false", field);
   }
+});
+
+// Cleared while the next one runs, so a second failure is shown and announced afresh.
+test("an Undo tried again after it failed clears the failure while it runs", async (t) => {
+  let finish;
+  const answers = [
+    { ok: false, error: "noSpace" },
+    new Promise((resolve) => {
+      finish = () => resolve({ ok: false, error: "noSpace" });
+    }),
+  ];
+  const { container, buttonLabelled } = await mountCard(t, {
+    request: UPDATE,
+    undoResult: () => answers.shift(),
+  });
+  await click(buttonLabelled("skills.approval.update"));
+  await settle();
+  await click(buttonLabelled("skills.approval.undo"));
+  await settle();
+  assert.match(container.textContent, /skills\.approval\.undoFailed/);
+
+  await click(buttonLabelled("skills.approval.undo"));
+  assert.doesNotMatch(container.textContent, /skills\.approval\.undoFailed/);
+  finish();
+  await settle();
+
+  assert.match(container.textContent, /skills\.approval\.undoFailed/);
 });
