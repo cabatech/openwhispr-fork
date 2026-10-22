@@ -58,12 +58,23 @@ function buildZip(entries) {
 
 const endRecordAt = (zip) => zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
 
-/** Makes the end record claim `count` entries through a zip64 record, as a forged file could. */
-function withClaimedEntries(zip, count) {
+// Each end-record field that, at its largest value, sends a reader to the zip64 record.
+const ZIP64_MARKERS = {
+  entries: (end) => {
+    end.writeUInt16LE(0xffff, 8);
+    end.writeUInt16LE(0xffff, 10);
+  },
+  offset: (end) => end.writeUInt32LE(0xffffffff, 16),
+  disk: (end) => end.writeUInt16LE(0xffff, 4),
+};
+
+/**
+ * Makes the end record claim `count` entries through a zip64 record, as a forged file could.
+ * `marker` names the end-record field that sends the reader there.
+ */
+function withClaimedEntries(zip, count, marker = "entries") {
   const at = endRecordAt(zip);
   const end = Buffer.from(zip.subarray(at));
-  end.writeUInt16LE(0xffff, 8);
-  end.writeUInt16LE(0xffff, 10);
   const record = Buffer.alloc(56);
   record.writeUInt32LE(0x06064b50, 0);
   record.writeBigUInt64LE(44n, 4);
@@ -71,6 +82,7 @@ function withClaimedEntries(zip, count) {
   record.writeBigUInt64LE(BigInt(count), 32);
   record.writeBigUInt64LE(BigInt(end.readUInt32LE(12)), 40);
   record.writeBigUInt64LE(BigInt(end.readUInt32LE(16)), 48);
+  ZIP64_MARKERS[marker](end);
   const locator = Buffer.alloc(20);
   locator.writeUInt32LE(0x07064b50, 0);
   locator.writeBigUInt64LE(BigInt(at), 8);
