@@ -236,6 +236,28 @@ test("a file still being read when the draft is discarded doesn't bring it back"
   assert.equal(store.useSkillsStore.getState().createDraft, null);
 });
 
+const slowFile = (name) => {
+  const file = { name, size: 3 };
+  file.arrayBuffer = () =>
+    new Promise((resolve) => {
+      file.finishRead = () => resolve(new Uint8Array([1]).buffer);
+    });
+  return file;
+};
+
+test("a file still being read when an empty draft is left doesn't come back", async (t) => {
+  const { container, store, unmount } = await renderCreate(t);
+  const slow = slowFile("late.md");
+  await pick(container, [slow]);
+  await click(button(container, "common.cancel"));
+  await unmount();
+
+  await React.act(async () => slow.finishRead());
+  await settle();
+
+  assert.equal(store.useSkillsStore.getState().createDraft?.files.length ?? 0, 0);
+});
+
 test("an Esc that ends text composition keeps editing", async (t) => {
   const { container, calls } = await renderCreate(t);
   await fill(container, { name: "Half done" });

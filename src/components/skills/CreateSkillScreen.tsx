@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type KeyboardEvent, type ReactElement } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, FileText, Plus, X } from "../icons";
 import { Button } from "../ui/button";
@@ -24,6 +24,14 @@ const FIELDS: readonly Field[] = ["name", "description", "instructions"];
 const EMPTY_DRAFT: SkillCreateDraft = { title: "", description: "", instructions: "", files: [] };
 
 const currentDraft = () => useSkillsStore.getState().createDraft ?? EMPTY_DRAFT;
+
+const hasContent = (draft: SkillCreateDraft) =>
+  Boolean(
+    draft.title.trim() ||
+    draft.description.trim() ||
+    draft.instructions.trim() ||
+    draft.files.length
+  );
 // As a case-insensitive disk sees a name: two such files would land on one path.
 const fileKey = (fileName: string) => fileName.normalize("NFC").toLowerCase();
 
@@ -64,12 +72,16 @@ export function CreateSkillScreen({ onCreated, onBack }: CreateSkillScreenProps)
   const filled = Boolean(
     draft.title.trim() && draft.description.trim() && draft.instructions.trim()
   );
-  const dirty = Boolean(
-    draft.title.trim() ||
-    draft.description.trim() ||
-    draft.instructions.trim() ||
-    draft.files.length
-  );
+  const dirty = hasContent(draft);
+
+  // Leaving an empty draft, by any way out, drops a file still being read for it, so the file
+  // doesn't turn up in the next one.
+  useEffect(() => {
+    const cleared = draftsCleared;
+    return () => {
+      if (!hasContent(currentDraft())) cleared.current += 1;
+    };
+  }, []);
 
   const update = (field: Field, patch: Partial<SkillCreateDraft>) => {
     setCreateDraft({ ...currentDraft(), ...patch });
