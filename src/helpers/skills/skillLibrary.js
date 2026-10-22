@@ -109,6 +109,10 @@ function toSummary(inspected, state) {
   };
 }
 
+function refusedUpload(fileName, problems) {
+  return { fileName, status: "invalid", problems, warnings: [] };
+}
+
 function sizeProblem(files) {
   if (files.length > SKILL_LIMITS.maxFiles) return { code: "tooManyFiles" };
   const bytes = files.reduce((total, file) => total + file.data.length, 0);
@@ -243,7 +247,17 @@ class SkillLibrary {
     const batchNames = new Set();
     const previews = [];
     for (const item of items) {
-      previews.push(await this._previewUpload(item, batchNames));
+      try {
+        previews.push(await this._previewUpload(item, batchNames));
+      } catch (error) {
+        // Refused alone, so one file the reader can't handle doesn't hide the rest of the drop.
+        debugLogger.warn(
+          "Could not preview an upload",
+          { fileName: item.fileName, error: error.message },
+          "skills"
+        );
+        previews.push(refusedUpload(item.fileName, [{ code: "unreadableArchive" }]));
+      }
     }
     return previews;
   }
@@ -370,7 +384,7 @@ class SkillLibrary {
   }
 
   async _previewUpload({ fileName, data }, batchNames) {
-    const refuse = (problems) => ({ fileName, status: "invalid", problems, warnings: [] });
+    const refuse = (problems) => refusedUpload(fileName, problems);
     if (data.length > SKILL_LIMITS.maxBytes) return refuse([{ code: "tooLarge" }]);
     const extension = path.extname(fileName).toLowerCase();
     let files;

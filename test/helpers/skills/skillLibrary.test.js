@@ -362,6 +362,34 @@ test(
   }
 );
 
+test("a file whose preview throws is refused alone, and the rest still preview", async (t) => {
+  const { library } = setup(t);
+  const previewOne = library._previewUpload.bind(library);
+  t.mock.method(library, "_previewUpload", (item, batchNames) => {
+    if (item.fileName === "broken.zip") throw new RangeError("out of range");
+    return previewOne(item, batchNames);
+  });
+
+  const previews = await library.previewUploads([
+    markdownUpload("first.md", skillText("first")),
+    { fileName: "broken.zip", data: Buffer.from("PK") },
+    markdownUpload("last.md", skillText("last")),
+  ]);
+
+  assert.deepEqual(
+    previews.map((preview) => [
+      preview.fileName,
+      preview.status,
+      preview.problems.map((problem) => problem.code),
+    ]),
+    [
+      ["first.md", "ready", []],
+      ["broken.zip", "invalid", ["unreadableArchive"]],
+      ["last.md", "ready", []],
+    ]
+  );
+});
+
 test("a failed write leaves the old skill and no staging folder", async (t) => {
   const { library, skillsDir } = setup(t);
   await upload(library, [markdownUpload("a.md", skillText("keep", "Old."))]);

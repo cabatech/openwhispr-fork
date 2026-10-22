@@ -65,7 +65,11 @@ export function UploadSkillsScreen({ onDone, onBack }: UploadSkillsScreenProps):
     const items = read.flatMap((entry) =>
       "data" in entry ? [{ fileName: entry.file.name, data: entry.data }] : []
     );
-    const result = items.length > 0 ? await window.electronAPI?.skillsPreviewUpload?.(items) : null;
+    // A preview that fails leaves every file shown as one that can't be opened.
+    const result =
+      items.length > 0
+        ? await window.electronAPI?.skillsPreviewUpload?.(items)?.catch(() => null)
+        : null;
     const previews = result && "items" in result ? result.items : [];
     for (const preview of previews) if (preview.token) issued.current.add(preview.token);
     let next = 0;

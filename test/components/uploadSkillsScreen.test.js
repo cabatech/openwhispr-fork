@@ -46,7 +46,10 @@ const invalid = (fileName, code) => ({
 });
 
 // previewQueue answers each preview call in turn, for screens that take several drops.
-async function renderUpload(t, { previews = [], previewQueue = null, commit = null } = {}) {
+async function renderUpload(
+  t,
+  { previews = [], previewQueue = null, commit = null, previewFails = false } = {}
+) {
   const calls = { previewed: [], committed: [], discarded: [], done: [], back: 0 };
   const mounted = await mountSkillsComponent(t, {
     modulePath: "/components/skills/UploadSkillsScreen.tsx",
@@ -55,6 +58,7 @@ async function renderUpload(t, { previews = [], previewQueue = null, commit = nu
     api: {
       skillsPreviewUpload: async (items) => {
         calls.previewed.push(items);
+        if (previewFails) throw new Error("Error invoking remote method 'skills-preview-upload'");
         return { items: previewQueue ? previewQueue.shift() : previews.slice(0, items.length) };
       },
       skillsCommitUpload: async (request) => {
@@ -140,6 +144,16 @@ test("a folder or an unreadable file gets its own row, and the rest still previe
     calls.previewed.map((items) => items.map((item) => item.fileName)),
     [["a.md"]]
   );
+});
+
+test("a failed preview still lists every dropped file as one that can't be opened", async (t) => {
+  const { container, drop } = await renderUpload(t, { previewFails: true });
+
+  await drop(fakeFile("first.md"), fakeFile("second.zip"));
+
+  const [first, second] = rows(container);
+  assert.match(label(first), /^first\.md\s*skills\.problems\.unreadableArchive$/);
+  assert.match(label(second), /^second\.zip\s*skills\.problems\.unreadableArchive$/);
 });
 
 test("leaving the screen frees the uploads it previewed", async (t) => {
