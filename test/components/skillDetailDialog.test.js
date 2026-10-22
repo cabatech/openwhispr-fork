@@ -367,6 +367,31 @@ test("a pop-up opened while the page had focus hands focus to the fallback when 
   assert.equal(fallbacks, 1);
 });
 
+test("a reread that fails stops showing the earlier read", async (t) => {
+  let fails = false;
+  const summary = skill("meeting-prep");
+  const { container, store } = await openDetail(t, {
+    summary,
+    api: {
+      skillsGet: async (name) => {
+        if (fails) throw new Error("Error invoking remote method 'skills-get'");
+        return { ...summary, name, markdown: MARKDOWN, files: FILES };
+      },
+    },
+  });
+  const markdown = () =>
+    findElement(container, (node) => node.getAttribute("data-markdown") !== null);
+  assert.ok(markdown());
+
+  fails = true;
+  await React.act(async () =>
+    store.useSkillsStore.setState({ skills: [{ ...summary, updatedAt: "2026-10-22T10:00:00Z" }] })
+  );
+  await settle();
+
+  assert.equal(markdown(), null);
+});
+
 test("the reveal label follows the platform", async (t) => {
   installBrowserGlobals(t);
   const vite = await createRendererServer(t, { cachePrefix: "openwhispr-platform-label-test-" });

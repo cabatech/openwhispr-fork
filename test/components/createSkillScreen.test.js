@@ -258,6 +258,20 @@ test("a file still being read when an empty draft is left doesn't come back", as
   assert.equal(store.useSkillsStore.getState().createDraft?.files.length ?? 0, 0);
 });
 
+test("a file still being read when the skill is created doesn't join the next draft", async (t) => {
+  const { container, store } = await renderCreate(t);
+  await fill(container, { name: "Weekly", description: "Recaps.", instructions: "Go" });
+  const slow = slowFile("late.md");
+  await pick(container, [slow]);
+  await click(createButton(container));
+  await settle();
+
+  await React.act(async () => slow.finishRead());
+  await settle();
+
+  assert.equal(store.useSkillsStore.getState().createDraft, null);
+});
+
 test("an Esc that ends text composition keeps editing", async (t) => {
   const { container, calls } = await renderCreate(t);
   await fill(container, { name: "Half done" });
