@@ -256,7 +256,9 @@ class SkillLibrary {
       return;
     }
     for (const name of versioned) {
-      if (isSkillFolderName(name) && !this._exists(name)) {
+      // A skill this start couldn't put back keeps them for the start that does.
+      const waiting = entries.some((entry) => MOVED_ASIDE.exec(entry)?.[1] === name);
+      if (isSkillFolderName(name) && !this._exists(name) && !waiting) {
         this._removeQuietly(path.join(this.versionsDir, name));
       }
     }

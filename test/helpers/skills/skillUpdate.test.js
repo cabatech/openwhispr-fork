@@ -232,6 +232,31 @@ test("an uninstall cut short leaves none of the skill's versions once the librar
   assert.equal(fs.existsSync(versionsDir), false);
 });
 
+// A start that can't put a replaced skill back keeps its versions for the start that does.
+test("a skill waiting to be put back keeps its versions until it is back", (t) => {
+  const { library, database, userDataDir, skillsDir, versionsDir } = playbook(t);
+  const { versionId } = library.applyUpdate(SSO);
+  // The app stopped in the middle of a replace, with the skill moved aside.
+  fs.renameSync(
+    path.join(skillsDir, NAME),
+    path.join(skillsDir, `.replaced-00000000-0000-4000-8000-000000000000-${NAME}`)
+  );
+  t.mock.method(fs, "renameSync", () => {
+    throw Object.assign(new Error("busy"), { code: "EPERM" });
+  });
+  new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+  t.mock.restoreAll();
+  assert.equal(fs.existsSync(versionsDir), true);
+
+  const later = new SkillLibrary({ userDataDir, database, recommendedDir: RECOMMENDED_DIR });
+
+  assert.deepEqual(
+    later.scan().map((skill) => skill.name),
+    [NAME]
+  );
+  assert.equal(later.undo(NAME, versionId), true);
+});
+
 test("a failed update leaves the skill and its versions as they were", (t) => {
   const { library, skillsDir, versionsDir } = playbook(t);
   const { versionId } = library.applyUpdate(SSO);
