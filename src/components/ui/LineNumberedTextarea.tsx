@@ -33,7 +33,8 @@ export function LineNumberedTextarea({
 
   return (
     // The box has the height, so a long text overflows the gutter and the textarea alike and
-    // the gutter can follow the textarea's scroll.
+    // the gutter can follow the textarea's scroll. Lines don't wrap, so each number stays
+    // beside its line; the gutter's extra bottom room matches a sideways scrollbar's.
     <div
       className={cn(
         "flex h-56 overflow-hidden rounded-lg border border-border/70 bg-input transition-colors hover:border-border-hover focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 dark:border-border-subtle/60 dark:bg-surface-1 dark:focus-within:border-border-active dark:focus-within:ring-ring/10",
@@ -44,7 +45,7 @@ export function LineNumberedTextarea({
       <div
         ref={gutter}
         aria-hidden="true"
-        className="select-none overflow-hidden border-e border-border/60 dark:border-white/8 bg-foreground/3 dark:bg-white/3 py-2 ps-3 pe-2 text-end font-mono text-[11px] leading-5 text-muted-foreground/50 tabular-nums"
+        className="select-none overflow-hidden border-e border-border/60 dark:border-white/8 bg-foreground/3 dark:bg-white/3 pt-2 pb-3.5 ps-3 pe-2 text-end font-mono text-[11px] leading-5 text-muted-foreground/50 tabular-nums"
       >
         {Array.from({ length: lineCount }, (_, index) => (
           <div key={index}>{index + 1}</div>
@@ -60,12 +61,13 @@ export function LineNumberedTextarea({
         }}
         placeholder={placeholder}
         rows={minLines}
+        wrap="off"
         dir="auto"
         spellCheck={false}
         aria-label={ariaLabel}
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
-        className="input-inline block h-full min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground/50 caret-primary"
+        className="input-inline block h-full min-w-0 flex-1 resize-none overflow-auto bg-transparent px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground/50 caret-primary"
       />
     </div>
   );
