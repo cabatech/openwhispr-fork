@@ -817,8 +817,8 @@ test("create names the folder from the title and keeps it unique", (t) => {
   assert.equal(fs.readFileSync(path.join(created, "scripts", "export.sh"), "utf8"), "echo hi");
 });
 
-// Two skills never show the same title, so their cards can be told apart.
-test("create refuses a title one of your skills already shows", (t) => {
+// Create and Add refuse a title another skill already shows, so their cards can be told apart.
+test("create refuses a title one of your skills already shows, naming that skill", (t) => {
   const { library, skillsDir } = setup(t);
   const make = (title) =>
     library.create({ title, description: "Recaps.", instructions: "Go", files: [] });
@@ -826,7 +826,7 @@ test("create refuses a title one of your skills already shows", (t) => {
 
   for (const title of ["Weekly report", "  weekly   REPORT "]) {
     assert.deepEqual(make(title), {
-      problems: [{ code: "nameTaken", values: { name: title.trim() } }],
+      problems: [{ code: "nameTaken", values: { name: "Weekly report" } }],
     });
   }
   assert.deepEqual(listDir(skillsDir), ["weekly-report"]);

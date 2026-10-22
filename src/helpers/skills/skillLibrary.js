@@ -138,9 +138,10 @@ function refusedUpload(fileName, problems) {
   return { fileName, status: "invalid", problems, warnings: [] };
 }
 
-// Two skills never show the same title, so their cards can be told apart.
-function titleTaken(title) {
-  return { code: "nameTaken", values: { name: title } };
+// Create and Add refuse a title another skill already shows, so their cards can be told
+// apart. The message names that skill as its card shows it.
+function titleTaken(skill) {
+  return { code: "nameTaken", values: { name: skill.displayName } };
 }
 
 function sizeProblem(files) {
@@ -386,7 +387,8 @@ class SkillLibrary {
   create({ title, description, instructions, files }) {
     const cleanTitle = title.trim();
     if (!cleanTitle) return { problems: [{ code: "missingName" }] };
-    if (this._skillTitled(cleanTitle)) return { problems: [titleTaken(cleanTitle)] };
+    const twin = this._skillTitled(cleanTitle);
+    if (twin) return { problems: [titleTaken(twin)] };
     const unsafe = files.find(
       (file) => file.fileName.includes("/") || !isSafeArchivePath(file.fileName)
     );
@@ -429,7 +431,8 @@ class SkillLibrary {
       return null;
     }
     if (this._exists(id)) return { name: id };
-    if (this._skillTitled(title)) return { problems: [titleTaken(title.trim())] };
+    const twin = this._skillTitled(title);
+    if (twin) return { problems: [titleTaken(twin)] };
     const markdown = buildSkillMarkdown({
       name: id,
       title,
@@ -573,9 +576,10 @@ class SkillLibrary {
     }
   }
 
+  // The skill already showing this title, ignoring case, spacing and how accents are encoded.
   _skillTitled(title) {
     const key = (text) => text.trim().replace(/\s+/g, " ").normalize("NFC").toLowerCase();
-    return this.scan().find((skill) => key(skill.displayName) === key(title))?.name ?? null;
+    return this.scan().find((skill) => key(skill.displayName) === key(title));
   }
 
   _recommendedIds() {
