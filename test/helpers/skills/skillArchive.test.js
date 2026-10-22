@@ -179,7 +179,15 @@ test("macOS archive leftovers are ignored", async () => {
 });
 
 test("a name this computer can't save is refused", async () => {
-  for (const raw of ["references/con.md", "references/COM1", "lpt¹.txt", "a?.md", "trailing. "]) {
+  for (const raw of [
+    "references/con.md",
+    "references/COM1",
+    "references/CONIN$",
+    "conout$.md",
+    "lpt¹.txt",
+    "a?.md",
+    "trailing. ",
+  ]) {
     const result = await read([
       { path: "SKILL.md", data: SKILL },
       { path: raw, data: "x" },

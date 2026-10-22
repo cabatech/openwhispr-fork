@@ -1,6 +1,7 @@
 const zlib = require("zlib");
 const unzipper = require("unzipper");
-const { SKILL_LIMITS, WINDOWS_RESERVED_NAME } = require("./skillFormat");
+const { WINDOWS_RESERVED_NAME } = require("../windowsReservedName");
+const { SKILL_LIMITS } = require("./skillFormat");
 
 const SKILL_FILE_NAME = "skill.md";
 const END_RECORD = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
