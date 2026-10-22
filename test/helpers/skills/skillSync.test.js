@@ -312,3 +312,48 @@ test("uninstalling, or removing a folder by hand, leaves a tombstone for a synce
     ["by-app", "by-hand"]
   );
 });
+
+// Past the limits a skill can be read at, the library can't tell what is in it, so the
+// cloud's copy never replaces or deletes it.
+test("a skill over this computer's own limits is never replaced or removed from the cloud", (t) => {
+  const ctx = setup(t);
+  if (!ctx) return;
+  ctx.library.applyFromCloud(cloudSkill("recap", [utf8("SKILL.md", skillText("recap"))]));
+  const extra = Object.fromEntries(
+    Array.from({ length: 501 }, (_, index) => [`references/f${index}.md`, `Note ${index}.\n`])
+  );
+  writeFolder(ctx.skillsDir, "recap", { "SKILL.md": skillText("recap"), ...extra });
+  ctx.library.scan();
+  const warn = t.mock.method(debugLogger, "warn", () => {});
+
+  const edited = ctx.library.applyFromCloud(
+    cloudSkill("recap", [utf8("SKILL.md", skillText("recap", "Cloud.", "Cloud.\n"))], {
+      updated_at: "2026-10-22T09:00:00.000Z",
+    })
+  );
+  const deleted = ctx.library.applyFromCloud(
+    cloudSkill("recap", [], { deleted_at: "2026-10-22T10:00:00.000Z" })
+  );
+
+  assert.deepEqual([edited, deleted], [false, false]);
+  assert.equal(listDir(path.join(ctx.skillsDir, "recap", "references")).length, 501);
+  assert.equal(readSkill(ctx.skillsDir, "recap"), skillText("recap"));
+  assert.ok(warn.mock.calls.length >= 2);
+});
+
+// A replace cut short leaves the skill only as its moved-aside copy until the next start
+// puts it back; meanwhile it isn't gone, so no removal is sent to the other devices.
+test("a skill waiting to be put back after a replace keeps its state", (t) => {
+  const ctx = setup(t);
+  if (!ctx) return;
+  ctx.library.applyFromCloud(cloudSkill("recap", [utf8("SKILL.md", skillText("recap"))]));
+  fs.renameSync(
+    path.join(ctx.skillsDir, "recap"),
+    path.join(ctx.skillsDir, `.replaced-${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}-recap`)
+  );
+
+  ctx.library.scan();
+
+  assert.deepEqual(ctx.database.getPendingSkillDeletes(), []);
+  assert.equal(ctx.database.getSkillForCloudMerge({ name: "recap" }).deleted_at, null);
+});

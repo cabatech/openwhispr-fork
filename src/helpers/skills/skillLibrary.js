@@ -34,6 +34,8 @@ const SYNC_LIMITS = { maxFiles: 100, maxBytes: 1024 * 1024 };
 
 // Where a replace puts the old copy while the new one is swapped in, named for its skill.
 const MOVED_ASIDE = /^\.replaced-[0-9a-f-]{36}-(.+)$/;
+// What a skill folder too big to read is marked with.
+const OVER_LIMITS = ["tooLarge", "tooManyFiles"];
 
 // A name the library can address on disk: one path segment that isn't hidden. Wider than
 // SKILL_NAME_PATTERN, so a folder dropped in under any name can still be shown and removed.
@@ -310,7 +312,11 @@ class SkillLibrary {
   scan() {
     fs.mkdirSync(this.skillsDir, { recursive: true });
     const found = new Map();
+    // A skill a replace left moved aside isn't gone: the next start puts it back.
+    const waiting = new Set();
     for (const entry of fs.readdirSync(this.skillsDir, { withFileTypes: true })) {
+      const movedAside = MOVED_ASIDE.exec(entry.name)?.[1];
+      if (movedAside) waiting.add(movedAside);
       // Hidden names include the staging and trash folders of a write in progress. A name the
       // app can't address, such as a Windows device name, is left alone too: it couldn't be
       // opened, switched or removed from here.
@@ -333,7 +339,7 @@ class SkillLibrary {
       }
     }
     for (const name of states.keys()) {
-      if (!found.has(name)) this.database.deleteSkillState(name);
+      if (!found.has(name) && !waiting.has(name)) this.database.deleteSkillState(name);
     }
 
     return this.database
@@ -684,8 +690,15 @@ class SkillLibrary {
       return false;
     };
     if (!isSkillFolderName(name) || !SKILL_NAME_PATTERN.test(name)) return skip("name");
-    // One too large to back up stays as it is here; the cloud never had this copy of it.
-    if (this.skillDir(name) && this._inspect(name).tooLargeToSync) return skip("tooLargeToSync");
+    // One too large to back up stays as it is here; the cloud never had this copy of it. Nor
+    // does one past this computer's own limits, whose files can't even be read to compare.
+    if (this.skillDir(name)) {
+      const here = this._inspect(name);
+      if (here.tooLargeToSync) return skip("tooLargeToSync");
+      if (here.problems.some((problem) => OVER_LIMITS.includes(problem.code))) {
+        return skip("overLimits");
+      }
+    }
     if (entry.deleted_at) {
       this._removeSkill(name);
       this.database.upsertSkillStateFromCloud(entry, null);
