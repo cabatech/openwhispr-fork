@@ -42,8 +42,8 @@ export interface SkillSummary {
   /** False for a skill that needs fixing; it can't be switched on. */
   valid: boolean;
   problem?: SkillIssue<SkillProblemCode>;
-  addedAt: string;
-  updatedAt: string;
+  addedAt: string | null;
+  updatedAt: string | null;
   lastUsedAt: string | null;
 }
 

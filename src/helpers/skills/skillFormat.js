@@ -49,16 +49,14 @@ function normalizeLineEndings(text) {
 
 // Agent Skills header: "---" on the first line, closed by "---" (or "...") on its own line.
 function splitFrontmatter(text) {
-  if (!text.startsWith("---\n")) return { header: null, body: text, headerEnd: 0 };
+  if (!text.startsWith("---\n")) return { header: null, body: text };
   const close = /\n(?:---|\.\.\.)[ \t]*(?:\n|$)/g;
   close.lastIndex = 3;
   const match = close.exec(text);
-  if (!match) return { header: null, body: text, headerEnd: 0 };
-  const headerEnd = match.index + match[0].length;
+  if (!match) return { header: null, body: text };
   return {
     header: text.slice(4, match.index),
-    body: text.slice(headerEnd).replace(/^\n+/, ""),
-    headerEnd,
+    body: text.slice(match.index + match[0].length).replace(/^\n+/, ""),
   };
 }
 
@@ -245,9 +243,6 @@ function contentHash(files) {
 module.exports = {
   SKILL_LIMITS,
   SKILL_NAME_PATTERN,
-  ALLOWED_TOP_LEVEL_KEYS,
-  normalizeLineEndings,
-  splitFrontmatter,
   parseSkillMarkdown,
   validateSkillFiles,
   displayNameFor,
