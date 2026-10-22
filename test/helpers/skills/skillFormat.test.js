@@ -104,7 +104,7 @@ test("a SKILL.md that isn't UTF-8 text is refused", () => {
   const text = md("name: resume\ndescription: Résumé helper.");
   for (const data of [
     Buffer.from(text, "latin1"),
-    Buffer.from(`﻿${text}`, "utf16le"),
+    Buffer.from(`\uFEFF${text}`, "utf16le"),
     Buffer.concat([Buffer.from(text), Buffer.from([0])]),
   ]) {
     const r = validateSkillFiles([{ path: "SKILL.md", data }], { source: "upload" });
